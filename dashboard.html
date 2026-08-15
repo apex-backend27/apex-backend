@@ -1317,53 +1317,56 @@ function saveUserData() {
     // Guardar en sessionStorage para compatibilidad local
     sessionStorage.setItem('apex_user', JSON.stringify(user));
     
-    // Enviar actualización al backend
+    // Enviar al backend
     var token = localStorage.getItem('apex_token');
-    if (!token) return;
+    if (!token) {
+        console.warn('⚠️ No hay token, los cambios solo se guardaron localmente');
+        return;
+    }
     
-    // Preparar datos para enviar (excluir campos sensibles)
+    // Preparar datos para enviar
     var datosActualizar = {
-        balance: user.balance,
-        puntos: user.puntos,
-        plan: user.plan,
-        plan_amount: user.plan_amount,
-        daily_earnings: user.daily_earnings,
-        produccion_activa: user.produccion_activa,
-        produccion_inicio: user.produccion_inicio,
-        produccion_duracion: user.produccion_duracion,
-        tiempo_restante: user.tiempo_restante,
-        recompensa_pendiente: user.recompensa_pendiente,
-        puntosPendientes: user.puntosPendientes,
-        codigo_usado: user.codigo_usado,
-        reclamado_hoy: user.reclamado_hoy,
-        fecha_produccion: user.fecha_produccion,
-        codigos_usados_hoy: user.codigos_usados_hoy,
-        codigos_usados: user.codigos_usados,
-        ultimo_reinicio_codigos: user.ultimo_reinicio_codigos,
-        ruleta_usos: user.ruleta_usos,
-        cofres_usos: user.cofres_usos,
-        dados_usos: user.dados_usos,
-        premio_ruleta: user.premio_ruleta,
-        premio_cofre: user.premio_cofre,
-        premio_dados: user.premio_dados,
-        cofres_abiertos: user.cofres_abiertos,
-        cupones_asignados: user.cupones_asignados,
-        logros_asignados: user.logros_asignados,
-        logros_pendientes_aprobar: user.logros_pendientes_aprobar,
-        tareas_asignadas: user.tareas_asignadas,
-        canjes_realizados: user.canjes_realizados,
-        logros_reclamados: user.logros_reclamados,
-        referidos: user.referidos,
-        referidos_directos: user.referidos_directos,
-        fechas_invito: user.fechas_invito,
-        historial: user.historial,
-        historial_detallado: user.historial_detallado,
-        historial_codigos: user.historial_codigos,
-        descuentoRetiroActivo: user.descuentoRetiroActivo,
-        bonusReferidoActivo: user.bonusReferidoActivo,
-        direccion_retiro: user.direccion_retiro,
-        cuenta_habilitada: user.cuenta_habilitada,
-        produccion_pausada: user.produccion_pausada
+        balance: Number(user.balance || 0),
+        puntos: Number(user.puntos || 0),
+        plan: user.plan || 'Sin plan',
+        plan_amount: Number(user.plan_amount || 0),
+        daily_earnings: Number(user.daily_earnings || 0),
+        produccion_activa: user.produccion_activa || false,
+        produccion_inicio: user.produccion_inicio || null,
+        produccion_duracion: Number(user.produccion_duracion || 0),
+        tiempo_restante: Number(user.tiempo_restante || 0),
+        recompensa_pendiente: Number(user.recompensa_pendiente || 0),
+        puntosPendientes: Number(user.puntosPendientes || 0),
+        codigo_usado: user.codigo_usado || false,
+        reclamado_hoy: user.reclamado_hoy || false,
+        fecha_produccion: user.fecha_produccion || null,
+        codigos_usados_hoy: Number(user.codigos_usados_hoy || 0),
+        codigos_usados: user.codigos_usados || [],
+        ultimo_reinicio_codigos: user.ultimo_reinicio_codigos || null,
+        ruleta_usos: Number(user.ruleta_usos || 0),
+        cofres_usos: Number(user.cofres_usos || 0),
+        dados_usos: Number(user.dados_usos || 0),
+        premio_ruleta: Number(user.premio_ruleta || 0),
+        premio_cofre: Number(user.premio_cofre || 0),
+        premio_dados: Number(user.premio_dados || 0),
+        cofres_abiertos: user.cofres_abiertos || [],
+        cupones_asignados: user.cupones_asignados || [],
+        logros_asignados: user.logros_asignados || [],
+        logros_pendientes_aprobar: user.logros_pendientes_aprobar || [],
+        tareas_asignadas: user.tareas_asignadas || [],
+        canjes_realizados: user.canjes_realizados || [],
+        logros_reclamados: user.logros_reclamados || [],
+        referidos: user.referidos || { izquierda: null, derecha: null, lista: [] },
+        referidos_directos: user.referidos_directos || { izquierda: null, derecha: null },
+        fechas_invito: user.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
+        historial: user.historial || [],
+        historial_detallado: user.historial_detallado || [],
+        historial_codigos: user.historial_codigos || [],
+        descuentoRetiroActivo: user.descuentoRetiroActivo || null,
+        bonusReferidoActivo: user.bonusReferidoActivo || null,
+        direccion_retiro: user.direccion_retiro || null,
+        cuenta_habilitada: user.cuenta_habilitada !== false,
+        produccion_pausada: user.produccion_pausada || false
     };
     
     fetch(API_URL + '/api/user/update', {
@@ -1374,8 +1377,16 @@ function saveUserData() {
         },
         body: JSON.stringify(datosActualizar)
     })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('❌ Error al guardar en backend:', data.error);
+        } else {
+            console.log('✅ Datos guardados en backend');
+        }
+    })
     .catch(error => {
-        console.error('Error al guardar datos en backend:', error);
+        console.error('❌ Error de red:', error);
     });
 }
 
@@ -2217,6 +2228,7 @@ function buyPlan(planName) {
         user.plan_amount = plan.amount;
         user.daily_earnings = plan.daily;
         user.fecha_plan = new Date().toISOString();
+ saveUserData();
 
         // ============================================================
 // OTORGAR COMISIÓN AL REFERIDOR (SOLO SI TIENE LOGRO ASIGNADO)

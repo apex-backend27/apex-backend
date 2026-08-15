@@ -2219,8 +2219,94 @@ function getUsers() {
 }
 
 function saveUsers(users) {
+    // Guardar en localStorage para compatibilidad local
     localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
     usuariosCache = users;
+    
+    // Enviar al backend
+    var token = localStorage.getItem('apex_token');
+    if (!token) {
+        console.warn('⚠️ No hay token, los cambios solo se guardaron localmente');
+        return;
+    }
+    
+    // Actualizar SOLO los usuarios que cambiaron
+    for (var i = 0; i < users.length; i++) {
+        var u = users[i];
+        if (u.telefono === 'admin' || u.telefono === '999999999') continue;
+        
+        // Si no tiene ID, no se puede sincronizar
+        if (!u.id) {
+            console.warn('⚠️ Usuario sin ID:', u.telefono);
+            continue;
+        }
+        
+        var datosActualizar = {
+            balance: Number(u.balance || 0),
+            puntos: Number(u.puntos || 0),
+            plan: u.plan || 'Sin plan',
+            plan_amount: Number(u.plan_amount || 0),
+            daily_earnings: Number(u.daily_earnings || 0),
+            ruleta_usos: Number(u.ruleta_usos || 0),
+            cofres_usos: Number(u.cofres_usos || 0),
+            dados_usos: Number(u.dados_usos || 0),
+            premio_ruleta: Number(u.premio_ruleta || 0),
+            premio_cofre: Number(u.premio_cofre || 0),
+            premio_dados: Number(u.premio_dados || 0),
+            cupones_asignados: u.cupones_asignados || [],
+            logros_asignados: u.logros_asignados || [],
+            tareas_asignadas: u.tareas_asignadas || [],
+            canjes_realizados: u.canjes_realizados || [],
+            logros_reclamados: u.logros_reclamados || [],
+            historial_detallado: u.historial_detallado || [],
+            direccion_retiro: u.direccion_retiro || null,
+            cuenta_habilitada: u.cuenta_habilitada !== false,
+            produccion_pausada: u.produccion_pausada || false,
+            nivel_autorizado: Number(u.nivel_autorizado || 0),
+            produccion_activa: u.produccion_activa || false,
+            produccion_inicio: u.produccion_inicio || null,
+            produccion_duracion: Number(u.produccion_duracion || 0),
+            tiempo_restante: Number(u.tiempo_restante || 0),
+            recompensa_pendiente: Number(u.recompensa_pendiente || 0),
+            puntosPendientes: Number(u.puntosPendientes || 0),
+            codigo_usado: u.codigo_usado || false,
+            reclamado_hoy: u.reclamado_hoy || false,
+            fecha_produccion: u.fecha_produccion || null,
+            codigos_usados_hoy: Number(u.codigos_usados_hoy || 0),
+            codigos_usados: u.codigos_usados || [],
+            ultimo_reinicio_codigos: u.ultimo_reinicio_codigos || null,
+            cofres_abiertos: u.cofres_abiertos || [],
+            logros_pendientes_aprobar: u.logros_pendientes_aprobar || [],
+            referidos: u.referidos || { izquierda: null, derecha: null, lista: [] },
+            referidos_directos: u.referidos_directos || { izquierda: null, derecha: null },
+            fechas_invito: u.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
+            historial: u.historial || [],
+            historial_codigos: u.historial_codigos || [],
+            descuentoRetiroActivo: u.descuentoRetiroActivo || null,
+            bonusReferidoActivo: u.bonusReferidoActivo || null
+        };
+        
+        // Enviar al backend
+        fetch(API_URL + '/api/admin/user/' + u.id, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify(datosActualizar)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('❌ Error al sincronizar usuario ' + u.telefono + ':', data.error);
+            } else {
+                console.log('✅ Usuario sincronizado:', u.telefono);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error de red al sincronizar:', error);
+        });
+    }
 }
 
 function getCodigos() {
