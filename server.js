@@ -454,6 +454,51 @@ app.put('/api/admin/user/:id', async (req, res) => {
     }
 });
 
+
+// ============================================================
+// ELIMINAR USUARIO (ADMIN)
+// ============================================================
+app.delete('/api/admin/user/:id', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ error: 'Token no proporcionado' });
+        }
+        
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminCheck = await pool.query(
+            'SELECT es_admin FROM users WHERE id = $1',
+            [decoded.userId]
+        );
+        
+        if (!adminCheck.rows[0]?.es_admin) {
+            return res.status(403).json({ error: 'Acceso denegado' });
+        }
+        
+        const userId = req.params.id;
+        
+        // Verificar que no estemos eliminando al propio admin
+        if (parseInt(userId) === decoded.userId) {
+            return res.status(400).json({ error: 'No puedes eliminarte a ti mismo' });
+        }
+        
+        const result = await pool.query(
+            'DELETE FROM users WHERE id = $1 RETURNING *',
+            [userId]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        
+        res.json({ message: 'Usuario eliminado', user: result.rows[0] });
+        
+    } catch (error) {
+        console.error('Error al eliminar usuario:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
 // ============================================================
 // INICIAR SERVIDOR
 // ============================================================

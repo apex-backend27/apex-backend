@@ -3047,15 +3047,57 @@ function toggleCuenta(telefono) {
 
 function eliminarUsuario(telefono) {
     if (!confirm('⚠️ ¿Eliminar este usuario?')) return;
+    
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
+    if (!user) {
+        showAlert('⚠️ Usuario no encontrado', 'danger');
+        return;
+    }
+    
     if (!confirm('¿Eliminar a ' + user.nombre + ' ' + user.apellido + '?')) return;
+    if (!confirm('⚠️ Esta acción NO se puede deshacer. ¿Estás seguro?')) return;
+
+    // Obtener el ID del usuario (necesario para eliminar en el backend)
+    var userId = user.id;
+    var token = localStorage.getItem('apex_token');
+
+    // Eliminar del localStorage (actual)
     users = users.filter(function(u) { return u.telefono !== telefono; });
     saveUsers(users);
-    showAlert('✅ Usuario eliminado', 'success');
-    renderUsuarios();
-    renderUsuariosActivos();
+
+    // ✅ Eliminar del backend (NeonTech) - SOLO si tiene ID
+    if (userId && token) {
+        fetch(API_URL + '/api/admin/user/' + userId, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert('⚠️ Usuario eliminado localmente, pero hubo un error en el backend: ' + data.error, 'warning');
+            } else {
+                showAlert('✅ Usuario eliminado permanentemente', 'success');
+            }
+            renderUsuarios();
+            renderUsuariosActivos();
+            actualizarStats();
+        })
+        .catch(error => {
+            showAlert('⚠️ Usuario eliminado localmente, pero error al sincronizar con el backend', 'warning');
+            renderUsuarios();
+            renderUsuariosActivos();
+            actualizarStats();
+        });
+    } else {
+        showAlert('✅ Usuario eliminado localmente (sin ID en el backend)', 'success');
+        renderUsuarios();
+        renderUsuariosActivos();
+        actualizarStats();
+    }
 }
 
 // ============================================================
@@ -3065,17 +3107,31 @@ function renderUsuariosActivos() {
     var users = getUsers();
     var niveles = getNiveles();
     var activos = [];
+    
     for (var i = 0; i < users.length; i++) {
-        if (users[i].plan && users[i].plan !== 'Sin plan' && users[i].telefono !== 'admin') {
-            activos.push({ user: users[i], index: i + 1 });
+        var u = users[i];
+        // ✅ CORRECCIÓN: Solo mostrar si el plan es válido y no es "Sin plan"
+        // También verificamos que no sea undefined, null, o un número
+        var planValido = u.plan && 
+                         u.plan !== 'Sin plan' && 
+                         u.plan !== 'null' && 
+                         u.plan !== 'undefined' &&
+                         typeof u.plan === 'string' &&
+                         u.telefono !== 'admin';
+        
+        if (planValido) {
+            activos.push({ user: u, index: i + 1 });
         }
     }
+    
     var tbody = document.getElementById('usuariosActivosTable');
     if (!tbody) return;
+    
     if (activos.length === 0) {
         tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#999;padding:20px;">No hay usuarios con plan activo</td></tr>';
         return;
     }
+    
     var html = '';
     for (var a = 0; a < activos.length; a++) {
         var u = activos[a].user;
