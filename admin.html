@@ -1143,8 +1143,6 @@
             <span class="codigo-texto" id="codigoDisplay"></span>
             <button class="copy-individual" onclick="copiarCodigo(document.getElementById('codigoDisplay').textContent)">📋</button>
         </div>
-<button class="btn btn-warning" onclick="sincronizarTodosLosUsuarios()" style="background:#f7971e;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600;">🔄 Sincronizar Todos</button>
-</div>
     </div>
 
     <div class="stats-grid" id="statsGrid">
@@ -1172,7 +1170,7 @@
                 <div class="table-wrapper">
                     <table>
                         <thead><tr><th>#</th><th>Nombre</th><th>Teléfono</th><th>Fecha Reg.</th><th>Saldo</th><th>Ver Historial</th><th>Depositado</th><th>Retirado</th><th>Puntos</th><th>Plan</th><th>Acciones</th></tr></thead>
-                        <tbody id="usersTableBody"><tr><td colspan="10" style="text-align:center;color:#999;padding:20px;">Cargando...</td></tr></tbody>
+                        <tbody id="usersTableBody"><tr><td colspan="11" style="text-align:center;color:#999;padding:20px;">Cargando...</td></tr></tbody>
                     </table>
                 </div>
             </div>
@@ -1674,7 +1672,9 @@
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
+const API_URL = 'https://apex-backend-cj21.onrender.com';
 var STORAGE_KEY = 'apex_users';
+var REMEMBER_KEY = 'apex_remember';
 var CODIGOS_KEY = 'apex_codigos_sistema';
 var PREMIOS_RULETA_KEY = 'apex_premios_ruleta';
 var PREMIOS_COFRES_KEY = 'apex_premios_cofres';
@@ -1686,11 +1686,6 @@ var PAGOS_KEY = 'apex_pagos';
 var NIVELES_KEY = 'apex_niveles';
 var CUPONES_KEY = 'apex_cupones_sistema';
 var DEPOSITOS_KEY = 'apex_depositos';
-
-const API_URL = 'https://apex-backend-cj21.onrender.com';
-
-var usuariosCache = [];
-var usuariosCacheAnterior = [];
 
 var PLANES_ORDEN = ['Sin plan', 'Trader', 'Analista', 'Gestor', 'Master', 'Elite'];
 
@@ -2224,176 +2219,9 @@ function getUsers() {
 }
 
 function saveUsers(users) {
-    // Guardar en localStorage para compatibilidad local
     localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
     usuariosCache = users;
-    
-    // Enviar al backend
-    var token = localStorage.getItem('apex_token');
-    if (!token) {
-        console.warn('⚠️ No hay token, los cambios solo se guardaron localmente');
-        return;
-    }
-    
-    // Actualizar SOLO los usuarios que cambiaron
-    for (var i = 0; i < users.length; i++) {
-        var u = users[i];
-        if (u.telefono === 'admin') continue;
-        
-        // Obtener el usuario anterior para comparar
-        var usuarioAnterior = usuariosCacheAnterior ? usuariosCacheAnterior.find(function(ua) { return ua.telefono === u.telefono; }) : null;
-        
-        // Si no hay cambios, saltar
-        if (usuarioAnterior) {
-            var cambios = false;
-            if (Number(usuarioAnterior.balance || 0) !== Number(u.balance || 0)) cambios = true;
-            if (Number(usuarioAnterior.puntos || 0) !== Number(u.puntos || 0)) cambios = true;
-            if (usuarioAnterior.plan !== u.plan) cambios = true;
-            if (usuarioAnterior.produccion_pausada !== u.produccion_pausada) cambios = true;
-            if (usuarioAnterior.cuenta_habilitada !== u.cuenta_habilitada) cambios = true;
-            if (Number(usuarioAnterior.ruleta_usos || 0) !== Number(u.ruleta_usos || 0)) cambios = true;
-            if (Number(usuarioAnterior.cofres_usos || 0) !== Number(u.cofres_usos || 0)) cambios = true;
-            if (Number(usuarioAnterior.dados_usos || 0) !== Number(u.dados_usos || 0)) cambios = true;
-            if (Number(usuarioAnterior.premio_ruleta || 0) !== Number(u.premio_ruleta || 0)) cambios = true;
-            if (Number(usuarioAnterior.premio_cofre || 0) !== Number(u.premio_cofre || 0)) cambios = true;
-            if (Number(usuarioAnterior.premio_dados || 0) !== Number(u.premio_dados || 0)) cambios = true;
-            if (usuarioAnterior.tareas_asignadas && u.tareas_asignadas) {
-                if (usuarioAnterior.tareas_asignadas.length !== u.tareas_asignadas.length) cambios = true;
-            }
-            if (usuarioAnterior.logros_asignados && u.logros_asignados) {
-                if (usuarioAnterior.logros_asignados.length !== u.logros_asignados.length) cambios = true;
-            }
-            if (usuarioAnterior.cupones_asignados && u.cupones_asignados) {
-                if (usuarioAnterior.cupones_asignados.length !== u.cupones_asignados.length) cambios = true;
-            }
-            if (usuarioAnterior.direccion_retiro !== u.direccion_retiro) cambios = true;
-            
-            if (!cambios) continue;
-        }
-        
-        // Preparar datos para actualizar
-        var datosActualizar = {
-            balance: Number(u.balance || 0),
-            puntos: Number(u.puntos || 0),
-            plan: u.plan || 'Sin plan',
-            plan_amount: Number(u.plan_amount || 0),
-            daily_earnings: Number(u.daily_earnings || 0),
-            produccion_activa: u.produccion_activa || false,
-            produccion_inicio: u.produccion_inicio || null,
-            produccion_duracion: Number(u.produccion_duracion || 0),
-            tiempo_restante: Number(u.tiempo_restante || 0),
-            recompensa_pendiente: Number(u.recompensa_pendiente || 0),
-            puntosPendientes: Number(u.puntosPendientes || 0),
-            codigo_usado: u.codigo_usado || false,
-            reclamado_hoy: u.reclamado_hoy || false,
-            fecha_produccion: u.fecha_produccion || null,
-            codigos_usados_hoy: Number(u.codigos_usados_hoy || 0),
-            codigos_usados: u.codigos_usados || [],
-            ultimo_reinicio_codigos: u.ultimo_reinicio_codigos || null,
-            ruleta_usos: Number(u.ruleta_usos || 0),
-            cofres_usos: Number(u.cofres_usos || 0),
-            dados_usos: Number(u.dados_usos || 0),
-            premio_ruleta: Number(u.premio_ruleta || 0),
-            premio_cofre: Number(u.premio_cofre || 0),
-            premio_dados: Number(u.premio_dados || 0),
-            cofres_abiertos: u.cofres_abiertos || [],
-            cupones_asignados: u.cupones_asignados || [],
-            logros_asignados: u.logros_asignados || [],
-            logros_pendientes_aprobar: u.logros_pendientes_aprobar || [],
-            tareas_asignadas: u.tareas_asignadas || [],
-            canjes_realizados: u.canjes_realizados || [],
-            logros_reclamados: u.logros_reclamados || [],
-            referidos: u.referidos || { izquierda: null, derecha: null, lista: [] },
-            referidos_directos: u.referidos_directos || { izquierda: null, derecha: null },
-            fechas_invito: u.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
-            historial: u.historial || [],
-            historial_detallado: u.historial_detallado || [],
-            historial_codigos: u.historial_codigos || [],
-            descuentoRetiroActivo: u.descuentoRetiroActivo || null,
-            bonusReferidoActivo: u.bonusReferidoActivo || null,
-            direccion_retiro: u.direccion_retiro || null,
-            cuenta_habilitada: u.cuenta_habilitada !== false,
-            produccion_pausada: u.produccion_pausada || false,
-            nivel_autorizado: Number(u.nivel_autorizado || 0)
-        };
-        
-        // Si tiene ID, actualizar
-        if (u.id) {
-            fetch(API_URL + '/api/admin/user/' + u.id, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
-                body: JSON.stringify(datosActualizar)
-            })
-            .catch(error => {
-                console.error('Error al guardar usuario ' + u.telefono + ':', error);
-            });
-        }
-    }
-    
-    // Guardar copia anterior para comparar
-    usuariosCacheAnterior = JSON.parse(JSON.stringify(users));
 }
-
-function sincronizarUsuarioConBackend(telefono) {
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) { showAlert('⚠️ Usuario no encontrado', 'danger'); return; }
-    
-    var token = localStorage.getItem('apex_token');
-    if (!token) { showAlert('⚠️ No hay token de autenticación', 'danger'); return; }
-    
-    var datosActualizar = {
-        balance: Number(user.balance || 0),
-        puntos: Number(user.puntos || 0),
-        plan: user.plan || 'Sin plan',
-        plan_amount: Number(user.plan_amount || 0),
-        daily_earnings: Number(user.daily_earnings || 0),
-        ruleta_usos: Number(user.ruleta_usos || 0),
-        cofres_usos: Number(user.cofres_usos || 0),
-        dados_usos: Number(user.dados_usos || 0),
-        premio_ruleta: Number(user.premio_ruleta || 0),
-        premio_cofre: Number(user.premio_cofre || 0),
-        premio_dados: Number(user.premio_dados || 0),
-        cupones_asignados: user.cupones_asignados || [],
-        logros_asignados: user.logros_asignados || [],
-        tareas_asignadas: user.tareas_asignadas || [],
-        canjes_realizados: user.canjes_realizados || [],
-        logros_reclamados: user.logros_reclamados || [],
-        historial_detallado: user.historial_detallado || [],
-        direccion_retiro: user.direccion_retiro || null,
-        cuenta_habilitada: user.cuenta_habilitada !== false,
-        produccion_pausada: user.produccion_pausada || false,
-        nivel_autorizado: Number(user.nivel_autorizado || 0)
-    };
-    
-    if (user.id) {
-        fetch(API_URL + '/api/admin/user/' + user.id, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
-            body: JSON.stringify(datosActualizar)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                showAlert('❌ Error al sincronizar: ' + data.error, 'danger');
-            } else {
-                showAlert('✅ Usuario sincronizado correctamente', 'success');
-            }
-        })
-        .catch(error => {
-            showAlert('❌ Error al sincronizar: ' + error.message, 'danger');
-        });
-    } else {
-        showAlert('⚠️ El usuario no tiene ID en el backend', 'danger');
-    }
-}
-
 
 function getCodigos() {
     try { return JSON.parse(localStorage.getItem(CODIGOS_KEY)) || []; } catch { return []; }
@@ -2528,9 +2356,6 @@ function getUsuarioReferido(telefono) {
 // ============================================================
 // VERIFICAR ADMIN
 // ============================================================
-// ============================================================
-// VERIFICAR ADMIN - CON BACKEND
-// ============================================================
 function verificarAdmin() {
     var token = localStorage.getItem('apex_token');
     if (!token) {
@@ -2544,26 +2369,28 @@ function verificarAdmin() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.error) {
+        if (data.error || !data.user) {
             localStorage.removeItem('apex_token');
             localStorage.removeItem('apex_user');
             window.location.href = 'index.html';
             return false;
         }
 
-        if (!data.user || data.user.es_admin !== true) {
+        var user = data.user;
+        if (!user.es_admin) {
             window.location.href = 'index.html';
             return false;
         }
 
-        // Guardar usuario en sessionStorage para compatibilidad
-        var user = data.user;
+        // Asegurar que 999999999 sea SUPER ADMIN
+        if (user.telefono === '999999999') {
+            user.es_super_admin = true;
+        }
+
         sessionStorage.setItem('apex_user', JSON.stringify(user));
-        
         document.getElementById('adminName').textContent = user.nombre + ' ' + (user.apellido || '');
         document.getElementById('adminAvatar').textContent = user.nombre ? user.nombre[0] : 'A';
 
-        // Mostrar/ocultar pestaña SUPER ADMIN
         var superAdminTab = document.getElementById('superAdminTabBtn');
         if (user.es_super_admin === true) {
             superAdminTab.style.display = 'block';
@@ -2571,30 +2398,26 @@ function verificarAdmin() {
             superAdminTab.style.display = 'none';
         }
 
-        // Cargar datos después de verificar
         cargarDatosAdmin();
         return true;
     })
     .catch(error => {
         console.error('Error al verificar admin:', error);
-        localStorage.removeItem('apex_token');
-        localStorage.removeItem('apex_user');
         window.location.href = 'index.html';
         return false;
     });
 }
 
 // ============================================================
-// CARGAR DATOS DEL ADMIN DESDE EL BACKEND
+// CARGAR DATOS DEL ADMIN
 // ============================================================
 function cargarDatosAdmin() {
     var token = localStorage.getItem('apex_token');
     if (!token) return;
 
-    // Cargar todos los usuarios
     fetch(API_URL + '/api/admin/users', {
         method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + token }
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
     })
     .then(response => response.json())
     .then(data => {
@@ -2602,11 +2425,12 @@ function cargarDatosAdmin() {
             showAlert('❌ Error al cargar usuarios: ' + data.error, 'danger');
             return;
         }
-        // Guardar en localStorage para compatibilidad con funciones existentes
+        if (!Array.isArray(data)) {
+            showAlert('❌ Datos inválidos', 'danger');
+            return;
+        }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         usuariosCache = data;
-        
-        // Renderizar todas las vistas
         renderUsuarios();
         renderUsuariosActivos();
         renderNiveles();
@@ -2629,21 +2453,220 @@ function cargarDatosAdmin() {
         actualizarSelectoresCupones();
         switchTab('usuarios');
         cargarSuperAdmin();
+        actualizarStats();
     })
     .catch(error => {
-        console.error('Error al cargar datos:', error);
+        console.error('Error cargando datos:', error);
         showAlert('❌ Error al cargar datos del servidor', 'danger');
     });
 }
 
+// ============================================================
+// SINCRONIZAR USUARIO CON BACKEND
+// ============================================================
+function sincronizarUsuarioConBackend(telefono) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) {
+        showAlert('⚠️ Usuario no encontrado', 'danger');
+        return;
+    }
+
+    var token = localStorage.getItem('apex_token');
+    if (!token) {
+        showAlert('⚠️ No hay token', 'danger');
+        return;
+    }
+
+    if (!user.id) {
+        showAlert('⚠️ El usuario no tiene ID en el backend', 'warning');
+        return;
+    }
+
+    var datosActualizar = {
+        balance: Number(user.balance || 0),
+        puntos: Number(user.puntos || 0),
+        plan: user.plan || 'Sin plan',
+        plan_amount: Number(user.plan_amount || 0),
+        daily_earnings: Number(user.daily_earnings || 0),
+        ruleta_usos: Number(user.ruleta_usos || 0),
+        cofres_usos: Number(user.cofres_usos || 0),
+        dados_usos: Number(user.dados_usos || 0),
+        premio_ruleta: Number(user.premio_ruleta || 0),
+        premio_cofre: Number(user.premio_cofre || 0),
+        premio_dados: Number(user.premio_dados || 0),
+        cupones_asignados: user.cupones_asignados || [],
+        logros_asignados: user.logros_asignados || [],
+        tareas_asignadas: user.tareas_asignadas || [],
+        canjes_realizados: user.canjes_realizados || [],
+        logros_reclamados: user.logros_reclamados || [],
+        historial_detallado: user.historial_detallado || [],
+        direccion_retiro: user.direccion_retiro || null,
+        cuenta_habilitada: user.cuenta_habilitada !== false,
+        produccion_pausada: user.produccion_pausada || false,
+        nivel_autorizado: Number(user.nivel_autorizado || 0)
+    };
+
+    fetch(API_URL + '/api/admin/user/' + user.id, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify(datosActualizar)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showAlert('❌ Error al sincronizar: ' + data.error, 'danger');
+        } else {
+            showAlert('✅ Usuario sincronizado correctamente', 'success');
+        }
+    })
+    .catch(error => {
+        showAlert('❌ Error al sincronizar: ' + error.message, 'danger');
+    });
+}
+
+function sincronizarTodosLosUsuarios() {
+    if (!confirm('⚠️ ¿Sincronizar TODOS los usuarios con el backend?')) return;
+
+    var users = getUsers();
+    var token = localStorage.getItem('apex_token');
+    if (!token) { showAlert('⚠️ No hay token', 'danger'); return; }
+
+    var total = users.filter(function(u) { return u.telefono !== 'admin' && u.id; }).length;
+    if (total === 0) {
+        showAlert('⚠️ No hay usuarios para sincronizar', 'warning');
+        return;
+    }
+
+    var sincronizados = 0;
+    showAlert('🔄 Sincronizando ' + total + ' usuarios...', 'info');
+
+    for (var i = 0; i < users.length; i++) {
+        var u = users[i];
+        if (u.telefono === 'admin' || !u.id) continue;
+
+        var datosActualizar = {
+            balance: Number(u.balance || 0),
+            puntos: Number(u.puntos || 0),
+            plan: u.plan || 'Sin plan',
+            ruleta_usos: Number(u.ruleta_usos || 0),
+            cofres_usos: Number(u.cofres_usos || 0),
+            dados_usos: Number(u.dados_usos || 0),
+            premio_ruleta: Number(u.premio_ruleta || 0),
+            premio_cofre: Number(u.premio_cofre || 0),
+            premio_dados: Number(u.premio_dados || 0),
+            cupones_asignados: u.cupones_asignados || [],
+            logros_asignados: u.logros_asignados || [],
+            tareas_asignadas: u.tareas_asignadas || [],
+            canjes_realizados: u.canjes_realizados || [],
+            logros_reclamados: u.logros_reclamados || [],
+            historial_detallado: u.historial_detallado || [],
+            direccion_retiro: u.direccion_retiro || null,
+            cuenta_habilitada: u.cuenta_habilitada !== false,
+            produccion_pausada: u.produccion_pausada || false,
+            nivel_autorizado: Number(u.nivel_autorizado || 0)
+        };
+
+        fetch(API_URL + '/api/admin/user/' + u.id, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify(datosActualizar)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.error) {
+                sincronizados++;
+                if (sincronizados === total) {
+                    showAlert('✅ ' + sincronizados + ' usuarios sincronizados correctamente', 'success');
+                }
+            }
+        })
+        .catch(error => {
+            sincronizados++;
+            if (sincronizados === total) {
+                showAlert('⚠️ ' + sincronizados + ' usuarios sincronizados (con algunos errores)', 'warning');
+            }
+        });
+    }
+}
+
+// ============================================================
+// VERIFICAR ADMIN - ORIGINAL
+// ============================================================
+function verificarAdminOriginal() {
+    try {
+        var user = JSON.parse(sessionStorage.getItem('apex_user'));
+        if (!user) {
+            window.location.href = 'index.html';
+            return false;
+        }
+        
+        if (user.telefono === '999999999') {
+            user.es_super_admin = true;
+            user.es_admin = true;
+            if (!user.username) {
+                user.username = 'admin1714';
+            }
+            var users = getUsers();
+            for (var i = 0; i < users.length; i++) {
+                if (users[i].telefono === '999999999') {
+                    users[i] = user;
+                    break;
+                }
+            }
+            saveUsers(users);
+            sessionStorage.setItem('apex_user', JSON.stringify(user));
+        }
+        
+        if (user.telefono === '999999999' || user.username === 'admin1714') {
+            user.es_super_admin = true;
+            user.es_admin = true;
+            var users = getUsers();
+            for (var i = 0; i < users.length; i++) {
+                if (users[i].telefono === user.telefono || users[i].username === 'admin1714') {
+                    users[i] = user;
+                    break;
+                }
+            }
+            saveUsers(users);
+            sessionStorage.setItem('apex_user', JSON.stringify(user));
+        }
+        
+        if (user.es_admin !== true) {
+            window.location.href = 'index.html';
+            return false;
+        }
+        
+        document.getElementById('adminName').textContent = user.nombre + ' ' + user.apellido;
+        document.getElementById('adminAvatar').textContent = user.nombre[0];
+
+        var superAdminTab = document.getElementById('superAdminTabBtn');
+        if (user.es_super_admin === true) {
+            superAdminTab.style.display = 'block';
+        } else {
+            superAdminTab.style.display = 'none';
+        }
+
+        return true;
+    } catch {
+        window.location.href = 'index.html';
+        return false;
+    }
+}
+
 function volverDashboard() { window.location.href = 'dashboard.html'; }
-function cerrarSesion() {
+function cerrarSesion() { 
     localStorage.removeItem('apex_token');
     localStorage.removeItem('apex_user');
     sessionStorage.removeItem('apex_user');
-    window.location.href = 'index.html';
+    window.location.href = 'index.html'; 
 }
-
 
 // ============================================================
 // SWITCH TABS
@@ -2707,12 +2730,12 @@ function actualizarStats() {
         }
     }
     document.getElementById('totalUsers').textContent = users.length;
-    document.getElementById('totalBalance').textContent = '$' + Number(totalBalance).toFixed(2);
-document.getElementById('totalRetiros').textContent = '$' + Number(totalRetirosPendientes).toFixed(2);
+    document.getElementById('totalBalance').textContent = '$' + totalBalance.toFixed(2);
+    document.getElementById('totalRetiros').textContent = '$' + totalRetirosPendientes.toFixed(2);
 }
 
 // ============================================================
-// RENDER USUARIOS (lista general con colores)
+// RENDER USUARIOS
 // ============================================================
 function renderUsuarios() {
     var users = getUsers();
@@ -2720,12 +2743,13 @@ function renderUsuarios() {
     
     if (!tbody) return;
     if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:20px;">No hay usuarios</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px;">No hay usuarios</td></tr>';
         return;
     }
     var html = '';
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
+        if (u.telefono === 'admin') continue;
         var planClass = u.plan === 'Sin plan' ? 'badge-default' : 'badge-success';
         var esAdmin = u.es_admin ? '👑' : '';
         var produccionPausada = u.produccion_pausada ? '⏸️' : '';
@@ -2770,15 +2794,21 @@ function renderUsuarios() {
             '<td>' + formatDate(u.fecha_registro || u.fechas_invito?.fechaRegistro) + '</td>' +
             '<td><strong>$' + Number(u.balance || 0).toFixed(2) + '</strong></td>' +
             '<td><button class="btn btn-info btn-sm" onclick="verIngresosUsuario(\'' + u.telefono + '\')">💰</button></td>' +
-            '<td>$' + depositado.toFixed(2) + '</td>' +
-            '<td>$' + retirado.toFixed(2) + '</td>' +
-            '<td>' + (u.puntos || 0) + '</td>' +
+            '<td>$' + Number(depositado).toFixed(2) + '</td>' +
+            '<td>$' + Number(retirado).toFixed(2) + '</td>' +
+            '<td>' + Number(u.puntos || 0) + '</td>' +
             '<td><span class="badge ' + planClass + '">' + (u.plan || 'Sin plan') + '</span></td>' +
             '<td><div class="action-buttons">' +
-                '<button class="btn btn-danger btn-sm" onclick="reiniciarHistorialUsuario(\'' + u.telefono + '\')" data-tooltip="Reiniciar historial de saldo">🔄</button>' +
                 botonesAdmin +
+                '<button class="btn btn-danger btn-sm" onclick="reiniciarHistorialUsuario(\'' + u.telefono + '\')" data-tooltip="Reiniciar historial de saldo">🔄</button>' +
                 '<button class="btn btn-primary btn-sm" onclick="abrirEditar(\'' + u.telefono + '\')" data-tooltip="Editar usuario">✏️</button>' +
-                (u.es_admin !== true ? '<button class="btn btn-danger btn-sm" onclick="eliminarUsuario(\'' + u.telefono + '\')" data-tooltip="Eliminar usuario">🗑️</button>' : '') +
+                '<button class="btn btn-success btn-sm" onclick="agregarSaldo(\'' + u.telefono + '\')" data-tooltip="Agregar saldo">💰</button>' +
+                '<button class="btn btn-danger btn-sm" onclick="quitarSaldo(\'' + u.telefono + '\')" data-tooltip="Quitar saldo">💸</button>' +
+                '<button class="btn btn-warning btn-sm" onclick="agregarPuntosAdmin(\'' + u.telefono + '\')" data-tooltip="Agregar puntos">⭐</button>' +
+                '<button class="btn btn-danger btn-sm" onclick="quitarPuntos(\'' + u.telefono + '\')" data-tooltip="Quitar puntos">❌⭐</button>' +
+                '<button class="btn btn-info btn-sm" onclick="toggleProduccion(\'' + u.telefono + '\')" data-tooltip="' + (u.produccion_pausada ? 'Reanudar' : 'Pausar') + '" style="background:' + (u.produccion_pausada ? '#4db6ac' : '#f7971e') + ';color:#fff;">' + (u.produccion_pausada ? '▶️' : '⏸️') + '</button>' +
+                '<button class="btn btn-danger btn-sm" onclick="toggleCuenta(\'' + u.telefono + '\')" data-tooltip="' + (u.cuenta_habilitada !== false ? 'Inhabilitar' : 'Habilitar') + '">' + (u.cuenta_habilitada !== false ? '🔒' : '🔓') + '</button>' +
+                (u.es_admin !== true ? '<button class="btn btn-danger btn-sm" onclick="eliminarUsuario(\'' + u.telefono + '\')" data-tooltip="Eliminar">🗑️</button>' : '') +
                 '<button class="btn btn-info btn-sm" onclick="verDetallesUsuario(\'' + u.telefono + '\')" data-tooltip="Ver detalles">👁️</button>' +
             '</div></td>' +
         '</tr>';
@@ -2788,43 +2818,248 @@ function renderUsuarios() {
     actualizarSelectores();
     actualizarSelectoresHistorial();
     actualizarSelectoresCupones();
+}
 
 // ============================================================
-// GENERAR NOTIFICACIONES PARA NUEVOS USUARIOS (UNA SOLA VEZ)
+// FUNCIONES DE ACCIONES
 // ============================================================
-var notifs = getNotificacionesAdmin();
-var ahora = Date.now();
-var UNA_HORA = 3600000;
-
-for (var i = 0; i < users.length; i++) {
-    var u = users[i];
-    if (u.telefono === 'admin') continue;
+function convertirEnAdmin(telefono) {
+    var userLogueado = JSON.parse(sessionStorage.getItem('apex_user'));
+    if (!userLogueado || userLogueado.es_super_admin !== true) {
+        showAlert('⛔ Solo el SUPER ADMIN puede asignar nuevos administradores.', 'danger');
+        return;
+    }
+    if (!confirm('👑 ¿Estás seguro de que quieres convertir a este usuario en Administrador?')) return;
     
-    var existe = false;
-    for (var n = 0; n < notifs.length; n++) {
-        if (notifs[n].tipo === 'registro' && notifs[n].telefono === u.telefono) {
-            var fechaNotif = new Date(notifs[n].fecha).getTime();
-            if (ahora - fechaNotif < UNA_HORA * 24) {
-                existe = true;
-                break;
-            }
-        }
-    }
-    if (!existe) {
-        generarNotificacion(
-            'registro',
-            '🆕 Nuevo usuario registrado',
-            u.nombre + ' ' + u.apellido + ' se unió a la plataforma',
-            u.nombre + ' ' + u.apellido,
-            u.telefono,
-            'completado'
-        );
+    var users = getUsers();
+    var targetUser = users.find(function(u) { return u.telefono === telefono; });
+    if (targetUser) {
+        targetUser.es_admin = true;
+        saveUsers(users);
+        sincronizarUsuarioConBackend(telefono);
+        showAlert('✅ Usuario convertido a Administrador exitosamente.', 'success');
+        renderUsuarios();
     }
 }
+
+function quitarAdmin(telefono) {
+    var userLogueado = JSON.parse(sessionStorage.getItem('apex_user'));
+    if (!userLogueado || userLogueado.es_super_admin !== true) {
+        showAlert('⛔ Solo el SUPER ADMIN puede quitar privilegios de administrador.', 'danger');
+        return;
+    }
+    if (!confirm('👑❌ ¿Estás seguro de que quieres quitar los privilegios de Administrador a este usuario?')) return;
+    
+    var users = getUsers();
+    var targetUser = users.find(function(u) { return u.telefono === telefono; });
+    if (targetUser) {
+        targetUser.es_admin = false;
+        saveUsers(users);
+        sincronizarUsuarioConBackend(telefono);
+        showAlert('✅ Privilegios de Administrador removidos.', 'success');
+        renderUsuarios();
+    }
+}
+
+function quitarSaldo(telefono) {
+    var monto = prompt('💰 Monto a quitar del saldo:', '10');
+    if (!monto) return;
+    var cantidad = parseFloat(monto);
+    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Monto inválido', 'danger'); return; }
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    
+    if ((user.balance || 0) < cantidad) {
+        showAlert('⚠️ Saldo insuficiente. Solo tiene $' + (user.balance || 0).toFixed(2), 'danger');
+        return;
+    }
+    
+    user.balance = (user.balance || 0) - cantidad;
+
+    if (!user.historial_detallado) user.historial_detallado = [];
+    user.historial_detallado.push({
+        tipo: 'admin',
+        concepto: '💰 Saldo removido por admin',
+        monto: -cantidad,
+        fecha: new Date().toISOString(),
+        estado: 'completado'
+    });
+
+    if (!user.historial) user.historial = [];
+    user.historial.push({
+        type: 'admin',
+        amount: -cantidad,
+        date: new Date().toISOString(),
+        status: 'completado',
+        concepto: '💰 -$' + Number(cantidad).toFixed(2) + ' por admin (removido)',
+        origen: 'admin'
+    });
+
+    saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    showAlert('✅ -$' + Number(cantidad).toFixed(2) + ' a ' + user.nombre + ' (saldo removido)', 'success');
+    renderUsuarios();
+    renderUsuariosActivos();
+}
+
+function quitarPuntos(telefono) {
+    var puntos = prompt('⭐ Puntos a quitar:', '10');
+    if (!puntos) return;
+    var cantidad = parseInt(puntos);
+    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Cantidad inválida', 'danger'); return; }
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    
+    if ((user.puntos || 0) < cantidad) {
+        showAlert('⚠️ Puntos insuficientes. Solo tiene ' + (user.puntos || 0) + ' puntos', 'danger');
+        return;
+    }
+    
+    user.puntos = (user.puntos || 0) - cantidad;
+
+    if (!user.historial_detallado) user.historial_detallado = [];
+    user.historial_detallado.push({
+        tipo: 'admin',
+        concepto: '⭐ Puntos removidos por admin',
+        puntos: -cantidad,
+        monto: 0,
+        fecha: new Date().toISOString(),
+        estado: 'completado'
+    });
+
+    if (!user.historial) user.historial = [];
+    user.historial.push({
+        type: 'admin',
+        amount: 0,
+        puntos: -cantidad,
+        date: new Date().toISOString(),
+        status: 'completado',
+        concepto: '⭐ -' + cantidad + ' puntos por admin (removido)',
+        origen: 'admin'
+    });
+
+    saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    showAlert('✅ -' + cantidad + ' puntos a ' + user.nombre + ' (puntos removidos)', 'success');
+    renderUsuarios();
+    renderUsuariosActivos();
+}
+
+function agregarPuntosAdmin(telefono) {
+    var puntos = prompt('Cantidad de puntos a agregar:', '10');
+    if (!puntos) return;
+    var cantidad = parseInt(puntos);
+    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Cantidad inválida', 'danger'); return; }
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    user.puntos = (user.puntos || 0) + cantidad;
+
+    if (!user.historial_detallado) user.historial_detallado = [];
+    user.historial_detallado.push({
+        tipo: 'admin',
+        concepto: '⭐ Puntos agregados por admin',
+        puntos: cantidad,
+        monto: 0,
+        fecha: new Date().toISOString(),
+        estado: 'completado'
+    });
+
+    if (!user.historial) user.historial = [];
+    user.historial.push({
+        type: 'admin',
+        amount: 0,
+        puntos: cantidad,
+        date: new Date().toISOString(),
+        status: 'completado',
+        concepto: '⭐ +' + cantidad + ' puntos por admin',
+        origen: 'admin'
+    });
+
+    saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    showAlert('✅ +' + cantidad + ' puntos a ' + user.nombre, 'success');
+    renderUsuarios();
+    renderUsuariosActivos();
+}
+
+function agregarSaldo(telefono) {
+    var monto = prompt('Monto a agregar al saldo:', '10');
+    if (!monto) return;
+    var cantidad = parseFloat(monto);
+    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Monto inválido', 'danger'); return; }
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    user.balance = (user.balance || 0) + cantidad;
+
+    if (!user.historial_detallado) user.historial_detallado = [];
+    user.historial_detallado.push({
+        tipo: 'admin',
+        concepto: '💰 Saldo agregado por admin',
+        monto: cantidad,
+        fecha: new Date().toISOString(),
+        estado: 'completado'
+    });
+
+    if (!user.historial) user.historial = [];
+    user.historial.push({
+        type: 'admin',
+        amount: cantidad,
+        date: new Date().toISOString(),
+        status: 'completado',
+        concepto: '💰 +$' + Number(cantidad).toFixed(2) + ' por admin',
+        origen: 'admin'
+    });
+
+    saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    showAlert('✅ +$' + Number(cantidad).toFixed(2) + ' a ' + user.nombre, 'success');
+    renderUsuarios();
+    renderUsuariosActivos();
+}
+
+function toggleProduccion(telefono) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    user.produccion_pausada = !user.produccion_pausada;
+    saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    showAlert(user.produccion_pausada ? '⏸️ Producción pausada para ' + user.nombre : '▶️ Producción reanudada para ' + user.nombre, 'success');
+    renderUsuarios();
+    renderUsuariosActivos();
+}
+
+function toggleCuenta(telefono) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    user.cuenta_habilitada = user.cuenta_habilitada === false ? true : false;
+    saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    showAlert(user.cuenta_habilitada ? '✅ Cuenta habilitada' : '⛔ Cuenta inhabilitada', user.cuenta_habilitada ? 'success' : 'warning');
+    renderUsuarios();
+    renderUsuariosActivos();
+}
+
+function eliminarUsuario(telefono) {
+    if (!confirm('⚠️ ¿Eliminar este usuario?')) return;
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    if (!confirm('¿Eliminar a ' + user.nombre + ' ' + user.apellido + '?')) return;
+    users = users.filter(function(u) { return u.telefono !== telefono; });
+    saveUsers(users);
+    showAlert('✅ Usuario eliminado', 'success');
+    renderUsuarios();
+    renderUsuariosActivos();
 }
 
 // ============================================================
-// RENDER USUARIOS ACTIVOS (con # y acciones completas)
+// RENDER USUARIOS ACTIVOS
 // ============================================================
 function renderUsuariosActivos() {
     var users = getUsers();
@@ -2868,12 +3103,12 @@ function renderUsuariosActivos() {
             '<td><strong>' + u.nombre + ' ' + u.apellido + '</strong></td>' +
             '<td><span class="usuario-telefono">' + u.telefono + '</span></td>' +
             '<td>' + formatDate(fechaPlan) + '</td>' +
-            '<td><span class="usos-badge">🎰 <span class="numero" id="ruleta_display_' + u.telefono + '">' + (u.ruleta_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'ruleta\')" data-tooltip="+1 uso">+</button></td>' +
-            '<td><span class="usos-badge">🎁 <span class="numero" id="cofres_display_' + u.telefono + '">' + (u.cofres_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'cofres\')" data-tooltip="+1 uso">+</button></td>' +
-            '<td><span class="usos-badge">🎲 <span class="numero" id="dados_display_' + u.telefono + '">' + (u.dados_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'dados\')" data-tooltip="+1 uso">+</button></td>' +
-            '<td><input type="number" class="input-premio" id="premio_ruleta_' + u.telefono + '" value="' + (u.premio_ruleta || 0) + '" min="0" step="1"></td>' +
-            '<td><input type="number" class="input-premio" id="premio_cofre_' + u.telefono + '" value="' + (u.premio_cofre || 0) + '" min="0" step="1"></td>' +
-            '<td><input type="number" class="input-premio" id="premio_dados_' + u.telefono + '" value="' + (u.premio_dados || 0) + '" min="0" step="1"></td>' +
+            '<td><span class="usos-badge">🎰 <span class="numero" id="ruleta_display_' + u.telefono + '">' + Number(u.ruleta_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'ruleta\')" data-tooltip="+1 uso">+</button></td>' +
+            '<td><span class="usos-badge">🎁 <span class="numero" id="cofres_display_' + u.telefono + '">' + Number(u.cofres_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'cofres\')" data-tooltip="+1 uso">+</button></td>' +
+            '<td><span class="usos-badge">🎲 <span class="numero" id="dados_display_' + u.telefono + '">' + Number(u.dados_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'dados\')" data-tooltip="+1 uso">+</button></td>' +
+            '<td><input type="number" class="input-premio" id="premio_ruleta_' + u.telefono + '" value="' + Number(u.premio_ruleta || 0) + '" min="0" step="1"></td>' +
+            '<td><input type="number" class="input-premio" id="premio_cofre_' + u.telefono + '" value="' + Number(u.premio_cofre || 0) + '" min="0" step="1"></td>' +
+            '<td><input type="number" class="input-premio" id="premio_dados_' + u.telefono + '" value="' + Number(u.premio_dados || 0) + '" min="0" step="1"></td>' +
             '<td><div class="action-buttons">' +
                 '<button class="btn btn-primary btn-sm" onclick="guardarPremiosUsuario(\'' + u.telefono + '\')" data-tooltip="Guardar premios">💾</button>' +
                 '<button class="btn btn-danger btn-sm" onclick="reiniciarUsos(\'' + u.telefono + '\')" data-tooltip="Reiniciar usos a 0">🔄</button>' +
@@ -2893,8 +3128,88 @@ function renderUsuariosActivos() {
     tbody.innerHTML = html;
 }
 
+function sumarUso(telefono, tipo) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    
+    if (tipo === 'ruleta') {
+        var usosActuales = parseInt(document.getElementById('ruleta_display_' + telefono).textContent) || 0;
+        document.getElementById('ruleta_display_' + telefono).textContent = usosActuales + 1;
+    } else if (tipo === 'cofres') {
+        var usosActuales = parseInt(document.getElementById('cofres_display_' + telefono).textContent) || 0;
+        document.getElementById('cofres_display_' + telefono).textContent = usosActuales + 1;
+    } else if (tipo === 'dados') {
+        var usosActuales = parseInt(document.getElementById('dados_display_' + telefono).textContent) || 0;
+        document.getElementById('dados_display_' + telefono).textContent = usosActuales + 1;
+    }
+    
+    showAlert('✅ +1 uso de ' + tipo + ' (guarda cambios para aplicar)', 'success');
+}
+
+function guardarPremiosUsuario(telefono) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    
+    var usosRuleta = parseInt(document.getElementById('ruleta_display_' + telefono).textContent) || 0;
+    var usosCofres = parseInt(document.getElementById('cofres_display_' + telefono).textContent) || 0;
+    var usosDados = parseInt(document.getElementById('dados_display_' + telefono).textContent) || 0;
+    
+    var premioRuleta = parseFloat(document.getElementById('premio_ruleta_' + telefono).value) || 0;
+    var premioCofre = parseFloat(document.getElementById('premio_cofre_' + telefono).value) || 0;
+    var premioDados = parseFloat(document.getElementById('premio_dados_' + telefono).value) || 0;
+    
+    if (usosRuleta > 0 && premioRuleta <= 0) {
+        showAlert('⚠️ ' + user.nombre + ' tiene ' + usosRuleta + ' usos de máquina pero NO tiene premio asignado.', 'warning');
+        return;
+    }
+    if (usosCofres > 0 && premioCofre <= 0) {
+        showAlert('⚠️ ' + user.nombre + ' tiene ' + usosCofres + ' usos de cofres pero NO tiene premio asignado.', 'warning');
+        return;
+    }
+    if (usosDados > 0 && premioDados <= 0) {
+        showAlert('⚠️ ' + user.nombre + ' tiene ' + usosDados + ' usos de dados pero NO tiene premio asignado.', 'warning');
+        return;
+    }
+    
+    user.ruleta_usos = usosRuleta;
+    user.cofres_usos = usosCofres;
+    user.dados_usos = usosDados;
+    user.premio_ruleta = premioRuleta;
+    user.premio_cofre = premioCofre;
+    user.premio_dados = premioDados;
+    
+    saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    
+    showAlert('✅ Usos y premios guardados para ' + user.nombre, 'success');
+    renderUsuariosActivos();
+    renderUsuarios();
+}
+
+function reiniciarUsos(telefono) {
+    if (!confirm('⚠️ ¿Reiniciar TODOS los usos a 0 para este usuario? Los premios se mantendrán.')) return;
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    
+    document.getElementById('ruleta_display_' + telefono).textContent = '0';
+    document.getElementById('cofres_display_' + telefono).textContent = '0';
+    document.getElementById('dados_display_' + telefono).textContent = '0';
+    
+    user.ruleta_usos = 0;
+    user.cofres_usos = 0;
+    user.dados_usos = 0;
+    
+    saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    
+    showAlert('✅ Usos reiniciados a 0 para ' + user.nombre + ' (premios intactos). Guarda cambios para aplicar.', 'success');
+}
+
 // ============================================================
-// VER HISTORIAL DEL USUARIO DESDE ACCIONES
+// VER HISTORIAL DEL USUARIO
 // ============================================================
 function verHistorialUsuarioAdmin(telefono) {
     var select = document.getElementById('historialUsuarioSelect');
@@ -2906,201 +3221,8 @@ function verHistorialUsuarioAdmin(telefono) {
 }
 
 // ============================================================
-// FUNCIONES DE ACCIONES (agregar/quitar saldo, puntos, etc.)
+// VER DETALLES USUARIO
 // ============================================================
-function quitarSaldo(telefono) {
-    var monto = prompt('💰 Monto a quitar del saldo:', '10');
-    if (!monto) return;
-    var cantidad = parseFloat(monto);
-    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Monto inválido', 'danger'); return; }
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    
-    if ((user.balance || 0) < cantidad) {
-        showAlert('⚠️ Saldo insuficiente. Solo tiene $' + (user.balance || 0).toFixed(2), 'danger');
-        return;
-    }
-    
-    user.balance = (user.balance || 0) - cantidad;
-
-    if (!user.historial_detallado) user.historial_detallado = [];
-    user.historial_detallado.push({
-        tipo: 'admin',
-        concepto: '💰 Saldo removido por admin',
-        monto: -cantidad,
-        fecha: new Date().toISOString(),
-        estado: 'completado'
-    });
-
-    if (!user.historial) user.historial = [];
-    user.historial.push({
-        type: 'admin',
-        amount: -cantidad,
-        date: new Date().toISOString(),
-        status: 'completado',
-        concepto: '💰 -$' + cantidad.toFixed(2) + ' por admin (removido)',
-        origen: 'admin'
-    });
-
-    saveUsers(users);
-    showAlert('✅ -$' + cantidad.toFixed(2) + ' a ' + user.nombre + ' (saldo removido)', 'success');
-    renderUsuarios();
-    renderUsuariosActivos();
-}
-
-function quitarPuntos(telefono) {
-    var puntos = prompt('⭐ Puntos a quitar:', '10');
-    if (!puntos) return;
-    var cantidad = parseInt(puntos);
-    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Cantidad inválida', 'danger'); return; }
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    
-    if ((user.puntos || 0) < cantidad) {
-        showAlert('⚠️ Puntos insuficientes. Solo tiene ' + (user.puntos || 0) + ' puntos', 'danger');
-        return;
-    }
-    
-    user.puntos = (user.puntos || 0) - cantidad;
-
-    if (!user.historial_detallado) user.historial_detallado = [];
-    user.historial_detallado.push({
-        tipo: 'admin',
-        concepto: '⭐ Puntos removidos por admin',
-        puntos: -cantidad,
-        monto: 0,
-        fecha: new Date().toISOString(),
-        estado: 'completado'
-    });
-
-    if (!user.historial) user.historial = [];
-    user.historial.push({
-        type: 'admin',
-        amount: 0,
-        puntos: -cantidad,
-        date: new Date().toISOString(),
-        status: 'completado',
-        concepto: '⭐ -' + cantidad + ' puntos por admin (removido)',
-        origen: 'admin'
-    });
-
-    saveUsers(users);
-    showAlert('✅ -' + cantidad + ' puntos a ' + user.nombre + ' (puntos removidos)', 'success');
-    renderUsuarios();
-    renderUsuariosActivos();
-}
-
-function agregarPuntosAdmin(telefono) {
-    var puntos = prompt('Cantidad de puntos a agregar:', '10');
-    if (!puntos) return;
-    var cantidad = parseInt(puntos);
-    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Cantidad inválida', 'danger'); return; }
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    user.puntos = (user.puntos || 0) + cantidad;
-
-    if (!user.historial_detallado) user.historial_detallado = [];
-    user.historial_detallado.push({
-        tipo: 'admin',
-        concepto: '⭐ Puntos agregados por admin',
-        puntos: cantidad,
-        monto: 0,
-        fecha: new Date().toISOString(),
-        estado: 'completado'
-    });
-
-    if (!user.historial) user.historial = [];
-    user.historial.push({
-        type: 'admin',
-        amount: 0,
-        puntos: cantidad,
-        date: new Date().toISOString(),
-        status: 'completado',
-        concepto: '⭐ +' + cantidad + ' puntos por admin',
-        origen: 'admin'
-    });
-
-    saveUsers(users);
-    showAlert('✅ +' + cantidad + ' puntos a ' + user.nombre, 'success');
-    renderUsuarios();
-    renderUsuariosActivos();
-}
-
-function agregarSaldo(telefono) {
-    var monto = prompt('💰 Monto a agregar al saldo:', '10');
-    if (!monto) return;
-    var cantidad = parseFloat(monto);
-    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Monto inválido', 'danger'); return; }
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    user.balance = (user.balance || 0) + cantidad;
-
-    if (!user.historial_detallado) user.historial_detallado = [];
-    user.historial_detallado.push({
-        tipo: 'admin',
-        concepto: '💰 Saldo agregado por admin',
-        monto: cantidad,
-        fecha: new Date().toISOString(),
-        estado: 'completado'
-    });
-
-    if (!user.historial) user.historial = [];
-    user.historial.push({
-        type: 'admin',
-        amount: cantidad,
-        date: new Date().toISOString(),
-        status: 'completado',
-        concepto: '💰 +$' + Number(cantidad).toFixed(2) + ' por admin',
-        origen: 'admin'
-    });
-
-    saveUsers(users);
-    sincronizarUsuarioConBackend(telefono);
-    
-    showAlert('✅ +$' + Number(cantidad).toFixed(2) + ' a ' + user.nombre, 'success');
-    renderUsuarios();
-    renderUsuariosActivos();
-}
-
-function toggleProduccion(telefono) {
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    user.produccion_pausada = !user.produccion_pausada;
-    saveUsers(users);
-    showAlert(user.produccion_pausada ? '⏸️ Producción pausada para ' + user.nombre : '▶️ Producción reanudada para ' + user.nombre, 'success');
-    renderUsuarios();
-    renderUsuariosActivos();
-}
-
-function toggleCuenta(telefono) {
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    user.cuenta_habilitada = user.cuenta_habilitada === false ? true : false;
-    saveUsers(users);
-    showAlert(user.cuenta_habilitada ? '✅ Cuenta habilitada' : '⛔ Cuenta inhabilitada', user.cuenta_habilitada ? 'success' : 'warning');
-    renderUsuarios();
-    renderUsuariosActivos();
-}
-
-function eliminarUsuario(telefono) {
-    if (!confirm('⚠️ ¿Eliminar este usuario?')) return;
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    if (!confirm('¿Eliminar a ' + user.nombre + ' ' + user.apellido + '?')) return;
-    users = users.filter(function(u) { return u.telefono !== telefono; });
-    saveUsers(users);
-    showAlert('✅ Usuario eliminado', 'success');
-    renderUsuarios();
-    renderUsuariosActivos();
-}
-
 function verDetallesUsuario(telefono) {
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
@@ -3142,9 +3264,7 @@ function verDetallesUsuario(telefono) {
     document.getElementById('detSaldo').textContent = '$' + Number(user.balance || 0).toFixed(2);
     document.getElementById('detPuntos').textContent = user.puntos || 0;
     document.getElementById('detDepositado').textContent = '$' + Number(depositado).toFixed(2);
-
     document.getElementById('detRetirado').textContent = '$' + Number(retirado).toFixed(2);
-
     document.getElementById('detPlan').textContent = user.plan || 'Sin plan';
     document.getElementById('detReferidos').textContent = (user.referidos && user.referidos.lista) ? user.referidos.lista.length : 0;
     document.getElementById('detProduccion').textContent = user.produccion_pausada ? '⏸️ Pausada' : (user.produccion_activa ? '🟢 Activa' : '🔴 Inactiva');
@@ -3212,7 +3332,7 @@ function verDetallesUsuario(telefono) {
             var d = mostrar[i];
             depositosHtml += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;">' +
                 '<span>' + (d.concepto || 'Depósito') + '</span>' +
-                '<span style="color:#4db6ac;font-weight:600;">+$' + d.monto.toFixed(2) + '</span>' +
+                '<span style="color:#4db6ac;font-weight:600;">+$' + Number(d.monto).toFixed(2) + '</span>' +
                 '<span style="color:#999;font-size:10px;">' + formatDateTime(d.fecha) + '</span>' +
             '</div>';
         }
@@ -3313,112 +3433,6 @@ function renderArbolMini(user) {
     html += '</div>';
 
     return html;
-}
-
-// ============================================================
-// USUARIOS ACTIVOS - USOS Y PREMIOS
-// ============================================================
-function sumarUso(telefono, tipo) {
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    
-    // SOLO ACTUALIZAR LA INTERFAZ, NO GUARDAR
-    if (tipo === 'ruleta') {
-        var usosActuales = parseInt(document.getElementById('ruleta_display_' + telefono).textContent) || 0;
-        document.getElementById('ruleta_display_' + telefono).textContent = usosActuales + 1;
-    } else if (tipo === 'cofres') {
-        var usosActuales = parseInt(document.getElementById('cofres_display_' + telefono).textContent) || 0;
-        document.getElementById('cofres_display_' + telefono).textContent = usosActuales + 1;
-    } else if (tipo === 'dados') {
-        var usosActuales = parseInt(document.getElementById('dados_display_' + telefono).textContent) || 0;
-        document.getElementById('dados_display_' + telefono).textContent = usosActuales + 1;
-    }
-    
-    // NO se guarda automáticamente
-    showAlert('✅ +1 uso de ' + tipo + ' (guarda cambios para aplicar)', 'success');
-    // NO llamamos a renderUsuariosActivos() ni a saveUsers()
-}
-
-function guardarPremiosUsuario(telefono) {
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    
-    // LEER USOS DESDE LA INTERFAZ
-    var usosRuleta = parseInt(document.getElementById('ruleta_display_' + telefono).textContent) || 0;
-    var usosCofres = parseInt(document.getElementById('cofres_display_' + telefono).textContent) || 0;
-    var usosDados = parseInt(document.getElementById('dados_display_' + telefono).textContent) || 0;
-    
-    var premioRuleta = parseFloat(document.getElementById('premio_ruleta_' + telefono).value) || 0;
-    var premioCofre = parseFloat(document.getElementById('premio_cofre_' + telefono).value) || 0;
-    var premioDados = parseFloat(document.getElementById('premio_dados_' + telefono).value) || 0;
-    
-    // VALIDAR: si hay usos, debe haber premio
-    if (usosRuleta > 0 && premioRuleta <= 0) {
-        showAlert('⚠️ ' + user.nombre + ' tiene ' + usosRuleta + ' usos de máquina pero NO tiene premio asignado.', 'warning');
-        return;
-    }
-    if (usosCofres > 0 && premioCofre <= 0) {
-        showAlert('⚠️ ' + user.nombre + ' tiene ' + usosCofres + ' usos de cofres pero NO tiene premio asignado.', 'warning');
-        return;
-    }
-    if (usosDados > 0 && premioDados <= 0) {
-        showAlert('⚠️ ' + user.nombre + ' tiene ' + usosDados + ' usos de dados pero NO tiene premio asignado.', 'warning');
-        return;
-    }
-    
-    // GUARDAR TODO
-    user.ruleta_usos = usosRuleta;
-    user.cofres_usos = usosCofres;
-    user.dados_usos = usosDados;
-    user.premio_ruleta = premioRuleta;
-    user.premio_cofre = premioCofre;
-    user.premio_dados = premioDados;
-    
-    saveUsers(users);
-    
-    // Actualizar sesión si el usuario está logueado
-    var sessionUser = sessionStorage.getItem('apex_user');
-    if (sessionUser) {
-        try {
-            var sessionData = JSON.parse(sessionUser);
-            if (sessionData.telefono === telefono) {
-                sessionData.ruleta_usos = usosRuleta;
-                sessionData.cofres_usos = usosCofres;
-                sessionData.dados_usos = usosDados;
-                sessionData.premio_ruleta = premioRuleta;
-                sessionData.premio_cofre = premioCofre;
-                sessionData.premio_dados = premioDados;
-                sessionStorage.setItem('apex_user', JSON.stringify(sessionData));
-            }
-        } catch(e) {}
-    }
-    
-    showAlert('✅ Usos y premios guardados para ' + user.nombre, 'success');
-    renderUsuariosActivos();
-    renderUsuarios();
-}
-
-function reiniciarUsos(telefono) {
-    if (!confirm('⚠️ ¿Reiniciar TODOS los usos a 0 para este usuario? Los premios se mantendrán.')) return;
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    
-    // Reiniciar en la interfaz
-    document.getElementById('ruleta_display_' + telefono).textContent = '0';
-    document.getElementById('cofres_display_' + telefono).textContent = '0';
-    document.getElementById('dados_display_' + telefono).textContent = '0';
-    
-    // Guardar en el usuario
-    user.ruleta_usos = 0;
-    user.cofres_usos = 0;
-    user.dados_usos = 0;
-    
-    saveUsers(users);
-    
-    showAlert('✅ Usos reiniciados a 0 para ' + user.nombre + ' (premios intactos). Guarda cambios para aplicar.', 'success');
 }
 
 // ============================================================
@@ -3533,7 +3547,7 @@ function cargarConfiguracion() {
 }
 
 // ============================================================
-// EDITAR USUARIO - LOGICA DE TELEFONO RESTRINGIDA
+// EDITAR USUARIO
 // ============================================================
 function abrirEditar(telefono) {
     var users = getUsers();
@@ -3569,9 +3583,6 @@ function guardarEdicion() {
     if (nombre) user.nombre = nombre;
     if (apellido) user.apellido = apellido;
 
-    // ============================================================
-    // VALIDACIÓN DE TELÉFONO - SOLO SUPER ADMIN PUEDE CAMBIARLO
-    // ============================================================
     var nuevoTelefono = document.getElementById('editTelefono').value.trim();
     if (nuevoTelefono !== user.telefono) {
         var userLogueado = JSON.parse(sessionStorage.getItem('apex_user'));
@@ -3579,7 +3590,6 @@ function guardarEdicion() {
             showAlert('⛔ Solo el SUPER ADMIN puede cambiar el número de teléfono.', 'danger');
             return;
         }
-        // Verificar que el nuevo teléfono no esté en uso
         var existe = users.some(function(u) { return u.telefono === nuevoTelefono && u.telefono !== user.telefono; });
         if (existe) {
             showAlert('⚠️ El teléfono "' + nuevoTelefono + '" ya está registrado por otro usuario.', 'danger');
@@ -3624,6 +3634,7 @@ function guardarEdicion() {
     }
 
     saveUsers(users);
+    sincronizarUsuarioConBackend(usuarioEditando);
     cerrarModal();
     showAlert('✅ Usuario actualizado', 'success');
     renderUsuarios();
@@ -3677,15 +3688,7 @@ function renderRetiros() {
             copyBtn = '<button class="btn btn-info btn-xs" onclick="copiarTexto(\'' + r.address + '\')" style="margin-left:5px;padding:2px 6px;">📋</button>';
         }
 
-        // ✅ CONVERTIR A NÚMERO antes de usar toFixed
-        var amountNum = Number(r.amount || 0);
-        var commissionNum = Number(r.commission || 0);
-        var netAmountNum = Number(r.netAmount || r.amount || 0);
-
-        html += '<tr><td><strong>' + r.usuario + '</strong>' + descuentoMostrar + 
-            '</td><td>$' + amountNum.toFixed(2) + 
-            '</td><td>$' + commissionNum.toFixed(2) + 
-            '</td><td>$' + netAmountNum.toFixed(2) + '</td>' +
+        html += '<tr><td><strong>' + r.usuario + '</strong>' + descuentoMostrar + '</td><td>$' + Number(r.amount || 0).toFixed(2) + '</td><td>$' + Number(r.commission || 0).toFixed(2) + '</td><td>$' + Number(r.netAmount || r.amount || 0).toFixed(2) + '</td>' +
             '<td style="font-size:10px;font-family:monospace;color:#4db6ac;word-break:break-all;">' + addressDisplay + ' ' + copyBtn + '</td>' +
             '<td><input type="text" id="nota_retiro_' + i + '" placeholder="Nota..." style="width:100px;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:10px;"></td>' +
             '<td>' + formatDateTime(r.date) + '</td>' +
@@ -3772,6 +3775,7 @@ function rechazarRetiro(telefono, fecha, index) {
                     estado: 'rechazado'
                 });
                 saveUsers(users);
+                sincronizarUsuarioConBackend(telefono);
                 showAlert('❌ Retiro rechazado. Nota guardada.', 'warning');
                 renderRetiros();
                 renderPagos();
@@ -3796,10 +3800,7 @@ function renderPagos() {
     for (var i = 0; i < pagos.length; i++) {
         var p = pagos[i];
         var estadoClass = p.estado === 'completado' ? 'badge-success' : 'badge-warning';
-        // ✅ CONVERTIR A NÚMERO antes de usar toFixed
-        var montoNum = Number(p.monto || 0);
-        
-        html += '<tr><td>' + (p.usuario || 'N/A') + '</td><td>$' + montoNum.toFixed(2) + '</td><td>' + (p.concepto || 'Pago') + '</td><td>' + formatDateTime(p.fecha) + '</td><td><span class="badge ' + estadoClass + '">' + (p.estado || 'completado') + '</span></td></tr>';
+        html += '<tr><td>' + (p.usuario || 'N/A') + '</td><td>$' + Number(p.monto || 0).toFixed(2) + '</td><td>' + (p.concepto || 'Pago') + '</td><td>' + formatDateTime(p.fecha) + '</td><td><span class="badge ' + estadoClass + '">' + (p.estado || 'completado') + '</span></td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -3954,6 +3955,7 @@ function aprobarTarea(telefono, index) {
 
     user.tareas_asignadas[index] = tarea;
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
 
     showAlert('✅ Tarea aprobada. +' + (tarea.tipo_recompensa === 'usdt' ? '$' + tarea.cantidad : tarea.cantidad + ' pts') + ' para ' + user.nombre, 'success');
     renderTareasPendientes();
@@ -3973,6 +3975,7 @@ function rechazarTarea(telefono, index) {
     tarea.fechaRechazo = new Date().toISOString();
     user.tareas_asignadas[index] = tarea;
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
     showAlert('❌ Tarea rechazada', 'warning');
     renderTareasPendientes();
 }
@@ -4065,7 +4068,7 @@ function asignarTareaAUsuarioEspecifico(telefono, tareaId, silencioso) {
 
     saveUsers(users);
     sincronizarUsuarioConBackend(telefono);
-    
+
     if (!silencioso) {
         showAlert('✅ Tarea asignada a ' + user.nombre, 'success');
     }
@@ -4263,6 +4266,7 @@ function aprobarLogro(telefono, index) {
     });
 
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
     showAlert('✅ Logro aprobado. +' + (recompensaTipo === 'usdt' ? '$' + recompensa : recompensa + ' pts') + ' para ' + user.nombre, 'success');
     renderLogrosPendientes();
     renderUsuarios();
@@ -4281,6 +4285,7 @@ function rechazarLogro(telefono, index) {
     logroPendiente.estado = 'rechazado';
     user.logros_pendientes_aprobar[index] = logroPendiente;
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
     showAlert('❌ Logro rechazado', 'warning');
     renderLogrosPendientes();
 }
@@ -4410,6 +4415,8 @@ function asignarLogroAUsuarioEspecifico(telefono, logroId, silencioso) {
     }
 
     if (!user.logros_asignados) user.logros_asignados = [];
+    
+    // Verificar si ya tiene este logro asignado
     if (user.logros_asignados.indexOf(logroId) !== -1) {
         if (!silencioso) showAlert('⚠️ Este logro ya está asignado a ' + user.nombre, 'warning');
         return false;
@@ -4424,7 +4431,6 @@ function asignarLogroAUsuarioEspecifico(telefono, logroId, silencioso) {
     }
     return true;
 }
-
 function mostrarLogrosAsignados() {
     var userSelect = document.getElementById('asignarLogroUsuario');
     var preview = document.getElementById('logrosAsignadosPreview');
@@ -4461,6 +4467,7 @@ function eliminarLogroAsignado(telefono, logroId) {
     if (!user) return;
     user.logros_asignados = user.logros_asignados.filter(function(id) { return id !== logroId; });
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
     mostrarLogrosAsignados();
     showAlert('✅ Logro eliminado del usuario', 'success');
 }
@@ -4551,6 +4558,7 @@ function autorizarNivel(telefono, autorizar) {
     }
 
     saveNiveles(niveles);
+    sincronizarUsuarioConBackend(telefono);
     renderNiveles();
     renderUsuarios();
     renderUsuariosActivos();
@@ -4585,6 +4593,7 @@ function autorizarNivelDesdeActivos(telefono) {
 
     niveles[telefono].nivelAutorizado = siguienteIndice;
     saveNiveles(niveles);
+    sincronizarUsuarioConBackend(telefono);
     
     showAlert('✅ Nivel ' + siguientePlan + ' autorizado para ' + user.nombre, 'success');
     renderUsuariosActivos();
@@ -4714,11 +4723,9 @@ function aprobarCanje(telefono, index) {
     var canje = user.canjes_realizados[index];
     if (canje.estado !== 'pendiente') { showAlert('⚠️ Ya procesado', 'warning'); return; }
 
-    // 1. Cambiar estado y dar el dinero
     canje.estado = 'aprobado';
     user.balance = (user.balance || 0) + canje.montoUSDT;
 
-    // 2. Actualizar historial detallado
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
         tipo: 'canje',
@@ -4728,13 +4735,11 @@ function aprobarCanje(telefono, index) {
         estado: 'aprobado'
     });
 
-    // 3. CORRECCIÓN CRUCIAL: Actualizar historial general
     if (user.historial) {
         for (var h = 0; h < user.historial.length; h++) {
             if (user.historial[h].type === 'canje' && 
                 user.historial[h].status === 'pendiente' && 
                 user.historial[h].amount === canje.montoUSDT) {
-                
                 user.historial[h].status = 'aprobado';
                 break; 
             }
@@ -4742,6 +4747,7 @@ function aprobarCanje(telefono, index) {
     }
 
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
     showAlert('✅ Canje aprobado. +$' + canje.montoUSDT + ' a ' + user.nombre, 'success');
     renderSolicitudesCanje();
     renderUsuarios();
@@ -4759,9 +4765,6 @@ function rechazarCanje(telefono, index) {
 
     canje.estado = 'rechazado';
 
-    // ============================================================
-    // CORRECCIÓN: Devolver los puntos al usuario
-    // ============================================================
     user.puntos = (user.puntos || 0) + canje.costoPuntos;
 
     if (!user.historial_detallado) user.historial_detallado = [];
@@ -4784,6 +4787,7 @@ function rechazarCanje(telefono, index) {
     }
 
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
     showAlert('❌ Canje rechazado. Puntos devueltos.', 'warning');
     renderSolicitudesCanje();
 }
@@ -4851,7 +4855,7 @@ function eliminarCupon(index) {
     showAlert('✅ Cupón eliminado', 'success');
 }
 
-    function guardarCupones() {
+function guardarCupones() {
     var container = document.getElementById('cuponesContainer');
     if (!container) return;
     var titulos = container.querySelectorAll('.cupon-titulo');
@@ -4921,12 +4925,15 @@ function asignarCuponAUsuarioEspecifico(telefono, cuponIndex, silencioso) {
     var cupon = cupones[cuponIndex];
 
     if (!user.cupones_asignados) user.cupones_asignados = [];
+    
+    // Verificar si ya tiene el mismo cupón activo
     for (var i = 0; i < user.cupones_asignados.length; i++) {
         if (user.cupones_asignados[i].id === cupon.id && !user.cupones_asignados[i].usado) {
             return false;
         }
     }
 
+    // Crear una copia del cupón para este usuario (con su propia fecha de expiración)
     var fechaExpiracion = new Date();
     fechaExpiracion.setDate(fechaExpiracion.getDate() + (cupon.dias_vigencia || 7));
 
@@ -4945,7 +4952,6 @@ function asignarCuponAUsuarioEspecifico(telefono, cuponIndex, silencioso) {
 
     saveUsers(users);
     sincronizarUsuarioConBackend(telefono);
-    
     if (!silencioso) {
         showAlert('✅ Cupón "' + cupon.titulo + '" asignado a ' + user.nombre, 'success');
     }
@@ -4970,15 +4976,12 @@ function renderDepositos() {
     var html = '';
     for (var i = 0; i < depositos.length; i++) {
         var d = depositos[i];
-        // ✅ CONVERTIR A NÚMERO antes de usar toFixed
-        var montoNum = Number(d.monto || 0);
-        
         html += '<tr>' +
             '<td>' + (i + 1) + '</td>' +
             '<td><strong>' + (d.usuario || 'N/A') + '</strong></td>' +
             '<td>' + (d.telefono || 'N/A') + '</td>' +
             '<td>' + formatDateTime(d.fecha) + '</td>' +
-            '<td><strong>$' + montoNum.toFixed(2) + '</strong></td>' +
+            '<td><strong>$' + Number(d.monto || 0).toFixed(2) + '</strong></td>' +
             '<td style="font-family:monospace;font-size:10px;">' + (d.hash || '-') + '</td>' +
             '<td style="font-size:10px;">' + (d.nota || '-') + '</td>' +
             '<td><button class="btn btn-info btn-sm" onclick="agregarNotaDeposito(' + i + ')" data-tooltip="Agregar nota">📝</button></td>' +
@@ -5042,6 +5045,7 @@ function agregarDeposito() {
         estado: 'completado'
     });
     saveUsers(users);
+    sincronizarUsuarioConBackend(userSelect);
     
     showAlert('✅ Depósito de $' + montoNum.toFixed(2) + ' agregado a ' + user.nombre, 'success');
     renderDepositos();
@@ -5083,7 +5087,7 @@ function renderEstadisticas() {
     var depositos = getDepositos();
     var pagos = getPagos();
     
-    var totalUsers = users.length;
+    var totalUsers = 0;
     var activeUsers = 0;
     var completedReferidos = 0;
     var completedAll = 0;
@@ -5100,6 +5104,8 @@ function renderEstadisticas() {
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
         if (u.telefono === 'admin') continue;
+        
+        totalUsers++;
         
         if (u.plan && u.plan !== 'Sin plan') {
             activeUsers++;
@@ -5156,10 +5162,10 @@ function renderEstadisticas() {
     document.getElementById('estCompletedReferidos').textContent = completedReferidos;
     document.getElementById('estCompletedAll').textContent = completedAll;
     document.getElementById('estPausados').textContent = pausados;
-    document.getElementById('estTotalDepositado').textContent = '$' + Number(totalDepositado).toFixed(2);
-document.getElementById('estTotalPagado').textContent = '$' + Number(totalPagado).toFixed(2);
-document.getElementById('estSaldoPlataforma').textContent = '$' + Number(saldoPlataforma).toFixed(2);
-document.getElementById('estRetirosPendientes').textContent = '$' + Number(retirosPendientes).toFixed(2);
+    document.getElementById('estTotalDepositado').textContent = '$' + totalDepositado.toFixed(2);
+    document.getElementById('estTotalPagado').textContent = '$' + totalPagado.toFixed(2);
+    document.getElementById('estSaldoPlataforma').textContent = '$' + saldoPlataforma.toFixed(2);
+    document.getElementById('estRetirosPendientes').textContent = '$' + retirosPendientes.toFixed(2);
     
     // Guardar datos para los clicks
     window._usuariosCompletados2 = usuariosCompletados2;
@@ -5329,6 +5335,7 @@ function limpiarHistorialUsuario() {
     if (!user) return;
     user.historial_detallado = [];
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
     showAlert('✅ Historial limpiado', 'success');
     renderHistorialUsuario();
 }
@@ -5353,6 +5360,7 @@ function buscarUsuarios() {
     var filtrados = [];
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
+        if (u.telefono === 'admin') continue;
         var nombreCompleto = (u.nombre + ' ' + u.apellido).toLowerCase();
         var telefono = u.telefono || '';
         var id = String(i + 1);
@@ -5366,7 +5374,7 @@ function buscarUsuarios() {
     
     // Mostrar resultados
     if (filtrados.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:20px;">🔍 No se encontraron usuarios</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px;">🔍 No se encontraron usuarios</td></tr>';
         return;
     }
     
@@ -5400,6 +5408,16 @@ function buscarUsuarios() {
         // Obtener el número de índice original
         var num = users.indexOf(u) + 1;
         
+        var userLogueado = JSON.parse(sessionStorage.getItem('apex_user'));
+        var botonesAdmin = '';
+        if (userLogueado && userLogueado.es_super_admin === true) {
+            if (u.es_admin !== true) {
+                botonesAdmin = '<button class="btn btn-warning btn-sm" onclick="convertirEnAdmin(\'' + u.telefono + '\')" data-tooltip="Convertir en Admin">👑</button>';
+            } else {
+                botonesAdmin = '<button class="btn btn-danger btn-sm" onclick="quitarAdmin(\'' + u.telefono + '\')" data-tooltip="Quitar Admin">👑❌</button>';
+            }
+        }
+
         html += '<tr class="' + rowClass + '">' +
             '<td>' + num + '</td>' +
             '<td><span class="usuario-nombre">' + u.nombre + ' ' + u.apellido + '</span> ' + esAdmin + ' ' + produccionPausada + '</td>' +
@@ -5409,11 +5427,18 @@ function buscarUsuarios() {
             '<td><button class="btn btn-info btn-sm" onclick="verDetallesUsuario(\'' + u.telefono + '\')">📜</button></td>' +
             '<td>$' + Number(depositado).toFixed(2) + '</td>' +
             '<td>$' + Number(retirado).toFixed(2) + '</td>' +
-            '<td>' + (u.puntos || 0) + '</td>' +
+            '<td>' + Number(u.puntos || 0) + '</td>' +
             '<td><span class="badge ' + planClass + '">' + (u.plan || 'Sin plan') + '</span></td>' +
             '<td><div class="action-buttons">' +
+                botonesAdmin +
                 '<button class="btn btn-danger btn-sm" onclick="reiniciarHistorialUsuario(\'' + u.telefono + '\')" data-tooltip="Reiniciar historial de saldo">🔄</button>' +
                 '<button class="btn btn-primary btn-sm" onclick="abrirEditar(\'' + u.telefono + '\')" data-tooltip="Editar usuario">✏️</button>' +
+                '<button class="btn btn-success btn-sm" onclick="agregarSaldo(\'' + u.telefono + '\')" data-tooltip="Agregar saldo">💰</button>' +
+                '<button class="btn btn-danger btn-sm" onclick="quitarSaldo(\'' + u.telefono + '\')" data-tooltip="Quitar saldo">💸</button>' +
+                '<button class="btn btn-warning btn-sm" onclick="agregarPuntosAdmin(\'' + u.telefono + '\')" data-tooltip="Agregar puntos">⭐</button>' +
+                '<button class="btn btn-danger btn-sm" onclick="quitarPuntos(\'' + u.telefono + '\')" data-tooltip="Quitar puntos">❌⭐</button>' +
+                '<button class="btn btn-info btn-sm" onclick="toggleProduccion(\'' + u.telefono + '\')" data-tooltip="' + (u.produccion_pausada ? 'Reanudar' : 'Pausar') + '" style="background:' + (u.produccion_pausada ? '#4db6ac' : '#f7971e') + ';color:#fff;">' + (u.produccion_pausada ? '▶️' : '⏸️') + '</button>' +
+                '<button class="btn btn-danger btn-sm" onclick="toggleCuenta(\'' + u.telefono + '\')" data-tooltip="' + (u.cuenta_habilitada !== false ? 'Inhabilitar' : 'Habilitar') + '">' + (u.cuenta_habilitada !== false ? '🔒' : '🔓') + '</button>' +
                 (u.es_admin !== true ? '<button class="btn btn-danger btn-sm" onclick="eliminarUsuario(\'' + u.telefono + '\')" data-tooltip="Eliminar usuario">🗑️</button>' : '') +
                 '<button class="btn btn-info btn-sm" onclick="verDetallesUsuario(\'' + u.telefono + '\')" data-tooltip="Ver detalles">👁️</button>' +
             '</div></td>' +
@@ -5443,33 +5468,9 @@ document.addEventListener('DOMContentLoaded', function() {
 // INICIALIZACIÓN
 // ============================================================
 function init() {
-    if (!verificarAdmin()) return;
     cargarConfiguracion();
-    renderUsuarios();
-    renderUsuariosActivos();
-    renderNiveles();
-    renderRetiros();
-    renderPagos();
-    renderPremiosRuleta();
-    renderPremiosCofres();
-    renderPremiosDados();
-    renderTareas();
-    renderTareasPendientes();
-    renderLogros();
-    renderLogrosPendientes();
-    renderCanjes();
-    renderSolicitudesCanje();
-    renderCupones();
-    renderDepositos();
-    renderEstadisticas();
-    actualizarSelectores();
-    actualizarSelectoresHistorial();
-    actualizarSelectoresCupones();
-    switchTab('usuarios');
-    setInterval(function() { actualizarStats(); }, 30000);
-    cargarSuperAdmin();
+    verificarAdmin();
 }
-
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -5586,6 +5587,7 @@ function guardarSuperAdmin() {
     
     users[superAdminIndex] = superAdmin;
     saveUsers(users);
+    sincronizarUsuarioConBackend(superAdmin.telefono);
     
     // Actualizar sesión
     sessionStorage.setItem('apex_user', JSON.stringify(superAdmin));
@@ -5640,6 +5642,7 @@ function convertirEnSuperAdmin() {
     }
 
     saveUsers(users);
+    sincronizarUsuarioConBackend(user.telefono);
     
     // Actualizar sesión
     sessionStorage.setItem('apex_user', JSON.stringify(user));
@@ -5667,6 +5670,7 @@ function convertirEnAdmin(telefono) {
     if (targetUser) {
         targetUser.es_admin = true;
         saveUsers(users);
+        sincronizarUsuarioConBackend(telefono);
         showAlert('✅ Usuario convertido a Administrador exitosamente.', 'success');
         renderUsuarios();
     }
@@ -5685,6 +5689,7 @@ function quitarAdmin(telefono) {
     if (targetUser) {
         targetUser.es_admin = false;
         saveUsers(users);
+        sincronizarUsuarioConBackend(telefono);
         showAlert('✅ Privilegios de Administrador removidos.', 'success');
         renderUsuarios();
     }
@@ -5971,83 +5976,6 @@ function toggleSemana(el) {
 function cerrarIngresos() {
     document.getElementById('ingresosModal').classList.remove('show');
 }    
-
-function sincronizarTodosLosUsuarios() {
-    if (!confirm('⚠️ ¿Sincronizar TODOS los usuarios con el backend?')) return;
-    
-    var users = getUsers();
-    var token = localStorage.getItem('apex_token');
-    if (!token) { showAlert('⚠️ No hay token', 'danger'); return; }
-    
-    var sincronizados = 0;
-    var total = users.filter(function(u) { return u.telefono !== 'admin'; }).length;
-    
-    if (total === 0) {
-        showAlert('⚠️ No hay usuarios para sincronizar', 'warning');
-        return;
-    }
-    
-    showAlert('🔄 Sincronizando ' + total + ' usuarios...', 'info');
-    
-    for (var i = 0; i < users.length; i++) {
-        var u = users[i];
-        if (u.telefono === 'admin') continue;
-        if (!u.id) {
-            sincronizados++;
-            if (sincronizados === total) {
-                showAlert('✅ ' + sincronizados + ' usuarios sincronizados correctamente', 'success');
-            }
-            continue;
-        }
-        
-        var datosActualizar = {
-            balance: Number(u.balance || 0),
-            puntos: Number(u.puntos || 0),
-            plan: u.plan || 'Sin plan',
-            ruleta_usos: Number(u.ruleta_usos || 0),
-            cofres_usos: Number(u.cofres_usos || 0),
-            dados_usos: Number(u.dados_usos || 0),
-            premio_ruleta: Number(u.premio_ruleta || 0),
-            premio_cofre: Number(u.premio_cofre || 0),
-            premio_dados: Number(u.premio_dados || 0),
-            cupones_asignados: u.cupones_asignados || [],
-            logros_asignados: u.logros_asignados || [],
-            tareas_asignadas: u.tareas_asignadas || [],
-            canjes_realizados: u.canjes_realizados || [],
-            logros_reclamados: u.logros_reclamados || [],
-            historial_detallado: u.historial_detallado || [],
-            direccion_retiro: u.direccion_retiro || null,
-            cuenta_habilitada: u.cuenta_habilitada !== false,
-            produccion_pausada: u.produccion_pausada || false,
-            nivel_autorizado: Number(u.nivel_autorizado || 0)
-        };
-        
-        fetch(API_URL + '/api/admin/user/' + u.id, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
-            body: JSON.stringify(datosActualizar)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (!data.error) {
-                sincronizados++;
-                if (sincronizados === total) {
-                    showAlert('✅ ' + sincronizados + ' usuarios sincronizados correctamente', 'success');
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error al sincronizar ' + u.telefono + ':', error);
-            sincronizados++;
-            if (sincronizados === total) {
-                showAlert('⚠️ ' + sincronizados + ' usuarios sincronizados (con algunos errores)', 'warning');
-            }
-        });
-    }
-}
 
 </script>
 </body>
