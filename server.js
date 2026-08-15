@@ -307,6 +307,72 @@ app.get('/api/prizes', async (req, res) => {
 });
 
 // ============================================================
+// ACTUALIZAR DATOS DEL USUARIO (NUEVA RUTA)
+// ============================================================
+app.put('/api/user/update', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ error: 'Token no proporcionado' });
+        }
+        
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.userId;
+        
+        const updates = req.body;
+        
+        // Construir consulta dinámica
+        const fields = [];
+        const values = [];
+        let paramCount = 1;
+        
+        for (const [key, value] of Object.entries(updates)) {
+            // Solo actualizar campos que existen en la tabla
+            const camposPermitidos = ['balance', 'puntos', 'plan', 'plan_amount', 'daily_earnings', 
+                'produccion_activa', 'produccion_inicio', 'produccion_duracion', 'tiempo_restante',
+                'recompensa_pendiente', 'puntosPendientes', 'codigo_usado', 'reclamado_hoy',
+                'fecha_produccion', 'codigos_usados_hoy', 'codigos_usados', 'ultimo_reinicio_codigos',
+                'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados',
+                'cofres_abiertos', 'cupones_asignados', 'logros_asignados', 'logros_pendientes_aprobar',
+                'tareas_asignadas', 'canjes_realizados', 'logros_reclamados', 'referidos',
+                'referidos_directos', 'fechas_invito', 'historial', 'historial_detallado',
+                'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
+                'direccion_retiro', 'cuenta_habilitada', 'produccion_pausada'];
+            
+            if (camposPermitidos.includes(key)) {
+                fields.push(`${key} = $${paramCount}`);
+                // Si es JSON, convertirlo a string
+                if (typeof value === 'object' && value !== null) {
+                    values.push(JSON.stringify(value));
+                } else {
+                    values.push(value);
+                }
+                paramCount++;
+            }
+        }
+        
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No hay datos para actualizar' });
+        }
+        
+        values.push(userId);
+        const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+        
+        const result = await pool.query(query, values);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        
+        res.json({ message: 'Usuario actualizado exitosamente', user: result.rows[0] });
+        
+    } catch (error) {
+        console.error('Error al actualizar usuario:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
+// ============================================================
 // INICIAR SERVIDOR
 // ============================================================
 app.listen(port, '0.0.0.0', () => {
