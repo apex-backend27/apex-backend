@@ -3931,10 +3931,10 @@ document.addEventListener('keydown', function(e) {
 // ============================================================
 // VIGILANTE DE ACTUALIZACIONES DEL BACKEND (MEJORADO)
 // ============================================================
+// ============================================================
+// VIGILANTE DE ACTUALIZACIONES - VERSIÓN SILENCIOSA
+// ============================================================
 function iniciarVigilante() {
-    // Variable para controlar si ya hay una notificación activa
-    var notificacionActiva = false;
-    
     setInterval(function() {
         var token = localStorage.getItem('apex_token');
         if (!token) return;
@@ -3947,95 +3947,39 @@ function iniciarVigilante() {
         .then(data => {
             if (data.user) {
                 var huboCambios = false;
-                var cambios = [];
                 
-                // COMPARAR CAMPOS IMPORTANTES (convertir a número cuando sea necesario)
-                var balanceActual = Number(data.user.balance || 0);
-                var balanceLocal = Number(user.balance || 0);
-                if (balanceActual !== balanceLocal) {
-                    huboCambios = true;
-                    cambios.push('💰 Saldo: $' + balanceActual.toFixed(2) + ' (era $' + balanceLocal.toFixed(2) + ')');
-                }
+                // Comparar campos importantes con conversión a número
+                if (Number(data.user.balance || 0) !== Number(user.balance || 0)) huboCambios = true;
+                if (Number(data.user.puntos || 0) !== Number(user.puntos || 0)) huboCambios = true;
+                if (data.user.plan !== user.plan) huboCambios = true;
+                if (data.user.cuenta_habilitada !== user.cuenta_habilitada) huboCambios = true;
+                if (data.user.produccion_pausada !== user.produccion_pausada) huboCambios = true;
+                if (Number(data.user.ruleta_usos || 0) !== Number(user.ruleta_usos || 0)) huboCambios = true;
+                if (Number(data.user.cofres_usos || 0) !== Number(user.cofres_usos || 0)) huboCambios = true;
+                if (Number(data.user.dados_usos || 0) !== Number(user.dados_usos || 0)) huboCambios = true;
                 
-                var puntosActual = Number(data.user.puntos || 0);
-                var puntosLocal = Number(user.puntos || 0);
-                if (puntosActual !== puntosLocal) {
-                    huboCambios = true;
-                    cambios.push('⭐ Puntos: ' + puntosActual + ' (era ' + puntosLocal + ')');
-                }
-                
-                // Comparar plan solo si cambió
-                if (data.user.plan !== user.plan) {
-                    huboCambios = true;
-                    cambios.push('📊 Plan: ' + (data.user.plan || 'Sin plan') + ' (era ' + (user.plan || 'Sin plan') + ')');
-                }
-                
-                // Comparar estado de cuenta
-                if (data.user.cuenta_habilitada !== user.cuenta_habilitada) {
-                    huboCambios = true;
-                    cambios.push('🔓 Cuenta: ' + (data.user.cuenta_habilitada ? 'Habilitada' : 'Inhabilitada'));
-                }
-                
-                // Comparar producción pausada
-                if (data.user.produccion_pausada !== user.produccion_pausada) {
-                    huboCambios = true;
-                    cambios.push('⏸️ Producción: ' + (data.user.produccion_pausada ? 'Pausada' : 'Activa'));
-                }
-                
-                // Comparar usos de actividades (solo si cambiaron)
-                if (Number(data.user.ruleta_usos || 0) !== Number(user.ruleta_usos || 0)) {
-                    huboCambios = true;
-                    cambios.push('🎰 Ruleta: ' + (data.user.ruleta_usos || 0) + ' usos');
-                }
-                if (Number(data.user.cofres_usos || 0) !== Number(user.cofres_usos || 0)) {
-                    huboCambios = true;
-                    cambios.push('🎁 Cofres: ' + (data.user.cofres_usos || 0) + ' usos');
-                }
-                if (Number(data.user.dados_usos || 0) !== Number(user.dados_usos || 0)) {
-                    huboCambios = true;
-                    cambios.push('🎲 Dados: ' + (data.user.dados_usos || 0) + ' usos');
-                }
-                
-                // Comparar arrays (solo si cambió la cantidad)
                 if (data.user.tareas_asignadas && user.tareas_asignadas) {
-                    if (data.user.tareas_asignadas.length !== user.tareas_asignadas.length) {
-                        huboCambios = true;
-                        cambios.push('📋 Tareas: ' + data.user.tareas_asignadas.length + ' pendientes');
-                    }
+                    if (data.user.tareas_asignadas.length !== user.tareas_asignadas.length) huboCambios = true;
                 }
                 
                 if (data.user.logros_asignados && user.logros_asignados) {
-                    if (data.user.logros_asignados.length !== user.logros_asignados.length) {
-                        huboCambios = true;
-                        cambios.push('🏆 Logros: ' + data.user.logros_asignados.length + ' asignados');
-                    }
+                    if (data.user.logros_asignados.length !== user.logros_asignados.length) huboCambios = true;
                 }
                 
-                // SI HAY CAMBIOS REALES, actualizar y notificar
+                // SI HAY CAMBIOS REALES, actualizar SILENCIOSAMENTE
                 if (huboCambios) {
                     // Actualizar los datos del usuario
                     Object.assign(user, data.user);
                     sessionStorage.setItem('apex_user', JSON.stringify(user));
                     renderDashboard();
-                    
-                    // Mostrar notificación SOLO si no hay una activa
-                    if (!notificacionActiva) {
-                        notificacionActiva = true;
-                        var mensaje = '🔄 Datos actualizados:\n' + cambios.join('\n');
-                        showAlert(mensaje, 'info');
-                        setTimeout(function() {
-                            notificacionActiva = false;
-                            cerrarAlerta();
-                        }, 5000);
-                    }
+                    // ✅ NOTIFICACIÓN ELIMINADA - Actualización silenciosa
                 }
             }
         })
         .catch(error => {
-            // Silenciar errores de red para no molestar al usuario
             console.log('Vigilante:', error.message);
         });
-    }, 15000); // 👈 Cambiado de 10s a 15s para reducir frecuencia
+    }, 15000);
 }
 
 // ============================================================
