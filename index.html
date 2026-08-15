@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .container { width: 100%; max-width: 400px; background: #ffffff; border-radius: 16px; padding: 32px 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .container { width: 100%; max-width: 400px; background: #ffffff; border-radius: 16px; padding: 32px 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: relative; }
         .brand { text-align: center; margin-bottom: 28px; }
         .brand h1 { font-size: 32px; font-weight: 800; color: #000000; }
         .brand .slogan { font-size: 10px; color: #999; letter-spacing: 4px; text-transform: uppercase; margin-top: 2px; }
@@ -41,147 +41,6 @@
         .invite-code input::placeholder { color: #ccc; text-transform: none; letter-spacing: 0; }
         .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #ffffff; border-top: 2px solid transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    
-        /* ============================================================
-           MODO OSCURO - INDEX
-           ============================================================ */
-        body.dark-mode {
-            background: #121212;
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .container {
-            background: #1e1e1e;
-            border-color: #333;
-        }
-
-        body.dark-mode .brand h1 {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .brand .slogan {
-            color: #666;
-        }
-
-        body.dark-mode .tabs {
-            background: #2a2a2a;
-        }
-
-        body.dark-mode .tabs button {
-            color: #888;
-        }
-
-        body.dark-mode .tabs button.active {
-            background: #000000;
-            color: #ffffff;
-        }
-
-        body.dark-mode .form-group label {
-            color: #999;
-        }
-
-        body.dark-mode .form-group input {
-            background: #2a2a2a;
-            border-color: #444;
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .form-group input:focus {
-            border-color: #666;
-            background: #333;
-        }
-
-        body.dark-mode .form-group input::placeholder {
-            color: #666;
-        }
-
-        body.dark-mode .remember-me label {
-            color: #999;
-        }
-
-        body.dark-mode .btn-primary {
-            background: #333;
-            color: #ffffff;
-        }
-
-        body.dark-mode .btn-primary:hover {
-            background: #444;
-        }
-
-        body.dark-mode .btn-primary:disabled {
-            opacity: 0.3;
-        }
-
-        body.dark-mode .alert-success {
-            background: #1a3a2a;
-            border-color: #2e7d32;
-            color: #4db6ac;
-        }
-
-        body.dark-mode .alert-danger {
-            background: #3a1a1a;
-            border-color: #c62828;
-            color: #ef5350;
-        }
-
-        body.dark-mode .alert-warning {
-            background: #3a2a1a;
-            border-color: #e65100;
-            color: #f7971e;
-        }
-
-        body.dark-mode .alert-info {
-            background: #1a2a3a;
-            border-color: #0d47a1;
-            color: #64b5f6;
-        }
-
-        body.dark-mode .info-text {
-            color: #666;
-        }
-
-        body.dark-mode .invite-code {
-            background: #2a2a2a;
-            border-color: #444;
-        }
-
-        body.dark-mode .invite-code label {
-            color: #999;
-        }
-
-        body.dark-mode .invite-code input {
-            background: #1e1e1e;
-            border-color: #444;
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .invite-code input:focus {
-            border-color: #666;
-            background: #2a2a2a;
-        }
-
-        body.dark-mode .invite-code input::placeholder {
-            color: #666;
-        }
-
-        body.dark-mode .debug-info {
-            color: #666;
-            border-top-color: #333;
-        }
-
-        body.dark-mode .debug-info button {
-            background: #2a2a2a;
-            border-color: #444;
-            color: #999;
-        }
-
-        body.dark-mode .debug-info button:hover {
-            background: #333;
-        }
-
-        /* ============================================================
-           BOTÓN TOGGLE MODO OSCURO - INDEX
-           ============================================================ */
         .dark-mode-toggle-index {
             background: none;
             border: none;
@@ -194,25 +53,39 @@
             top: 16px;
             right: 16px;
         }
+        .dark-mode-toggle-index:hover { background: #f0f0f0; }
+        body.dark-mode .dark-mode-toggle-index:hover { background: #333; }
 
-        .dark-mode-toggle-index:hover {
-            background: #f0f0f0;
-        }
-
-        body.dark-mode .dark-mode-toggle-index:hover {
-            background: #333;
-        }
-
-        .container {
-            position: relative;
-        }
-
-	</style>
+        /* Modo oscuro */
+        body.dark-mode { background: #121212; color: #e0e0e0; }
+        body.dark-mode .container { background: #1e1e1e; border-color: #333; }
+        body.dark-mode .brand h1 { color: #e0e0e0; }
+        body.dark-mode .brand .slogan { color: #666; }
+        body.dark-mode .tabs { background: #2a2a2a; }
+        body.dark-mode .tabs button { color: #888; }
+        body.dark-mode .tabs button.active { background: #000000; color: #ffffff; }
+        body.dark-mode .form-group label { color: #999; }
+        body.dark-mode .form-group input { background: #2a2a2a; border-color: #444; color: #e0e0e0; }
+        body.dark-mode .form-group input:focus { border-color: #666; background: #333; }
+        body.dark-mode .form-group input::placeholder { color: #666; }
+        body.dark-mode .remember-me label { color: #999; }
+        body.dark-mode .btn-primary { background: #333; color: #ffffff; }
+        body.dark-mode .btn-primary:hover { background: #444; }
+        body.dark-mode .alert-success { background: #1a3a2a; border-color: #2e7d32; color: #4db6ac; }
+        body.dark-mode .alert-danger { background: #3a1a1a; border-color: #c62828; color: #ef5350; }
+        body.dark-mode .alert-warning { background: #3a2a1a; border-color: #e65100; color: #f7971e; }
+        body.dark-mode .alert-info { background: #1a2a3a; border-color: #0d47a1; color: #64b5f6; }
+        body.dark-mode .info-text { color: #666; }
+        body.dark-mode .invite-code { background: #2a2a2a; border-color: #444; }
+        body.dark-mode .invite-code label { color: #999; }
+        body.dark-mode .invite-code input { background: #1e1e1e; border-color: #444; color: #e0e0e0; }
+        body.dark-mode .invite-code input:focus { border-color: #666; background: #2a2a2a; }
+        body.dark-mode .invite-code input::placeholder { color: #666; }
+    </style>
 </head>
 <body>
-
 <div class="container">
-	    <button class="dark-mode-toggle-index" onclick="toggleDarkModeIndex()" id="darkModeToggleIndex">🌙</button>
+    <button class="dark-mode-toggle-index" onclick="toggleDarkModeIndex()" id="darkModeToggleIndex">🌙</button>
     <div class="brand">
         <h1>APEX</h1>
         <div class="slogan">CRECE · GANA · TRIUNFA</div>
@@ -276,19 +149,13 @@
 </div>
 
 <script>
-
-
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
+const API_URL = 'https://apex-backend-cj21.onrender.com';
 var STORAGE_KEY = 'apex_users';
 var REMEMBER_KEY = 'apex_remember';
 var ADMIN_CODE = 'Eamb1714';
-
-// ============================================================
-// CONFIGURACIÓN DEL BACKEND
-// ============================================================
-const API_URL = 'https://apex-backend-cj21.onrender.com';
 
 // ============================================================
 // UTILIDADES
@@ -303,43 +170,6 @@ function showAlert(msg, type) {
     window.alertTimeout = setTimeout(function() { el.className = 'alert'; }, 5000);
 }
 
-function getUsers() {
-    try {
-        var data = localStorage.getItem(STORAGE_KEY);
-        if (!data) return [];
-        var parsed = JSON.parse(data);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-        return [];
-    }
-}
-
-function saveUsers(users) {
-    if (!Array.isArray(users)) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-}
-
-function generarCodigoReferido() {
-    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    var codigo = 'APEX';
-    for (var i = 0; i < 6; i++) {
-        codigo += chars.charAt(Math.floor(Math.random() * 36));
-    }
-    return codigo;
-}
-
-function generarWalletAddress() {
-    var chars = '0123456789abcdef';
-    var address = '0x';
-    for (var i = 0; i < 40; i++) {
-        address += chars.charAt(Math.floor(Math.random() * 16));
-    }
-    return address;
-}
-
-// ============================================================
-// TABS
-// ============================================================
 function switchTab(tab) {
     var tabs = document.querySelectorAll('.tab-content');
     for (var i = 0; i < tabs.length; i++) {
@@ -356,7 +186,7 @@ function switchTab(tab) {
 }
 
 // ============================================================
-// REGISTRO - SIN COMISIÓN (solo se asigna referido)
+// REGISTRO - CON BACKEND
 // ============================================================
 function registerUser(event) {
     event.preventDefault();
@@ -378,12 +208,10 @@ function registerUser(event) {
     btn.disabled = true;
     btn.innerHTML = '<span class="loading-spinner"></span> Registrando...';
 
-    // Enviar al backend
     fetch(API_URL + '/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
- 	    username: telefono,
             telefono: telefono,
             nombre: nombre,
             apellido: apellido,
@@ -402,8 +230,6 @@ function registerUser(event) {
         }
 
         showAlert(data.message, 'success');
-        
-        // Guardar token y datos del usuario
         localStorage.setItem('apex_token', data.token);
         localStorage.setItem('apex_user', JSON.stringify(data.user));
 
@@ -422,7 +248,7 @@ function registerUser(event) {
 }
 
 // ============================================================
-// LOGIN
+// LOGIN - CON BACKEND
 // ============================================================
 function loginUser(event) {
     event.preventDefault();
@@ -454,7 +280,6 @@ function loginUser(event) {
             return;
         }
 
-        // Guardar token y datos del usuario
         localStorage.setItem('apex_token', data.token);
         localStorage.setItem('apex_user', JSON.stringify(data.user));
 
@@ -483,12 +308,11 @@ function loginUser(event) {
 }
 
 // ============================================================
-// SESSION CHECK - Verificar sesión con el backend
+// VERIFICACIÓN DE SESIÓN
 // ============================================================
 (function() {
     var token = localStorage.getItem('apex_token');
     if (token) {
-        // Verificar token con el backend
         fetch(API_URL + '/api/verify', {
             method: 'GET',
             headers: { 'Authorization': 'Bearer ' + token }
@@ -508,14 +332,11 @@ function loginUser(event) {
             localStorage.removeItem('apex_user');
         });
     } else {
-        // Verificar "Recordarme"
         var rememberData = localStorage.getItem('apex_remember');
         if (rememberData) {
             try {
                 var data = JSON.parse(rememberData);
                 if (data.timestamp && (Date.now() - data.timestamp) < 7 * 24 * 60 * 60 * 1000) {
-                    // Intentar login automático
-                    // Aquí podrías implementar un refresh token si lo deseas
                     localStorage.removeItem('apex_remember');
                 } else {
                     localStorage.removeItem('apex_remember');
@@ -527,9 +348,8 @@ function loginUser(event) {
     }
 })();
 
-
 // ============================================================
-// MODO OSCURO - INDEX
+// MODO OSCURO
 // ============================================================
 function toggleDarkModeIndex() {
     var body = document.body;
@@ -542,7 +362,6 @@ function toggleDarkModeIndex() {
     }
 }
 
-// Cargar preferencia de modo oscuro al iniciar
 (function() {
     var isDark = localStorage.getItem('apex_dark_mode') === 'true';
     if (isDark) {
@@ -553,7 +372,6 @@ function toggleDarkModeIndex() {
         }
     }
 })();
-
 </script>
 </body>
 </html>
