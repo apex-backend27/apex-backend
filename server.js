@@ -18,6 +18,11 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
+// 🏠 Ruta raíz (NUEVA)
+app.get('/', (req, res) => {
+  res.send('Servidor funcionando correctamente');
+});
+
 // ✅ Ruta de prueba
 app.get('/test', (req, res) => {
   res.json({ mensaje: 'Backend funcionando correctamente' });
