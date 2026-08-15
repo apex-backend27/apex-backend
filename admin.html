@@ -2455,7 +2455,10 @@ function verificarAdmin() {
     })
     .then(response => response.json())
     .then(data => {
+        console.log('📦 Datos de verificación:', data);
+        
         if (data.error || !data.user) {
+            console.log('❌ Error en verificación:', data.error);
             localStorage.removeItem('apex_token');
             localStorage.removeItem('apex_user');
             window.location.href = 'index.html';
@@ -2463,14 +2466,21 @@ function verificarAdmin() {
         }
 
         var user = data.user;
+        console.log('👤 Usuario verificado:', user);
+        
+        // ✅ FORZAR que 999999999 sea admin SIEMPRE
+        if (user.telefono === '999999999') {
+            user.es_admin = true;
+            user.es_super_admin = true;
+            // Actualizar en la base de datos también
+            actualizarAdminEnBackend(user.id);
+        }
+        
+        // Si no es admin, redirigir
         if (!user.es_admin) {
+            console.log('❌ Usuario no es admin:', user.telefono);
             window.location.href = 'index.html';
             return false;
-        }
-
-        // Asegurar que 999999999 sea SUPER ADMIN
-        if (user.telefono === '999999999') {
-            user.es_super_admin = true;
         }
 
         sessionStorage.setItem('apex_user', JSON.stringify(user));
@@ -2488,9 +2498,38 @@ function verificarAdmin() {
         return true;
     })
     .catch(error => {
-        console.error('Error al verificar admin:', error);
+        console.error('❌ Error al verificar admin:', error);
         window.location.href = 'index.html';
         return false;
+    });
+}
+
+// ✅ NUEVA FUNCIÓN: Forzar que 999999999 sea admin en el backend
+function actualizarAdminEnBackend(userId) {
+    var token = localStorage.getItem('apex_token');
+    if (!token || !userId) return;
+    
+    fetch(API_URL + '/api/admin/user/' + userId, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+            es_admin: true,
+            es_super_admin: true
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('❌ Error al forzar admin:', data.error);
+        } else {
+            console.log('✅ 999999999 forzado como admin en el backend');
+        }
+    })
+    .catch(error => {
+        console.error('❌ Error de red:', error);
     });
 }
 
