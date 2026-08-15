@@ -2604,8 +2604,8 @@ function actualizarStats() {
         }
     }
     document.getElementById('totalUsers').textContent = users.length;
-    document.getElementById('totalBalance').textContent = '$' + totalBalance.toFixed(2);
-    document.getElementById('totalRetiros').textContent = '$' + totalRetirosPendientes.toFixed(2);
+    document.getElementById('totalBalance').textContent = '$' + Number(totalBalance).toFixed(2);
+document.getElementById('totalRetiros').textContent = '$' + Number(totalRetirosPendientes).toFixed(2);
 }
 
 // ============================================================
@@ -2665,7 +2665,7 @@ function renderUsuarios() {
             '<td><span class="usuario-nombre">' + u.nombre + ' ' + u.apellido + '</span> ' + esAdmin + ' ' + produccionPausada + '</td>' +
             '<td><span class="usuario-telefono">' + u.telefono + '</span></td>' +
             '<td>' + formatDate(u.fecha_registro || u.fechas_invito?.fechaRegistro) + '</td>' +
-            '<td><strong>$' + (u.balance || 0).toFixed(2) + '</strong></td>' +
+            '<td><strong>$' + Number(u.balance || 0).toFixed(2) + '</strong></td>' +
             '<td><button class="btn btn-info btn-sm" onclick="verIngresosUsuario(\'' + u.telefono + '\')">💰</button></td>' +
             '<td>$' + depositado.toFixed(2) + '</td>' +
             '<td>$' + retirado.toFixed(2) + '</td>' +
@@ -3037,10 +3037,12 @@ function verDetallesUsuario(telefono) {
     document.getElementById('detRegistro').textContent = formatDateTime(user.fecha_registro || user.fechas_invito?.fechaRegistro);
     document.getElementById('detInvitadoPor').textContent = getUsuarioReferido(user.telefono);
     document.getElementById('detPrimerDeposito').textContent = primerDeposito ? formatDateTime(primerDeposito) : 'No registrado';
-    document.getElementById('detSaldo').textContent = '$' + (user.balance || 0).toFixed(2);
+    document.getElementById('detSaldo').textContent = '$' + Number(user.balance || 0).toFixed(2);
     document.getElementById('detPuntos').textContent = user.puntos || 0;
-    document.getElementById('detDepositado').textContent = '$' + depositado.toFixed(2);
-    document.getElementById('detRetirado').textContent = '$' + retirado.toFixed(2);
+    document.getElementById('detDepositado').textContent = '$' + Number(depositado).toFixed(2);
+
+    document.getElementById('detRetirado').textContent = '$' + Number(retirado).toFixed(2);
+
     document.getElementById('detPlan').textContent = user.plan || 'Sin plan';
     document.getElementById('detReferidos').textContent = (user.referidos && user.referidos.lista) ? user.referidos.lista.length : 0;
     document.getElementById('detProduccion').textContent = user.produccion_pausada ? '⏸️ Pausada' : (user.produccion_activa ? '🟢 Activa' : '🔴 Inactiva');
@@ -3561,22 +3563,27 @@ function renderRetiros() {
         var r = retiros[i];
         var descuentoMostrar = '';
         if (r.descuentoAplicado > 0) {
-            descuentoMostrar = '<br><span style="font-size:10px;color:#4db6ac;">💚 ' + (r.descuentoAplicado * 100).toFixed(0) + '% descuento</span>';
+            descuentoMostrar = '<br><span style="font-size:10px;color:#4db6ac;">💚 ' + Number(r.descuentoAplicado * 100).toFixed(0) + '% descuento</span>';
             if (r.cupon_usado) {
                 descuentoMostrar += '<br><span style="font-size:9px;color:#999;">Cupón: ' + r.cupon_usado + '</span>';
             }
         }
         
-        // ============================================================
-        // CORRECCIÓN: Dirección completa y botón de copiar
-        // ============================================================
         var addressDisplay = r.address || 'No configurada';
         var copyBtn = '';
         if (r.address && r.address !== 'No configurada') {
             copyBtn = '<button class="btn btn-info btn-xs" onclick="copiarTexto(\'' + r.address + '\')" style="margin-left:5px;padding:2px 6px;">📋</button>';
         }
 
-        html += '<tr><td><strong>' + r.usuario + '</strong>' + descuentoMostrar + '</td><td>$' + r.amount.toFixed(2) + '</td><td>$' + (r.commission || 0).toFixed(2) + '</td><td>$' + (r.netAmount || r.amount).toFixed(2) + '</td>' +
+        // ✅ CONVERTIR A NÚMERO antes de usar toFixed
+        var amountNum = Number(r.amount || 0);
+        var commissionNum = Number(r.commission || 0);
+        var netAmountNum = Number(r.netAmount || r.amount || 0);
+
+        html += '<tr><td><strong>' + r.usuario + '</strong>' + descuentoMostrar + 
+            '</td><td>$' + amountNum.toFixed(2) + 
+            '</td><td>$' + commissionNum.toFixed(2) + 
+            '</td><td>$' + netAmountNum.toFixed(2) + '</td>' +
             '<td style="font-size:10px;font-family:monospace;color:#4db6ac;word-break:break-all;">' + addressDisplay + ' ' + copyBtn + '</td>' +
             '<td><input type="text" id="nota_retiro_' + i + '" placeholder="Nota..." style="width:100px;padding:4px;border:1px solid #ccc;border-radius:4px;font-size:10px;"></td>' +
             '<td>' + formatDateTime(r.date) + '</td>' +
@@ -3686,7 +3693,10 @@ function renderPagos() {
     for (var i = 0; i < pagos.length; i++) {
         var p = pagos[i];
         var estadoClass = p.estado === 'completado' ? 'badge-success' : 'badge-warning';
-        html += '<tr><td>' + (p.usuario || 'N/A') + '</td><td>$' + p.monto.toFixed(2) + '</td><td>' + (p.concepto || 'Pago') + '</td><td>' + formatDateTime(p.fecha) + '</td><td><span class="badge ' + estadoClass + '">' + (p.estado || 'completado') + '</span></td></tr>';
+        // ✅ CONVERTIR A NÚMERO antes de usar toFixed
+        var montoNum = Number(p.monto || 0);
+        
+        html += '<tr><td>' + (p.usuario || 'N/A') + '</td><td>$' + montoNum.toFixed(2) + '</td><td>' + (p.concepto || 'Pago') + '</td><td>' + formatDateTime(p.fecha) + '</td><td><span class="badge ' + estadoClass + '">' + (p.estado || 'completado') + '</span></td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -4873,12 +4883,15 @@ function renderDepositos() {
     var html = '';
     for (var i = 0; i < depositos.length; i++) {
         var d = depositos[i];
+        // ✅ CONVERTIR A NÚMERO antes de usar toFixed
+        var montoNum = Number(d.monto || 0);
+        
         html += '<tr>' +
             '<td>' + (i + 1) + '</td>' +
             '<td><strong>' + (d.usuario || 'N/A') + '</strong></td>' +
             '<td>' + (d.telefono || 'N/A') + '</td>' +
             '<td>' + formatDateTime(d.fecha) + '</td>' +
-            '<td><strong>$' + (d.monto || 0).toFixed(2) + '</strong></td>' +
+            '<td><strong>$' + montoNum.toFixed(2) + '</strong></td>' +
             '<td style="font-family:monospace;font-size:10px;">' + (d.hash || '-') + '</td>' +
             '<td style="font-size:10px;">' + (d.nota || '-') + '</td>' +
             '<td><button class="btn btn-info btn-sm" onclick="agregarNotaDeposito(' + i + ')" data-tooltip="Agregar nota">📝</button></td>' +
@@ -5056,10 +5069,10 @@ function renderEstadisticas() {
     document.getElementById('estCompletedReferidos').textContent = completedReferidos;
     document.getElementById('estCompletedAll').textContent = completedAll;
     document.getElementById('estPausados').textContent = pausados;
-    document.getElementById('estTotalDepositado').textContent = '$' + totalDepositado.toFixed(2);
-    document.getElementById('estTotalPagado').textContent = '$' + totalPagado.toFixed(2);
-    document.getElementById('estSaldoPlataforma').textContent = '$' + saldoPlataforma.toFixed(2);
-    document.getElementById('estRetirosPendientes').textContent = '$' + retirosPendientes.toFixed(2);
+    document.getElementById('estTotalDepositado').textContent = '$' + Number(totalDepositado).toFixed(2);
+document.getElementById('estTotalPagado').textContent = '$' + Number(totalPagado).toFixed(2);
+document.getElementById('estSaldoPlataforma').textContent = '$' + Number(saldoPlataforma).toFixed(2);
+document.getElementById('estRetirosPendientes').textContent = '$' + Number(retirosPendientes).toFixed(2);
     
     // Guardar datos para los clicks
     window._usuariosCompletados2 = usuariosCompletados2;
@@ -5305,10 +5318,10 @@ function buscarUsuarios() {
             '<td><span class="usuario-nombre">' + u.nombre + ' ' + u.apellido + '</span> ' + esAdmin + ' ' + produccionPausada + '</td>' +
             '<td><span class="usuario-telefono">' + u.telefono + '</span></td>' +
             '<td>' + formatDate(u.fecha_registro || u.fechas_invito?.fechaRegistro) + '</td>' +
-            '<td><strong>$' + (u.balance || 0).toFixed(2) + '</strong></td>' +
+            '<td><strong>$' + Number(u.balance || 0).toFixed(2) + '</strong></td>' +
             '<td><button class="btn btn-info btn-sm" onclick="verDetallesUsuario(\'' + u.telefono + '\')">📜</button></td>' +
-            '<td>$' + depositado.toFixed(2) + '</td>' +
-            '<td>$' + retirado.toFixed(2) + '</td>' +
+            '<td>$' + Number(depositado).toFixed(2) + '</td>' +
+            '<td>$' + Number(retirado).toFixed(2) + '</td>' +
             '<td>' + (u.puntos || 0) + '</td>' +
             '<td><span class="badge ' + planClass + '">' + (u.plan || 'Sin plan') + '</span></td>' +
             '<td><div class="action-buttons">' +
