@@ -383,6 +383,7 @@ function registerUser(event) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+ 	    username: telefono,
             telefono: telefono,
             nombre: nombre,
             apellido: apellido,
