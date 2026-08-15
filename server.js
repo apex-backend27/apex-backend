@@ -373,6 +373,88 @@ app.put('/api/user/update', async (req, res) => {
 });
 
 // ============================================================
+// RUTAS DE ADMINISTRACIÓN
+// ============================================================
+
+// Obtener todos los usuarios (solo admin)
+app.get('/api/admin/users', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ error: 'Token no proporcionado' });
+        }
+        
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // Verificar que sea admin
+        const adminCheck = await pool.query(
+            'SELECT es_admin FROM users WHERE id = $1',
+            [decoded.userId]
+        );
+        
+        if (!adminCheck.rows[0]?.es_admin) {
+            return res.status(403).json({ error: 'Acceso denegado' });
+        }
+        
+        const result = await pool.query('SELECT * FROM users ORDER BY id DESC');
+        res.json(result.rows);
+        
+    } catch (error) {
+        console.error('Error al obtener usuarios:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
+// Actualizar usuario (admin)
+app.put('/api/admin/user/:id', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ error: 'Token no proporcionado' });
+        }
+        
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminCheck = await pool.query(
+            'SELECT es_admin FROM users WHERE id = $1',
+            [decoded.userId]
+        );
+        
+        if (!adminCheck.rows[0]?.es_admin) {
+            return res.status(403).json({ error: 'Acceso denegado' });
+        }
+        
+        const userId = req.params.id;
+        const updates = req.body;
+        
+        const fields = [];
+        const values = [];
+        let paramCount = 1;
+        
+        for (const [key, value] of Object.entries(updates)) {
+            const camposPermitidos = ['balance', 'puntos', 'plan', 'cuenta_habilitada', 'produccion_pausada', 'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados', 'nivel_autorizado'];
+            if (camposPermitidos.includes(key)) {
+                fields.push(`${key} = $${paramCount}`);
+                values.push(value);
+                paramCount++;
+            }
+        }
+        
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'No hay datos para actualizar' });
+        }
+        
+        values.push(userId);
+        const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+        
+        const result = await pool.query(query, values);
+        res.json({ message: 'Usuario actualizado', user: result.rows[0] });
+        
+    } catch (error) {
+        console.error('Error al actualizar usuario:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
+// ============================================================
 // INICIAR SERVIDOR
 // ============================================================
 app.listen(port, '0.0.0.0', () => {
