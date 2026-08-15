@@ -1143,6 +1143,8 @@
             <span class="codigo-texto" id="codigoDisplay"></span>
             <button class="copy-individual" onclick="copiarCodigo(document.getElementById('codigoDisplay').textContent)">📋</button>
         </div>
+<button class="btn btn-warning" onclick="sincronizarTodosLosUsuarios()" style="background:#f7971e;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600;">🔄 Sincronizar Todos</button>
+</div>
     </div>
 
     <div class="stats-grid" id="statsGrid">
@@ -1687,6 +1689,9 @@ var DEPOSITOS_KEY = 'apex_depositos';
 
 const API_URL = 'https://apex-backend-cj21.onrender.com';
 
+var usuariosCache = [];
+var usuariosCacheAnterior = [];
+
 var PLANES_ORDEN = ['Sin plan', 'Trader', 'Analista', 'Gestor', 'Master', 'Elite'];
 
 var PLANS = [
@@ -2223,62 +2228,149 @@ function saveUsers(users) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
     usuariosCache = users;
     
-    // Enviar al backend (solo si hay token)
+    // Enviar al backend
     var token = localStorage.getItem('apex_token');
-    if (!token) return;
+    if (!token) {
+        console.warn('⚠️ No hay token, los cambios solo se guardaron localmente');
+        return;
+    }
     
-    // Actualizar cada usuario en el backend
+    // Actualizar SOLO los usuarios que cambiaron
     for (var i = 0; i < users.length; i++) {
         var u = users[i];
         if (u.telefono === 'admin') continue;
         
-        // Preparar datos para actualizar (excluir campos sensibles)
+        // Obtener el usuario anterior para comparar
+        var usuarioAnterior = usuariosCacheAnterior ? usuariosCacheAnterior.find(function(ua) { return ua.telefono === u.telefono; }) : null;
+        
+        // Si no hay cambios, saltar
+        if (usuarioAnterior) {
+            var cambios = false;
+            if (Number(usuarioAnterior.balance || 0) !== Number(u.balance || 0)) cambios = true;
+            if (Number(usuarioAnterior.puntos || 0) !== Number(u.puntos || 0)) cambios = true;
+            if (usuarioAnterior.plan !== u.plan) cambios = true;
+            if (usuarioAnterior.produccion_pausada !== u.produccion_pausada) cambios = true;
+            if (usuarioAnterior.cuenta_habilitada !== u.cuenta_habilitada) cambios = true;
+            if (Number(usuarioAnterior.ruleta_usos || 0) !== Number(u.ruleta_usos || 0)) cambios = true;
+            if (Number(usuarioAnterior.cofres_usos || 0) !== Number(u.cofres_usos || 0)) cambios = true;
+            if (Number(usuarioAnterior.dados_usos || 0) !== Number(u.dados_usos || 0)) cambios = true;
+            if (Number(usuarioAnterior.premio_ruleta || 0) !== Number(u.premio_ruleta || 0)) cambios = true;
+            if (Number(usuarioAnterior.premio_cofre || 0) !== Number(u.premio_cofre || 0)) cambios = true;
+            if (Number(usuarioAnterior.premio_dados || 0) !== Number(u.premio_dados || 0)) cambios = true;
+            if (usuarioAnterior.tareas_asignadas && u.tareas_asignadas) {
+                if (usuarioAnterior.tareas_asignadas.length !== u.tareas_asignadas.length) cambios = true;
+            }
+            if (usuarioAnterior.logros_asignados && u.logros_asignados) {
+                if (usuarioAnterior.logros_asignados.length !== u.logros_asignados.length) cambios = true;
+            }
+            if (usuarioAnterior.cupones_asignados && u.cupones_asignados) {
+                if (usuarioAnterior.cupones_asignados.length !== u.cupones_asignados.length) cambios = true;
+            }
+            if (usuarioAnterior.direccion_retiro !== u.direccion_retiro) cambios = true;
+            
+            if (!cambios) continue;
+        }
+        
+        // Preparar datos para actualizar
         var datosActualizar = {
-            balance: u.balance,
-            puntos: u.puntos,
-            plan: u.plan,
-            plan_amount: u.plan_amount,
-            daily_earnings: u.daily_earnings,
-            produccion_activa: u.produccion_activa,
-            produccion_inicio: u.produccion_inicio,
-            produccion_duracion: u.produccion_duracion,
-            tiempo_restante: u.tiempo_restante,
-            recompensa_pendiente: u.recompensa_pendiente,
-            puntosPendientes: u.puntosPendientes,
-            codigo_usado: u.codigo_usado,
-            reclamado_hoy: u.reclamado_hoy,
-            fecha_produccion: u.fecha_produccion,
-            codigos_usados_hoy: u.codigos_usados_hoy,
-            codigos_usados: u.codigos_usados,
-            ultimo_reinicio_codigos: u.ultimo_reinicio_codigos,
-            ruleta_usos: u.ruleta_usos,
-            cofres_usos: u.cofres_usos,
-            dados_usos: u.dados_usos,
-            premio_ruleta: u.premio_ruleta,
-            premio_cofre: u.premio_cofre,
-            premio_dados: u.premio_dados,
-            cofres_abiertos: u.cofres_abiertos,
-            cupones_asignados: u.cupones_asignados,
-            logros_asignados: u.logros_asignados,
-            logros_pendientes_aprobar: u.logros_pendientes_aprobar,
-            tareas_asignadas: u.tareas_asignadas,
-            canjes_realizados: u.canjes_realizados,
-            logros_reclamados: u.logros_reclamados,
-            referidos: u.referidos,
-            referidos_directos: u.referidos_directos,
-            fechas_invito: u.fechas_invito,
-            historial: u.historial,
-            historial_detallado: u.historial_detallado,
-            historial_codigos: u.historial_codigos,
-            descuentoRetiroActivo: u.descuentoRetiroActivo,
-            bonusReferidoActivo: u.bonusReferidoActivo,
-            direccion_retiro: u.direccion_retiro,
-            cuenta_habilitada: u.cuenta_habilitada,
-            produccion_pausada: u.produccion_pausada,
-            nivel_autorizado: u.nivel_autorizado || 0
+            balance: Number(u.balance || 0),
+            puntos: Number(u.puntos || 0),
+            plan: u.plan || 'Sin plan',
+            plan_amount: Number(u.plan_amount || 0),
+            daily_earnings: Number(u.daily_earnings || 0),
+            produccion_activa: u.produccion_activa || false,
+            produccion_inicio: u.produccion_inicio || null,
+            produccion_duracion: Number(u.produccion_duracion || 0),
+            tiempo_restante: Number(u.tiempo_restante || 0),
+            recompensa_pendiente: Number(u.recompensa_pendiente || 0),
+            puntosPendientes: Number(u.puntosPendientes || 0),
+            codigo_usado: u.codigo_usado || false,
+            reclamado_hoy: u.reclamado_hoy || false,
+            fecha_produccion: u.fecha_produccion || null,
+            codigos_usados_hoy: Number(u.codigos_usados_hoy || 0),
+            codigos_usados: u.codigos_usados || [],
+            ultimo_reinicio_codigos: u.ultimo_reinicio_codigos || null,
+            ruleta_usos: Number(u.ruleta_usos || 0),
+            cofres_usos: Number(u.cofres_usos || 0),
+            dados_usos: Number(u.dados_usos || 0),
+            premio_ruleta: Number(u.premio_ruleta || 0),
+            premio_cofre: Number(u.premio_cofre || 0),
+            premio_dados: Number(u.premio_dados || 0),
+            cofres_abiertos: u.cofres_abiertos || [],
+            cupones_asignados: u.cupones_asignados || [],
+            logros_asignados: u.logros_asignados || [],
+            logros_pendientes_aprobar: u.logros_pendientes_aprobar || [],
+            tareas_asignadas: u.tareas_asignadas || [],
+            canjes_realizados: u.canjes_realizados || [],
+            logros_reclamados: u.logros_reclamados || [],
+            referidos: u.referidos || { izquierda: null, derecha: null, lista: [] },
+            referidos_directos: u.referidos_directos || { izquierda: null, derecha: null },
+            fechas_invito: u.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
+            historial: u.historial || [],
+            historial_detallado: u.historial_detallado || [],
+            historial_codigos: u.historial_codigos || [],
+            descuentoRetiroActivo: u.descuentoRetiroActivo || null,
+            bonusReferidoActivo: u.bonusReferidoActivo || null,
+            direccion_retiro: u.direccion_retiro || null,
+            cuenta_habilitada: u.cuenta_habilitada !== false,
+            produccion_pausada: u.produccion_pausada || false,
+            nivel_autorizado: Number(u.nivel_autorizado || 0)
         };
         
-        fetch(API_URL + '/api/admin/user/' + u.id, {
+        // Si tiene ID, actualizar
+        if (u.id) {
+            fetch(API_URL + '/api/admin/user/' + u.id, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify(datosActualizar)
+            })
+            .catch(error => {
+                console.error('Error al guardar usuario ' + u.telefono + ':', error);
+            });
+        }
+    }
+    
+    // Guardar copia anterior para comparar
+    usuariosCacheAnterior = JSON.parse(JSON.stringify(users));
+}
+
+function sincronizarUsuarioConBackend(telefono) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) { showAlert('⚠️ Usuario no encontrado', 'danger'); return; }
+    
+    var token = localStorage.getItem('apex_token');
+    if (!token) { showAlert('⚠️ No hay token de autenticación', 'danger'); return; }
+    
+    var datosActualizar = {
+        balance: Number(user.balance || 0),
+        puntos: Number(user.puntos || 0),
+        plan: user.plan || 'Sin plan',
+        plan_amount: Number(user.plan_amount || 0),
+        daily_earnings: Number(user.daily_earnings || 0),
+        ruleta_usos: Number(user.ruleta_usos || 0),
+        cofres_usos: Number(user.cofres_usos || 0),
+        dados_usos: Number(user.dados_usos || 0),
+        premio_ruleta: Number(user.premio_ruleta || 0),
+        premio_cofre: Number(user.premio_cofre || 0),
+        premio_dados: Number(user.premio_dados || 0),
+        cupones_asignados: user.cupones_asignados || [],
+        logros_asignados: user.logros_asignados || [],
+        tareas_asignadas: user.tareas_asignadas || [],
+        canjes_realizados: user.canjes_realizados || [],
+        logros_reclamados: user.logros_reclamados || [],
+        historial_detallado: user.historial_detallado || [],
+        direccion_retiro: user.direccion_retiro || null,
+        cuenta_habilitada: user.cuenta_habilitada !== false,
+        produccion_pausada: user.produccion_pausada || false,
+        nivel_autorizado: Number(user.nivel_autorizado || 0)
+    };
+    
+    if (user.id) {
+        fetch(API_URL + '/api/admin/user/' + user.id, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -2286,11 +2378,22 @@ function saveUsers(users) {
             },
             body: JSON.stringify(datosActualizar)
         })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert('❌ Error al sincronizar: ' + data.error, 'danger');
+            } else {
+                showAlert('✅ Usuario sincronizado correctamente', 'success');
+            }
+        })
         .catch(error => {
-            console.error('Error al guardar usuario ' + u.telefono + ':', error);
+            showAlert('❌ Error al sincronizar: ' + error.message, 'danger');
         });
+    } else {
+        showAlert('⚠️ El usuario no tiene ID en el backend', 'danger');
     }
 }
+
 
 function getCodigos() {
     try { return JSON.parse(localStorage.getItem(CODIGOS_KEY)) || []; } catch { return []; }
@@ -2927,7 +3030,7 @@ function agregarPuntosAdmin(telefono) {
 }
 
 function agregarSaldo(telefono) {
-    var monto = prompt('Monto a agregar al saldo:', '10');
+    var monto = prompt('💰 Monto a agregar al saldo:', '10');
     if (!monto) return;
     var cantidad = parseFloat(monto);
     if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Monto inválido', 'danger'); return; }
@@ -2936,9 +3039,6 @@ function agregarSaldo(telefono) {
     if (!user) return;
     user.balance = (user.balance || 0) + cantidad;
 
-    // ============================================================
-    // CORRECCIÓN: Guardar en el historial detallado para que el modal lo vea
-    // ============================================================
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
         tipo: 'admin',
@@ -2954,12 +3054,14 @@ function agregarSaldo(telefono) {
         amount: cantidad,
         date: new Date().toISOString(),
         status: 'completado',
-        concepto: '💰 +$' + cantidad.toFixed(2) + ' por admin',
+        concepto: '💰 +$' + Number(cantidad).toFixed(2) + ' por admin',
         origen: 'admin'
     });
 
     saveUsers(users);
-    showAlert('✅ +$' + cantidad.toFixed(2) + ' a ' + user.nombre, 'success');
+    sincronizarUsuarioConBackend(telefono);
+    
+    showAlert('✅ +$' + Number(cantidad).toFixed(2) + ' a ' + user.nombre, 'success');
     renderUsuarios();
     renderUsuariosActivos();
 }
@@ -3625,6 +3727,7 @@ function aprobarRetiro(telefono, fecha, index) {
                     estado: 'aprobado'
                 });
                 saveUsers(users);
+                sincronizarUsuarioConBackend(telefono);
                 showAlert('✅ Retiro aprobado. Nota guardada.', 'success');
                 renderRetiros();
                 renderPagos();
@@ -3933,7 +4036,6 @@ function asignarTareaAUsuarioEspecifico(telefono, tareaId, silencioso) {
     var tarea = tareas.find(function(t) { return t.id === tareaId; });
     if (!tarea) return false;
 
-    // Verificar si ya tiene la misma tarea pendiente
     if (user.tareas_asignadas) {
         for (var i = 0; i < user.tareas_asignadas.length; i++) {
             if (user.tareas_asignadas[i].tareaId === tareaId && 
@@ -3962,6 +4064,8 @@ function asignarTareaAUsuarioEspecifico(telefono, tareaId, silencioso) {
     });
 
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    
     if (!silencioso) {
         showAlert('✅ Tarea asignada a ' + user.nombre, 'success');
     }
@@ -4306,37 +4410,21 @@ function asignarLogroAUsuarioEspecifico(telefono, logroId, silencioso) {
     }
 
     if (!user.logros_asignados) user.logros_asignados = [];
-    
-    // Verificar si ya tiene este logro asignado
     if (user.logros_asignados.indexOf(logroId) !== -1) {
         if (!silencioso) showAlert('⚠️ Este logro ya está asignado a ' + user.nombre, 'warning');
         return false;
     }
 
     user.logros_asignados.push(logroId);
-    
-    // ============================================================
-    // GUARDAR EXPLÍCITAMENTE - ESTO ES LO QUE FALTABA
-    // ============================================================
     saveUsers(users);
-    
-    // También actualizar la sesión si el usuario está logueado
-    var sessionUser = sessionStorage.getItem('apex_user');
-    if (sessionUser) {
-        try {
-            var sessionData = JSON.parse(sessionUser);
-            if (sessionData.telefono === telefono) {
-                sessionData.logros_asignados = user.logros_asignados;
-                sessionStorage.setItem('apex_user', JSON.stringify(sessionData));
-            }
-        } catch(e) {}
-    }
+    sincronizarUsuarioConBackend(telefono);
     
     if (!silencioso) {
         showAlert('✅ Logro "' + logro.nombre + '" asignado a ' + user.nombre, 'success');
     }
     return true;
 }
+
 function mostrarLogrosAsignados() {
     var userSelect = document.getElementById('asignarLogroUsuario');
     var preview = document.getElementById('logrosAsignadosPreview');
@@ -4833,15 +4921,12 @@ function asignarCuponAUsuarioEspecifico(telefono, cuponIndex, silencioso) {
     var cupon = cupones[cuponIndex];
 
     if (!user.cupones_asignados) user.cupones_asignados = [];
-    
-    // Verificar si ya tiene el mismo cupón activo
     for (var i = 0; i < user.cupones_asignados.length; i++) {
         if (user.cupones_asignados[i].id === cupon.id && !user.cupones_asignados[i].usado) {
             return false;
         }
     }
 
-    // Crear una copia del cupón para este usuario (con su propia fecha de expiración)
     var fechaExpiracion = new Date();
     fechaExpiracion.setDate(fechaExpiracion.getDate() + (cupon.dias_vigencia || 7));
 
@@ -4859,6 +4944,8 @@ function asignarCuponAUsuarioEspecifico(telefono, cuponIndex, silencioso) {
     });
 
     saveUsers(users);
+    sincronizarUsuarioConBackend(telefono);
+    
     if (!silencioso) {
         showAlert('✅ Cupón "' + cupon.titulo + '" asignado a ' + user.nombre, 'success');
     }
@@ -5884,6 +5971,83 @@ function toggleSemana(el) {
 function cerrarIngresos() {
     document.getElementById('ingresosModal').classList.remove('show');
 }    
+
+function sincronizarTodosLosUsuarios() {
+    if (!confirm('⚠️ ¿Sincronizar TODOS los usuarios con el backend?')) return;
+    
+    var users = getUsers();
+    var token = localStorage.getItem('apex_token');
+    if (!token) { showAlert('⚠️ No hay token', 'danger'); return; }
+    
+    var sincronizados = 0;
+    var total = users.filter(function(u) { return u.telefono !== 'admin'; }).length;
+    
+    if (total === 0) {
+        showAlert('⚠️ No hay usuarios para sincronizar', 'warning');
+        return;
+    }
+    
+    showAlert('🔄 Sincronizando ' + total + ' usuarios...', 'info');
+    
+    for (var i = 0; i < users.length; i++) {
+        var u = users[i];
+        if (u.telefono === 'admin') continue;
+        if (!u.id) {
+            sincronizados++;
+            if (sincronizados === total) {
+                showAlert('✅ ' + sincronizados + ' usuarios sincronizados correctamente', 'success');
+            }
+            continue;
+        }
+        
+        var datosActualizar = {
+            balance: Number(u.balance || 0),
+            puntos: Number(u.puntos || 0),
+            plan: u.plan || 'Sin plan',
+            ruleta_usos: Number(u.ruleta_usos || 0),
+            cofres_usos: Number(u.cofres_usos || 0),
+            dados_usos: Number(u.dados_usos || 0),
+            premio_ruleta: Number(u.premio_ruleta || 0),
+            premio_cofre: Number(u.premio_cofre || 0),
+            premio_dados: Number(u.premio_dados || 0),
+            cupones_asignados: u.cupones_asignados || [],
+            logros_asignados: u.logros_asignados || [],
+            tareas_asignadas: u.tareas_asignadas || [],
+            canjes_realizados: u.canjes_realizados || [],
+            logros_reclamados: u.logros_reclamados || [],
+            historial_detallado: u.historial_detallado || [],
+            direccion_retiro: u.direccion_retiro || null,
+            cuenta_habilitada: u.cuenta_habilitada !== false,
+            produccion_pausada: u.produccion_pausada || false,
+            nivel_autorizado: Number(u.nivel_autorizado || 0)
+        };
+        
+        fetch(API_URL + '/api/admin/user/' + u.id, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify(datosActualizar)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.error) {
+                sincronizados++;
+                if (sincronizados === total) {
+                    showAlert('✅ ' + sincronizados + ' usuarios sincronizados correctamente', 'success');
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error al sincronizar ' + u.telefono + ':', error);
+            sincronizados++;
+            if (sincronizados === total) {
+                showAlert('⚠️ ' + sincronizados + ' usuarios sincronizados (con algunos errores)', 'warning');
+            }
+        });
+    }
+}
 
 </script>
 </body>
