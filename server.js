@@ -211,7 +211,7 @@ app.post('/api/register', async (req, res) => {
     // Insertar usuario en la base de datos
     const result = await pool.query(
       `INSERT INTO users 
-       (username, email, password_hash, full_name, phone, address, wallet_address, referral_code, referred_by) 
+       (email, password_hash, full_name, phone, address, wallet_address, referral_code, referred_by) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
        RETURNING id, username, email, wallet_address, referral_code`,
       [username, email, hashedPassword, fullName, phone, address, walletAddress, referralCodeGenerated, referralCode || null]
