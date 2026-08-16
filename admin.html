@@ -3796,8 +3796,13 @@ function guardarConfiguracion() {
     var puntos = parseInt(document.getElementById('puntosPorCodigo').value) || 10;
     
     // Guardar en localStorage (rápido)
-    localStorage.setItem('apex_tiempo_produccion', tiempo);
-    localStorage.setItem('apex_puntos_por_codigo', puntos);
+    // ✅ Guardar en localStorage para que el dashboard lo use
+localStorage.setItem('apex_tiempo_produccion', tiempo);
+localStorage.setItem('apex_puntos_por_codigo', puntos);
+localStorage.setItem('apex_configuracion', JSON.stringify({
+    tiempo_produccion: tiempo,
+    puntos_por_codigo: puntos
+}));
     
     // Guardar en el backend
     var token = localStorage.getItem('apex_token');

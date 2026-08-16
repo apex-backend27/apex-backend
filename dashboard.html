@@ -1725,14 +1725,22 @@ function renderPerfil() {
 // ============================================================
 function renderDashboard() {
 // ✅ Cargar configuración del admin
-function cargarConfiguracionDashboard() {
+function cargarConfiguracionDesdeAdmin() {
     var configData = localStorage.getItem('apex_configuracion');
     if (configData) {
         try {
             var config = JSON.parse(configData);
             window.tiempoProduccion = config.tiempo_produccion || 10;
             window.puntosPorCodigo = config.puntos_por_codigo || 10;
-        } catch(e) {}
+            console.log('✅ Configuración cargada:', window.tiempoProduccion, 'segundos,', window.puntosPorCodigo, 'puntos');
+        } catch(e) {
+            console.warn('Error al leer configuración:', e);
+        }
+    } else {
+        // Si no hay configuración, usar valores por defecto
+        window.tiempoProduccion = 10;
+        window.puntosPorCodigo = 10;
+        console.log('⚠️ Usando valores por defecto: 10 segundos, 10 puntos');
     }
 }
     if (!user) return;
