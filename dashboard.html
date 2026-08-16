@@ -2079,7 +2079,7 @@ function validateCode() {
         return;
     }
 
-    // ✅ VALIDAR EN EL BACKEND (ruta pública)
+    // ✅ VALIDAR EN EL BACKEND
     fetch('https://apex-backend-cj21.onrender.com/api/validate-code', {
         method: 'POST',
         headers: {
@@ -2106,33 +2106,50 @@ function validateCode() {
             return;
         }
 
-        // ✅ Si todo está bien, usar el código
+        // ✅ USAR EL CÓDIGO
         if (!user.codigos_usados) user.codigos_usados = [];
         user.codigos_usados.push(code);
         user.codigos_usados_hoy = (user.codigos_usados_hoy || 0) + 1;
         user.ultimo_reinicio_codigos = new Date().toDateString();
 
-        // ✅ Obtener configuración del backend
-var tiempoProduccion = 10;
-var puntosPorCodigo = 10;
+        // ✅ OBTENER CONFIGURACIÓN
+        var tiempoProduccion = 10;
+        var puntosPorCodigo = 10;
 
-try {
-    var configData = localStorage.getItem('apex_configuracion');
-    if (configData) {
-        var config = JSON.parse(configData);
-        tiempoProduccion = config.tiempo_produccion || 10;
-        puntosPorCodigo = config.puntos_por_codigo || 10;
-    }
-} catch(e) {
-    console.warn('Error al leer configuración:', e);
-}
+        try {
+            var configData = localStorage.getItem('apex_configuracion');
+            if (configData) {
+                var config = JSON.parse(configData);
+                tiempoProduccion = config.tiempo_produccion || 10;
+                puntosPorCodigo = config.puntos_por_codigo || 10;
+            }
+        } catch(e) {
+            console.warn('Error al leer configuración:', e);
+        }
+
+        // ✅ CALCULAR RECOMPENSA - FORZANDO VALOR
         var montoGanado = Number((user.daily_earnings || 0) * 0.5);
-user.recompensa_pendiente = montoGanado;
-console.log('💰 validateCode() - daily_earnings:', user.daily_earnings);
-console.log('💰 validateCode() - montoGanado:', montoGanado);
-console.log('💰 validateCode() - recompensa_pendiente asignada:', user.recompensa_pendiente);
-console.log('💰 recompensa_pendiente asignada en validateCode():', user.recompensa_pendiente);
+        
+        // ✅ SI daily_earnings ES 0 O undefined, USAR VALOR POR DEFECTO
+        if (montoGanado === 0 || isNaN(montoGanado)) {
+            // Si el usuario tiene plan Trader (6), Analista (10), etc.
+            if (user.plan === 'Trader') montoGanado = 3;
+            else if (user.plan === 'Analista') montoGanado = 5;
+            else if (user.plan === 'Gestor') montoGanado = 8.5;
+            else if (user.plan === 'Master') montoGanado = 13.5;
+            else if (user.plan === 'Elite') montoGanado = 21;
+            else montoGanado = 1; // Valor mínimo por si acaso
+            console.log('⚠️ daily_earnings era 0, usando valor por defecto del plan:', montoGanado);
+        }
+
+        user.recompensa_pendiente = montoGanado;
         user.puntosPendientes = puntosPorCodigo;
+        
+        console.log('💰 DAILY_EARNINGS:', user.daily_earnings);
+        console.log('💰 PLAN:', user.plan);
+        console.log('💰 MONTO GANADO:', montoGanado);
+        console.log('💰 RECOMPENSA PENDIENTE ASIGNADA:', user.recompensa_pendiente);
+
         user.codigo_usado = true;
         user.reclamado_hoy = false;
         user.produccion_activa = true;
@@ -2148,10 +2165,12 @@ console.log('💰 recompensa_pendiente asignada en validateCode():', user.recomp
             estado: 'usado'
         });
 
+        // ✅ GUARDAR TODO
         saveUserData();
         guardarEnBackend();
         actualizarEstadoCodigos();
         renderDashboard();
+        
         showAlert('✅ Código validado! Producción iniciada.', 'success');
         input.value = '';
 
