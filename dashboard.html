@@ -1815,6 +1815,7 @@ function renderDashboard() {
             productionStatus.innerHTML = '<span style="color:#999;">Usa un código para comenzar</span>';
             claimBtn.className = 'claim-btn disabled';
             claimBtn.textContent = '🔑 Usa un código';
+	    claimBtn.onclick = claimReward;
             
             actualizarEstadoCodigos();
             renderActividades();
@@ -2142,6 +2143,7 @@ function claimReward() {
     if (user.produccion_activa) { showAlert('⏳ Espera a que termine', 'warning'); return; }
     if (!user.codigo_usado || user.reclamado_hoy) { showAlert('⚠️ No hay recompensa', 'warning'); return; }
 
+console.log('💥 claimReward() ejecutada');
 console.log('🔍 claimReward() - recompensa_pendiente:', user.recompensa_pendiente);
 console.log('🔍 claimReward() - codigo_usado:', user.codigo_usado);
 console.log('🔍 claimReward() - reclamado_hoy:', user.reclamado_hoy);
