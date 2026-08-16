@@ -2067,56 +2067,40 @@ function validateCode() {
         return;
     }
 
-    // ✅ VERIFICAR EN EL BACKEND
-    var token = localStorage.getItem('apex_token');
-    if (!token) {
-        showAlert('⚠️ No hay sesión activa', 'danger');
-        return;
-    }
-
     var btn = document.getElementById('validateCodeBtn');
     btn.disabled = true;
     input.disabled = true;
 
-    fetch('https://apex-backend-cj21.onrender.com/api/admin/codes', {
-        method: 'GET',
+    var token = localStorage.getItem('apex_token');
+    if (!token) {
+        showAlert('⚠️ No hay sesión activa', 'danger');
+        btn.disabled = false;
+        input.disabled = false;
+        return;
+    }
+
+    // ✅ VALIDAR EN EL BACKEND (ruta pública)
+    fetch('https://apex-backend-cj21.onrender.com/api/validate-code', {
+        method: 'POST',
         headers: {
+            'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + token
-        }
+        },
+        body: JSON.stringify({ codigo: code })
     })
     .then(function(response) {
         return response.json();
     })
-    .then(function(codigosSistema) {
-        // Buscar el código en la lista del backend
-        var codigoEncontrado = null;
-        for (var i = 0; i < codigosSistema.length; i++) {
-            if (codigosSistema[i].codigo === code) {
-                codigoEncontrado = codigosSistema[i];
-                break;
-            }
+    .then(function(data) {
+        if (data.error) {
+            showAlert('❌ ' + data.error, 'danger');
+            btn.disabled = false;
+            input.disabled = false;
+            return;
         }
-        
-        if (!codigoEncontrado) {
+
+        if (!data.valid) {
             showAlert('❌ Código inválido', 'danger');
-            btn.disabled = false;
-            input.disabled = false;
-            return;
-        }
-
-        // Verificar expiración
-        var now = Date.now();
-        var fechaExpiracion = new Date(codigoEncontrado.fecha_expiracion).getTime();
-        if (fechaExpiracion && now > fechaExpiracion) {
-            showAlert('⏰ Código expirado', 'danger');
-            btn.disabled = false;
-            input.disabled = false;
-            return;
-        }
-
-        // Verificar si ya fue usado
-        if (codigoEncontrado.estado !== 'disponible') {
-            showAlert('❌ Código ya usado', 'danger');
             btn.disabled = false;
             input.disabled = false;
             return;
@@ -2149,26 +2133,8 @@ function validateCode() {
             estado: 'usado'
         });
 
-        // ✅ Marcar el código como usado en el backend
-        fetch('https://apex-backend-cj21.onrender.com/api/admin/codes/' + codigoEncontrado.id, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + token
-            },
-            body: JSON.stringify({
-                estado: 'usado',
-                usuario_uso: user.telefono,
-                fecha_uso: new Date().toISOString()
-            })
-        })
-        .catch(function(error) {
-            console.error('Error al marcar código como usado:', error);
-        });
-
-        // ✅ Guardar cambios
         saveUserData();
-        guardarEnBackend();  // Guardar en el backend
+        guardarEnBackend();
         actualizarEstadoCodigos();
         renderDashboard();
         showAlert('✅ Código validado! Producción iniciada.', 'success');

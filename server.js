@@ -458,6 +458,53 @@ res.json({
 // RUTAS DE ADMINISTRACIÓN
 // ============================================================
 
+
+// ============================================================
+// RUTAS PÚBLICAS - VALIDAR CÓDIGOS
+// ============================================================
+app.post('/api/validate-code', authenticate, async (req, res) => {
+    try {
+        const { codigo } = req.body;
+        const userId = req.userId;
+        
+        // Buscar el código en la base de datos
+        const result = await pool.query(
+            'SELECT * FROM codigos WHERE codigo = $1 AND estado = $2',
+            [codigo, 'disponible']
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Código inválido o ya usado' });
+        }
+        
+        const codigoData = result.rows[0];
+        
+        // Verificar expiración
+        if (codigoData.fecha_expiracion && new Date() > new Date(codigoData.fecha_expiracion)) {
+            return res.status(400).json({ error: 'Código expirado' });
+        }
+        
+        // Marcar como usado
+        await pool.query(
+            'UPDATE codigos SET estado = $1, usuario_uso = $2, fecha_uso = NOW() WHERE id = $3',
+            ['usado', req.user.telefono, codigoData.id]
+        );
+        
+        // Obtener puntos del código
+        const puntos = codigoData.puntos || 10;
+        
+        res.json({ 
+            valid: true, 
+            puntos: puntos,
+            message: 'Código válido' 
+        });
+        
+    } catch (error) {
+        console.error('Error al validar código:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
 // Obtener todos los usuarios (solo admin)
 app.get('/api/admin/users', async (req, res) => {
     try {
