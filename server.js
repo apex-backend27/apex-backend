@@ -593,6 +593,32 @@ app.post('/api/admin/codes', authenticate, isAdmin, async (req, res) => {
     }
 });
 
+// ✅ NUEVA RUTA: Actualizar un código (marcar como usado)
+app.put('/api/admin/codes/:id', authenticate, isAdmin, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estado, usuario_uso, fecha_uso } = req.body;
+        
+        const result = await pool.query(
+            `UPDATE codigos SET 
+                estado = COALESCE($1, estado),
+                usuario_uso = COALESCE($2, usuario_uso),
+                fecha_uso = COALESCE($3, fecha_uso)
+             WHERE id = $4 RETURNING *`,
+            [estado, usuario_uso, fecha_uso, id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Código no encontrado' });
+        }
+        
+        res.json({ message: 'Código actualizado', codigo: result.rows[0] });
+    } catch (error) {
+        console.error('Error al actualizar código:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
 // Actualizar usuario (admin)
 app.put('/api/admin/user/:id', async (req, res) => {
     try {

@@ -2030,10 +2030,22 @@ function actualizarEstadoCodigos() {
 }
 
 function validateCode() {
-    if (!user) { showAlert('⚠️ Usuario no encontrado', 'danger'); return; }
-    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
-    if (user.produccion_pausada) { showAlert('⛔ Producción pausada por el administrador', 'danger'); return; }
-    if (!user.plan || user.plan === 'Sin plan') { showAlert('⚠️ Necesitas un plan activo', 'danger'); return; }
+    if (!user) {
+        showAlert('⚠️ Usuario no encontrado', 'danger');
+        return;
+    }
+    if (user.cuenta_habilitada === false) {
+        showAlert('⛔ Cuenta inhabilitada', 'danger');
+        return;
+    }
+    if (user.produccion_pausada) {
+        showAlert('⛔ Producción pausada por el administrador', 'danger');
+        return;
+    }
+    if (!user.plan || user.plan === 'Sin plan') {
+        showAlert('⚠️ Necesitas un plan activo', 'danger');
+        return;
+    }
 
     verificarReinicioCodigosDiarios();
 
@@ -2055,16 +2067,10 @@ function validateCode() {
         return;
     }
 
-    var codigosSistema = getCodigosSistema();
-    var codigoEncontrado = null;
-    for (var i = 0; i < codigosSistema.length; i++) {
-        if (codigosSistema[i].codigo === code) { codigoEncontrado = codigosSistema[i]; break; }
-    }
-    if (!codigoEncontrado) { showAlert('❌ Código inválido', 'danger'); return; }
-
-    var now = Date.now();
-    if (codigoEncontrado.fechaExpiracion && now > codigoEncontrado.fechaExpiracion) {
-        showAlert('⏰ Código expirado', 'danger');
+    // ✅ VERIFICAR EN EL BACKEND
+    var token = localStorage.getItem('apex_token');
+    if (!token) {
+        showAlert('⚠️ No hay sesión activa', 'danger');
         return;
     }
 
@@ -2072,46 +2078,112 @@ function validateCode() {
     btn.disabled = true;
     input.disabled = true;
 
-    if (!user.codigos_usados) user.codigos_usados = [];
-    user.codigos_usados.push(code);
-    user.codigos_usados_hoy = (user.codigos_usados_hoy || 0) + 1;
-    user.ultimo_reinicio_codigos = new Date().toDateString();
+    fetch('https://apex-backend-cj21.onrender.com/api/admin/codes', {
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + token
+        }
+    })
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(codigosSistema) {
+        // Buscar el código en la lista del backend
+        var codigoEncontrado = null;
+        for (var i = 0; i < codigosSistema.length; i++) {
+            if (codigosSistema[i].codigo === code) {
+                codigoEncontrado = codigosSistema[i];
+                break;
+            }
+        }
+        
+        if (!codigoEncontrado) {
+            showAlert('❌ Código inválido', 'danger');
+            btn.disabled = false;
+            input.disabled = false;
+            return;
+        }
 
-    var tiempoProduccion = parseInt(localStorage.getItem('apex_tiempo_produccion')) || 10;
-    var puntosPorCodigo = parseInt(localStorage.getItem('apex_puntos_por_codigo')) || 10;
-    var montoGanado = (user.daily_earnings || 0) * 0.5;
+        // Verificar expiración
+        var now = Date.now();
+        var fechaExpiracion = new Date(codigoEncontrado.fecha_expiracion).getTime();
+        if (fechaExpiracion && now > fechaExpiracion) {
+            showAlert('⏰ Código expirado', 'danger');
+            btn.disabled = false;
+            input.disabled = false;
+            return;
+        }
 
-    user.recompensa_pendiente = montoGanado;
-    user.puntosPendientes = puntosPorCodigo;
-    user.codigo_usado = true;
-    user.reclamado_hoy = false;
-    user.produccion_activa = true;
-    user.produccion_inicio = new Date().toISOString();
-    user.produccion_duracion = tiempoProduccion;
-    // ============================================================
-    // GUARDAR FECHA DE PRODUCCIÓN PARA VALIDAR COBRO
-    // ============================================================
-    user.fecha_produccion = new Date().toDateString();
+        // Verificar si ya fue usado
+        if (codigoEncontrado.estado !== 'disponible') {
+            showAlert('❌ Código ya usado', 'danger');
+            btn.disabled = false;
+            input.disabled = false;
+            return;
+        }
 
-    if (!user.historial_codigos) user.historial_codigos = [];
-    user.historial_codigos.push({
-        codigo: code,
-        puntos: puntosPorCodigo,
-        fecha: new Date().toISOString(),
-        estado: 'usado'
-    });
+        // ✅ Si todo está bien, usar el código
+        if (!user.codigos_usados) user.codigos_usados = [];
+        user.codigos_usados.push(code);
+        user.codigos_usados_hoy = (user.codigos_usados_hoy || 0) + 1;
+        user.ultimo_reinicio_codigos = new Date().toDateString();
 
-    saveUserData();
-    actualizarEstadoCodigos();
-    renderDashboard();
-    showAlert('✅ Código validado! Producción iniciada.', 'success');
-    input.value = '';
+        var tiempoProduccion = parseInt(localStorage.getItem('apex_tiempo_produccion')) || 10;
+        var puntosPorCodigo = parseInt(localStorage.getItem('apex_puntos_por_codigo')) || 10;
+        var montoGanado = (user.daily_earnings || 0) * 0.5;
 
-    setTimeout(function() {
+        user.recompensa_pendiente = montoGanado;
+        user.puntosPendientes = puntosPorCodigo;
+        user.codigo_usado = true;
+        user.reclamado_hoy = false;
+        user.produccion_activa = true;
+        user.produccion_inicio = new Date().toISOString();
+        user.produccion_duracion = tiempoProduccion;
+        user.fecha_produccion = new Date().toDateString();
+
+        if (!user.historial_codigos) user.historial_codigos = [];
+        user.historial_codigos.push({
+            codigo: code,
+            puntos: puntosPorCodigo,
+            fecha: new Date().toISOString(),
+            estado: 'usado'
+        });
+
+        // ✅ Marcar el código como usado en el backend
+        fetch('https://apex-backend-cj21.onrender.com/api/admin/codes/' + codigoEncontrado.id, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            },
+            body: JSON.stringify({
+                estado: 'usado',
+                usuario_uso: user.telefono,
+                fecha_uso: new Date().toISOString()
+            })
+        })
+        .catch(function(error) {
+            console.error('Error al marcar código como usado:', error);
+        });
+
+        // ✅ Guardar cambios
+        saveUserData();
+        guardarEnBackend();  // Guardar en el backend
+        actualizarEstadoCodigos();
+        renderDashboard();
+        showAlert('✅ Código validado! Producción iniciada.', 'success');
+        input.value = '';
+
         btn.disabled = false;
         input.disabled = false;
         actualizarEstadoCodigos();
-    }, 2000);
+    })
+    .catch(function(error) {
+        console.error('Error al validar código:', error);
+        showAlert('❌ Error al conectar con el servidor', 'danger');
+        btn.disabled = false;
+        input.disabled = false;
+    });
 }
 
 function claimReward() {
