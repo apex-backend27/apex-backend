@@ -3746,7 +3746,7 @@ function generarCodigo() {
             codigo: codigo,
             puntos: puntos,
             estado: 'disponible',
-            fechaExpiracion: new Date(Date.now() + 3600000).toISOString() // 1 hora
+            fechaExpiracion: new Date(Date.now() + 3600000).toISOString()
         })
     })
     .then(function(response) {
@@ -3763,38 +3763,6 @@ function generarCodigo() {
         console.error('Error:', error);
         showAlert('❌ Error de conexión con el servidor', 'danger');
     });
-}
-    saveCodigos(codigos);
-    document.getElementById('codigoDisplay').textContent = codigo;
-    showAlert('✅ Código ' + codigo + ' generado (' + puntos + ' pts, 1h)', 'success');
-}
-
-function copiarCodigo(codigo) {
-    if (!codigo) return;
-    var input = document.createElement('input');
-    input.value = codigo;
-    input.style.position = 'fixed';
-    input.style.opacity = '0';
-    document.body.appendChild(input);
-    input.select();
-    document.execCommand('copy');
-    document.body.removeChild(input);
-    showAlert('📋 Copiado', 'success');
-}
-
-function guardarConfiguracion() {
-    var tiempo = parseInt(document.getElementById('tiempoProduccion').value) || 10;
-    var puntos = parseInt(document.getElementById('puntosPorCodigo').value) || 10;
-    localStorage.setItem('apex_tiempo_produccion', tiempo);
-    localStorage.setItem('apex_puntos_por_codigo', puntos);
-    showAlert('✅ Configuración guardada: ' + tiempo + 's, ' + puntos + ' pts', 'success');
-}
-
-function cargarConfiguracion() {
-    var tiempo = parseInt(localStorage.getItem('apex_tiempo_produccion')) || 10;
-    var puntos = parseInt(localStorage.getItem('apex_puntos_por_codigo')) || 10;
-    document.getElementById('tiempoProduccion').value = tiempo;
-    document.getElementById('puntosPorCodigo').value = puntos;
 }
 
 // ============================================================
