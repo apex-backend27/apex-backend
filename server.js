@@ -12,6 +12,45 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// ============================================================
+// MIDDLEWARE DE AUTENTICACIÓN
+// ============================================================
+const authenticate = async (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ error: 'Token no proporcionado' });
+    }
+    
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const result = await pool.query(
+            'SELECT * FROM users WHERE id = $1',
+            [decoded.userId]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Usuario no encontrado' });
+        }
+        
+        req.user = result.rows[0];
+        req.userId = decoded.userId;
+        next();
+    } catch (error) {
+        console.error('Error en autenticación:', error);
+        return res.status(401).json({ error: 'Token inválido' });
+    }
+};
+
+// ============================================================
+// MIDDLEWARE PARA VERIFICAR SI ES ADMIN
+// ============================================================
+const isAdmin = async (req, res, next) => {
+    if (!req.user || !req.user.es_admin) {
+        return res.status(403).json({ error: 'Acceso denegado. Se requieren privilegios de administrador.' });
+    }
+    next();
+};
+
 // Conexión a NeonTech
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -250,27 +289,48 @@ app.post('/api/login', async (req, res) => {
 // ============================================================
 // VERIFICAR TOKEN
 // ============================================================
-app.get('/api/verify', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ error: 'Token no proporcionado' });
+app.get('/api/verify', authenticate, async (req, res) => {
+    try {
+        // Obtener el usuario COMPLETO de la base de datos
+        const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        
+        const userData = result.rows[0];
+        
+        res.json({ 
+            user: {
+                id: userData.id,
+                telefono: userData.telefono,
+                nombre: userData.nombre,
+                apellido: userData.apellido,
+                es_admin: userData.es_admin,
+                es_super_admin: userData.es_super_admin || false,
+                codigo_referido: userData.codigo_referido,
+                polygon_address: userData.polygon_address,
+                balance: Number(userData.balance || 0),
+                puntos: Number(userData.puntos || 0),
+                plan: userData.plan || 'Sin plan',
+                plan_amount: Number(userData.plan_amount || 0),
+                daily_earnings: Number(userData.daily_earnings || 0),
+                cuenta_habilitada: userData.cuenta_habilitada !== false,
+                produccion_pausada: userData.produccion_pausada || false,
+                // ✅ TODOS los campos que necesites
+                ruleta_usos: Number(userData.ruleta_usos || 0),
+                cofres_usos: Number(userData.cofres_usos || 0),
+                dados_usos: Number(userData.dados_usos || 0),
+                premio_ruleta: Number(userData.premio_ruleta || 0),
+                premio_cofre: Number(userData.premio_cofre || 0),
+                premio_dados: Number(userData.premio_dados || 0),
+                direccion_retiro: userData.direccion_retiro || null
+            }
+        });
+    } catch (error) {
+        console.error('Error en /api/verify:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
     }
-    
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const result = await pool.query(
-      'SELECT id, telefono, nombre, apellido, es_admin, codigo_referido, polygon_address, balance FROM users WHERE id = $1',
-      [decoded.userId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Usuario no encontrado' });
-    }
-    
-    res.json({ user: result.rows[0] });
-  } catch (error) {
-    res.status(401).json({ error: 'Token inválido' });
-  }
 });
 
 // ============================================================
