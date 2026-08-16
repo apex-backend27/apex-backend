@@ -501,6 +501,98 @@ app.get('/api/admin/users', async (req, res) => {
     }
 });
 
+// ============================================================
+// ADMIN - CONFIGURACIÓN
+// ============================================================
+app.get('/api/admin/config', authenticate, isAdmin, async (req, res) => {
+    try {
+        // Verificar que la tabla existe
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS configuracion (
+                id SERIAL PRIMARY KEY,
+                tiempo_produccion INTEGER DEFAULT 10,
+                puntos_por_codigo INTEGER DEFAULT 10,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        
+        const result = await pool.query('SELECT * FROM configuracion LIMIT 1');
+        if (result.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO configuracion (tiempo_produccion, puntos_por_codigo) VALUES (10, 10)`
+            );
+            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10 });
+        }
+        res.json({
+            tiempo_produccion: result.rows[0].tiempo_produccion || 10,
+            puntos_por_codigo: result.rows[0].puntos_por_codigo || 10
+        });
+    } catch (error) {
+        console.error('Error al obtener configuración:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
+app.put('/api/admin/config', authenticate, isAdmin, async (req, res) => {
+    try {
+        const { tiempo_produccion, puntos_por_codigo } = req.body;
+        
+        // Verificar que la tabla existe
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS configuracion (
+                id SERIAL PRIMARY KEY,
+                tiempo_produccion INTEGER DEFAULT 10,
+                puntos_por_codigo INTEGER DEFAULT 10,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        
+        // Insertar o actualizar
+        await pool.query(
+            `INSERT INTO configuracion (id, tiempo_produccion, puntos_por_codigo, updated_at) 
+             VALUES (1, $1, $2, NOW()) 
+             ON CONFLICT (id) DO UPDATE 
+             SET tiempo_produccion = $1, puntos_por_codigo = $2, updated_at = NOW()`,
+            [tiempo_produccion || 10, puntos_por_codigo || 10]
+        );
+        
+        res.json({ message: 'Configuración actualizada' });
+    } catch (error) {
+        console.error('Error al guardar configuración:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
+// ============================================================
+// ADMIN - CÓDIGOS
+// ============================================================
+app.get('/api/admin/codes', authenticate, isAdmin, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM codigos ORDER BY created_at DESC LIMIT 100');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error al obtener códigos:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
+app.post('/api/admin/codes', authenticate, isAdmin, async (req, res) => {
+    try {
+        const { codigo, puntos, estado, fechaExpiracion } = req.body;
+        
+        const result = await pool.query(
+            `INSERT INTO codigos (codigo, puntos, estado, created_at, fecha_expiracion) 
+             VALUES ($1, $2, $3, NOW(), $4) RETURNING *`,
+            [codigo, puntos || 10, estado || 'disponible', fechaExpiracion || new Date(Date.now() + 3600000).toISOString()]
+        );
+        
+        res.json({ message: 'Código creado', codigo: result.rows[0] });
+    } catch (error) {
+        console.error('Error al crear código:', error);
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
 // Actualizar usuario (admin)
 app.put('/api/admin/user/:id', async (req, res) => {
     try {
