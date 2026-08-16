@@ -3717,20 +3717,53 @@ function guardarPremiosDados() {
 // CÓDIGOS Y CONFIGURACIÓN
 // ============================================================
 function generarCodigo() {
+    // 1. Generar el código
     var codigo = '';
-    for (var i = 0; i < 8; i++) { codigo += Math.floor(Math.random() * 10); }
-    var codigos = getCodigos();
-    var now = Date.now();
-    var UNA_HORA = 3600000;
+    for (var i = 0; i < 8; i++) {
+        codigo += Math.floor(Math.random() * 10);
+    }
+    
+    // 2. Mostrar en pantalla
+    document.getElementById('codigoDisplay').textContent = codigo;
+    
+    // 3. Obtener puntos
     var puntos = parseInt(document.getElementById('puntosPorCodigo').value) || 10;
-    codigos.push({
-        codigo: codigo,
-        puntos: puntos,
-        estado: 'disponible',
-        fechaCreacion: now,
-        fechaExpiracion: now + UNA_HORA,
-        usuarioUso: null
+    
+    // 4. Guardar en el backend
+    var token = localStorage.getItem('apex_token');
+    if (!token) {
+        showAlert('⚠️ No hay sesión activa', 'danger');
+        return;
+    }
+    
+    fetch('https://apex-backend-cj21.onrender.com/api/admin/codes', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+            codigo: codigo,
+            puntos: puntos,
+            estado: 'disponible',
+            fechaExpiracion: new Date(Date.now() + 3600000).toISOString() // 1 hora
+        })
+    })
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(data) {
+        if (data.error) {
+            showAlert('❌ Error al guardar código: ' + data.error, 'danger');
+        } else {
+            showAlert('✅ Código ' + codigo + ' generado y guardado', 'success');
+        }
+    })
+    .catch(function(error) {
+        console.error('Error:', error);
+        showAlert('❌ Error de conexión con el servidor', 'danger');
     });
+}
     saveCodigos(codigos);
     document.getElementById('codigoDisplay').textContent = codigo;
     showAlert('✅ Código ' + codigo + ' generado (' + puntos + ' pts, 1h)', 'success');
