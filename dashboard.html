@@ -1802,6 +1802,42 @@ function renderDashboard() {
     calcularGanancias();
     verificarAdmin();
 
+function guardarEnBackend() {
+    var token = localStorage.getItem('apex_token');
+    if (!token) {
+        console.warn('⚠️ No hay token, guardando solo localmente');
+        return;
+    }
+    
+    fetch('https://apex-backend-cj21.onrender.com/api/user/update', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+            balance: Number(user.balance || 0),
+            puntos: Number(user.puntos || 0),
+            plan: user.plan || 'Sin plan',
+            plan_amount: Number(user.plan_amount || 0),
+            daily_earnings: Number(user.daily_earnings || 0)
+        })
+    })
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(data) {
+        if (data.error) {
+            console.error('❌ Error al guardar:', data.error);
+        } else {
+            console.log('✅ Datos guardados en el backend');
+        }
+    })
+    .catch(function(error) {
+        console.error('❌ Error de red:', error);
+    });
+}
+
     // ============================================================
     // PRODUCCIÓN - VERSIÓN ÚNICA Y CORRECTA
     // ============================================================
@@ -2229,6 +2265,7 @@ function buyPlan(planName) {
         user.daily_earnings = plan.daily;
         user.fecha_plan = new Date().toISOString();
  saveUserData();
+guardarEnBackend();
 
         // ============================================================
 // OTORGAR COMISIÓN AL REFERIDOR (SOLO SI TIENE LOGRO ASIGNADO)
