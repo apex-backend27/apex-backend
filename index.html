@@ -149,6 +149,22 @@
 </div>
 
 <script>
+
+// ============================================================
+// CONTROL DE SESIÓN - FORZAR LOGIN
+// ============================================================
+(function() {
+    // Si hay token y usuario, pero NO queremos redirigir automáticamente
+    var token = localStorage.getItem('apex_token');
+    var user = localStorage.getItem('apex_user');
+    
+    if (token && user) {
+        console.log('👤 Sesión encontrada para:', JSON.parse(user).nombre);
+        console.log('ℹ️ Debes hacer clic en "Iniciar Sesión" para continuar');
+        // ✅ NO hacemos nada - el usuario debe hacer clic en el botón
+    }
+})();
+
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
