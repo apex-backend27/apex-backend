@@ -365,7 +365,28 @@ app.put('/api/user/update', async (req, res) => {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
         
-        res.json({ message: 'Usuario actualizado exitosamente', user: result.rows[0] });
+        // ✅ Enviar TODOS los campos del usuario
+const userData = result.rows[0];
+res.json({ 
+    message: 'Usuario actualizado exitosamente', 
+    user: {
+        id: userData.id,
+        telefono: userData.telefono,
+        nombre: userData.nombre,
+        apellido: userData.apellido,
+        es_admin: userData.es_admin,
+        es_super_admin: userData.es_super_admin || false,
+        codigo_referido: userData.codigo_referido,
+        polygon_address: userData.polygon_address,
+        balance: Number(userData.balance || 0),
+        puntos: Number(userData.puntos || 0),
+        plan: userData.plan || 'Sin plan',
+        plan_amount: Number(userData.plan_amount || 0),
+        daily_earnings: Number(userData.daily_earnings || 0),
+        cuenta_habilitada: userData.cuenta_habilitada,
+        produccion_pausada: userData.produccion_pausada || false
+    }
+});
         
     } catch (error) {
         console.error('Error al actualizar usuario:', error);
