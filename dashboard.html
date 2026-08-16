@@ -1317,7 +1317,7 @@ function saveUserData() {
     
     var token = localStorage.getItem('apex_token');
     if (!token) {
-        console.warn('⚠️ No hay token, solo guardando localmente');
+        console.warn('⚠️ No hay token, guardando solo localmente');
         return;
     }
     
@@ -1347,14 +1347,7 @@ function saveUserData() {
             ultimo_reinicio_codigos: user.ultimo_reinicio_codigos || null,
             ruleta_usos: Number(user.ruleta_usos || 0),
             cofres_usos: Number(user.cofres_usos || 0),
-            dados_usos: Number(user.dados_usos || 0),
-            premio_ruleta: Number(user.premio_ruleta || 0),
-            premio_cofre: Number(user.premio_cofre || 0),
-            premio_dados: Number(user.premio_dados || 0),
-            cofres_abiertos: user.cofres_abiertos || [],
-            historial: user.historial || [],
-            historial_detallado: user.historial_detallado || [],
-            historial_codigos: user.historial_codigos || []
+            dados_usos: Number(user.dados_usos || 0)
         })
     })
     .then(function(response) {
@@ -1371,6 +1364,8 @@ function saveUserData() {
         console.error('❌ Error de red:', error);
     });
 }
+
+
 function getCodigosSistema() {
     try { return JSON.parse(localStorage.getItem(CODIGOS_KEY)) || []; } catch { return []; }
 }
@@ -1729,6 +1724,17 @@ function renderPerfil() {
 // RENDER DASHBOARD
 // ============================================================
 function renderDashboard() {
+// ✅ Cargar configuración del admin
+function cargarConfiguracionDashboard() {
+    var configData = localStorage.getItem('apex_configuracion');
+    if (configData) {
+        try {
+            var config = JSON.parse(configData);
+            window.tiempoProduccion = config.tiempo_produccion || 10;
+            window.puntosPorCodigo = config.puntos_por_codigo || 10;
+        } catch(e) {}
+    }
+}
     if (!user) return;
 
     var hoy = new Date().toDateString();
@@ -2095,8 +2101,20 @@ function validateCode() {
         user.codigos_usados_hoy = (user.codigos_usados_hoy || 0) + 1;
         user.ultimo_reinicio_codigos = new Date().toDateString();
 
-        var tiempoProduccion = parseInt(localStorage.getItem('apex_tiempo_produccion')) || 10;
-        var puntosPorCodigo = parseInt(localStorage.getItem('apex_puntos_por_codigo')) || 10;
+        // ✅ Obtener configuración del backend
+var tiempoProduccion = 10;
+var puntosPorCodigo = 10;
+
+try {
+    var configData = localStorage.getItem('apex_configuracion');
+    if (configData) {
+        var config = JSON.parse(configData);
+        tiempoProduccion = config.tiempo_produccion || 10;
+        puntosPorCodigo = config.puntos_por_codigo || 10;
+    }
+} catch(e) {
+    console.warn('Error al leer configuración:', e);
+}
         var montoGanado = (user.daily_earnings || 0) * 0.5;
 
         user.recompensa_pendiente = montoGanado;

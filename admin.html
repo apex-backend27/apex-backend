@@ -3835,9 +3835,7 @@ function guardarConfiguracion() {
 
 function cargarConfiguracion() {
     var token = localStorage.getItem('apex_token');
-    
     if (!token) {
-        // Fallback a localStorage
         var tiempo = parseInt(localStorage.getItem('apex_tiempo_produccion')) || 10;
         var puntos = parseInt(localStorage.getItem('apex_puntos_por_codigo')) || 10;
         document.getElementById('tiempoProduccion').value = tiempo;
@@ -3847,34 +3845,27 @@ function cargarConfiguracion() {
     
     fetch('https://apex-backend-cj21.onrender.com/api/admin/config', {
         method: 'GET',
-        headers: {
-            'Authorization': 'Bearer ' + token
-        }
+        headers: { 'Authorization': 'Bearer ' + token }
     })
-    .then(function(response) {
-        return response.json();
-    })
-    .then(function(data) {
+    .then(response => response.json())
+    .then(data => {
         if (!data.error) {
             document.getElementById('tiempoProduccion').value = data.tiempo_produccion || 10;
             document.getElementById('puntosPorCodigo').value = data.puntos_por_codigo || 10;
-        } else {
-            // Fallback a localStorage
-            var tiempo = parseInt(localStorage.getItem('apex_tiempo_produccion')) || 10;
-            var puntos = parseInt(localStorage.getItem('apex_puntos_por_codigo')) || 10;
-            document.getElementById('tiempoProduccion').value = tiempo;
-            document.getElementById('puntosPorCodigo').value = puntos;
+            // ✅ Guardar en localStorage para que el dashboard lo use
+            localStorage.setItem('apex_configuracion', JSON.stringify({
+                tiempo_produccion: data.tiempo_produccion || 10,
+                puntos_por_codigo: data.puntos_por_codigo || 10
+            }));
         }
     })
-    .catch(function() {
-        // Fallback a localStorage
+    .catch(() => {
         var tiempo = parseInt(localStorage.getItem('apex_tiempo_produccion')) || 10;
         var puntos = parseInt(localStorage.getItem('apex_puntos_por_codigo')) || 10;
         document.getElementById('tiempoProduccion').value = tiempo;
         document.getElementById('puntosPorCodigo').value = puntos;
     });
 }
-
 function copiarCodigo(codigo) {
     if (!codigo) {
         showAlert('⚠️ No hay código para copiar', 'warning');
