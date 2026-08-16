@@ -1891,8 +1891,7 @@ function cargarConfiguracionDesdeAdmin() {
     } else if (user.codigo_usado && !user.reclamado_hoy && user.recompensa_pendiente > 0) {
     console.log('🎯 Entrando al caso de recompensa pendiente');
     console.log('recompensa_pendiente:', user.recompensa_pendiente);
-    // ... el resto del código ...
-}
+   
         // Verificar que la recompensa sea de hoy
         var hoy = new Date().toDateString();
         if (user.fecha_produccion && user.fecha_produccion !== hoy) {
