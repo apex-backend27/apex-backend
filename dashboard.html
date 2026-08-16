@@ -2079,7 +2079,6 @@ function validateCode() {
         return;
     }
 
-    // ✅ VALIDAR EN EL BACKEND
     fetch('https://apex-backend-cj21.onrender.com/api/validate-code', {
         method: 'POST',
         headers: {
@@ -2127,25 +2126,25 @@ function validateCode() {
             console.warn('Error al leer configuración:', e);
         }
 
-        // ✅ CALCULAR RECOMPENSA - FORZANDO VALOR
-        var montoGanado = Number((user.daily_earnings || 0) * 0.5);
+        // ✅ CALCULAR RECOMPENSA - FORZANDO VALOR SEGÚN PLAN
+        var dailyEarnings = user.daily_earnings || 0;
         
-        // ✅ SI daily_earnings ES 0 O undefined, USAR VALOR POR DEFECTO
-        if (montoGanado === 0 || isNaN(montoGanado)) {
-            // Si el usuario tiene plan Trader (6), Analista (10), etc.
-            if (user.plan === 'Trader') montoGanado = 3;
-            else if (user.plan === 'Analista') montoGanado = 5;
-            else if (user.plan === 'Gestor') montoGanado = 8.5;
-            else if (user.plan === 'Master') montoGanado = 13.5;
-            else if (user.plan === 'Elite') montoGanado = 21;
-            else montoGanado = 1; // Valor mínimo por si acaso
-            console.log('⚠️ daily_earnings era 0, usando valor por defecto del plan:', montoGanado);
+        // Si daily_earnings es 0 o undefined, calcular según el plan
+        if (dailyEarnings === 0 || isNaN(dailyEarnings)) {
+            if (user.plan === 'Trader') dailyEarnings = 6;
+            else if (user.plan === 'Analista') dailyEarnings = 10;
+            else if (user.plan === 'Gestor') dailyEarnings = 17;
+            else if (user.plan === 'Master') dailyEarnings = 27;
+            else if (user.plan === 'Elite') dailyEarnings = 42;
+            else dailyEarnings = 0;
+            console.log('⚠️ daily_earnings forzado a:', dailyEarnings, 'para el plan:', user.plan);
         }
 
+        var montoGanado = Number(dailyEarnings * 0.5);
         user.recompensa_pendiente = montoGanado;
         user.puntosPendientes = puntosPorCodigo;
         
-        console.log('💰 DAILY_EARNINGS:', user.daily_earnings);
+        console.log('💰 DAILY_EARNINGS:', dailyEarnings);
         console.log('💰 PLAN:', user.plan);
         console.log('💰 MONTO GANADO:', montoGanado);
         console.log('💰 RECOMPENSA PENDIENTE ASIGNADA:', user.recompensa_pendiente);
@@ -2165,12 +2164,10 @@ function validateCode() {
             estado: 'usado'
         });
 
-        // ✅ GUARDAR TODO
         saveUserData();
         guardarEnBackend();
         actualizarEstadoCodigos();
         renderDashboard();
-        
         showAlert('✅ Código validado! Producción iniciada.', 'success');
         input.value = '';
 
