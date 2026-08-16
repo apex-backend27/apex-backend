@@ -2126,9 +2126,11 @@ try {
 } catch(e) {
     console.warn('Error al leer configuración:', e);
 }
-        var montoGanado = (user.daily_earnings || 0) * 0.5;
-
-        user.recompensa_pendiente = Number(montoGanado);
+        var montoGanado = Number((user.daily_earnings || 0) * 0.5);
+user.recompensa_pendiente = montoGanado;
+console.log('💰 validateCode() - daily_earnings:', user.daily_earnings);
+console.log('💰 validateCode() - montoGanado:', montoGanado);
+console.log('💰 validateCode() - recompensa_pendiente asignada:', user.recompensa_pendiente);
 console.log('💰 recompensa_pendiente asignada en validateCode():', user.recompensa_pendiente);
         user.puntosPendientes = puntosPorCodigo;
         user.codigo_usado = true;
