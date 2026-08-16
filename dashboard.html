@@ -1313,83 +1313,64 @@ function saveUsers(users) {
 
 function saveUserData() {
     if (!user) return;
-    
-    // Guardar en sessionStorage para compatibilidad local
     sessionStorage.setItem('apex_user', JSON.stringify(user));
     
-    // Enviar al backend
     var token = localStorage.getItem('apex_token');
     if (!token) {
-        console.warn('⚠️ No hay token, los cambios solo se guardaron localmente');
+        console.warn('⚠️ No hay token, solo guardando localmente');
         return;
     }
     
-    // Preparar datos para enviar
-    var datosActualizar = {
-        balance: Number(user.balance || 0),
-        puntos: Number(user.puntos || 0),
-        plan: user.plan || 'Sin plan',
-        plan_amount: Number(user.plan_amount || 0),
-        daily_earnings: Number(user.daily_earnings || 0),
-        produccion_activa: user.produccion_activa || false,
-        produccion_inicio: user.produccion_inicio || null,
-        produccion_duracion: Number(user.produccion_duracion || 0),
-        tiempo_restante: Number(user.tiempo_restante || 0),
-        recompensa_pendiente: Number(user.recompensa_pendiente || 0),
-        puntosPendientes: Number(user.puntosPendientes || 0),
-        codigo_usado: user.codigo_usado || false,
-        reclamado_hoy: user.reclamado_hoy || false,
-        fecha_produccion: user.fecha_produccion || null,
-        codigos_usados_hoy: Number(user.codigos_usados_hoy || 0),
-        codigos_usados: user.codigos_usados || [],
-        ultimo_reinicio_codigos: user.ultimo_reinicio_codigos || null,
-        ruleta_usos: Number(user.ruleta_usos || 0),
-        cofres_usos: Number(user.cofres_usos || 0),
-        dados_usos: Number(user.dados_usos || 0),
-        premio_ruleta: Number(user.premio_ruleta || 0),
-        premio_cofre: Number(user.premio_cofre || 0),
-        premio_dados: Number(user.premio_dados || 0),
-        cofres_abiertos: user.cofres_abiertos || [],
-        cupones_asignados: user.cupones_asignados || [],
-        logros_asignados: user.logros_asignados || [],
-        logros_pendientes_aprobar: user.logros_pendientes_aprobar || [],
-        tareas_asignadas: user.tareas_asignadas || [],
-        canjes_realizados: user.canjes_realizados || [],
-        logros_reclamados: user.logros_reclamados || [],
-        referidos: user.referidos || { izquierda: null, derecha: null, lista: [] },
-        referidos_directos: user.referidos_directos || { izquierda: null, derecha: null },
-        fechas_invito: user.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
-        historial: user.historial || [],
-        historial_detallado: user.historial_detallado || [],
-        historial_codigos: user.historial_codigos || [],
-        descuentoRetiroActivo: user.descuentoRetiroActivo || null,
-        bonusReferidoActivo: user.bonusReferidoActivo || null,
-        direccion_retiro: user.direccion_retiro || null,
-        cuenta_habilitada: user.cuenta_habilitada !== false,
-        produccion_pausada: user.produccion_pausada || false
-    };
-    
-    fetch(API_URL + '/api/user/update', {
+    fetch('https://apex-backend-cj21.onrender.com/api/user/update', {
         method: 'PUT',
         headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + token
         },
-        body: JSON.stringify(datosActualizar)
+        body: JSON.stringify({
+            balance: Number(user.balance || 0),
+            puntos: Number(user.puntos || 0),
+            plan: user.plan || 'Sin plan',
+            plan_amount: Number(user.plan_amount || 0),
+            daily_earnings: Number(user.daily_earnings || 0),
+            produccion_activa: user.produccion_activa || false,
+            produccion_inicio: user.produccion_inicio || null,
+            produccion_duracion: Number(user.produccion_duracion || 0),
+            tiempo_restante: Number(user.tiempo_restante || 0),
+            recompensa_pendiente: Number(user.recompensa_pendiente || 0),
+            puntosPendientes: Number(user.puntosPendientes || 0),
+            codigo_usado: user.codigo_usado || false,
+            reclamado_hoy: user.reclamado_hoy || false,
+            fecha_produccion: user.fecha_produccion || null,
+            codigos_usados_hoy: Number(user.codigos_usados_hoy || 0),
+            codigos_usados: user.codigos_usados || [],
+            ultimo_reinicio_codigos: user.ultimo_reinicio_codigos || null,
+            ruleta_usos: Number(user.ruleta_usos || 0),
+            cofres_usos: Number(user.cofres_usos || 0),
+            dados_usos: Number(user.dados_usos || 0),
+            premio_ruleta: Number(user.premio_ruleta || 0),
+            premio_cofre: Number(user.premio_cofre || 0),
+            premio_dados: Number(user.premio_dados || 0),
+            cofres_abiertos: user.cofres_abiertos || [],
+            historial: user.historial || [],
+            historial_detallado: user.historial_detallado || [],
+            historial_codigos: user.historial_codigos || []
+        })
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(data) {
         if (data.error) {
-            console.error('❌ Error al guardar en backend:', data.error);
+            console.error('❌ Error al guardar:', data.error);
         } else {
-            console.log('✅ Datos guardados en backend');
+            console.log('✅ Datos guardados en el backend');
         }
     })
-    .catch(error => {
+    .catch(function(error) {
         console.error('❌ Error de red:', error);
     });
 }
-
 function getCodigosSistema() {
     try { return JSON.parse(localStorage.getItem(CODIGOS_KEY)) || []; } catch { return []; }
 }
@@ -1871,6 +1852,7 @@ function renderDashboard() {
                         productionTimer.className = 'timer completed';
                         productionStatus.innerHTML = '✅ <span style="color:#f7971e;">¡Recompensa lista!</span>';
                         var monto = user.recompensa_pendiente || 0;
+			console.log('🎯 Recompensa al terminar:', monto);
                         claimBtn.className = 'claim-btn active';
                         claimBtn.textContent = '💰 Cobrar $' + Number(monto).toFixed(2) + ' + puntos';
                         renderDashboard();
@@ -2117,6 +2099,7 @@ function validateCode() {
         var montoGanado = (user.daily_earnings || 0) * 0.5;
 
         user.recompensa_pendiente = montoGanado;
+        console.log('💰 Recompensa asignada:', montoGanado);
         user.puntosPendientes = puntosPorCodigo;
         user.codigo_usado = true;
         user.reclamado_hoy = false;
@@ -2158,6 +2141,10 @@ function claimReward() {
     if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
     if (user.produccion_activa) { showAlert('⏳ Espera a que termine', 'warning'); return; }
     if (!user.codigo_usado || user.reclamado_hoy) { showAlert('⚠️ No hay recompensa', 'warning'); return; }
+
+console.log('🔍 claimReward() - recompensa_pendiente:', user.recompensa_pendiente);
+console.log('🔍 claimReward() - codigo_usado:', user.codigo_usado);
+console.log('🔍 claimReward() - reclamado_hoy:', user.reclamado_hoy);
 
     // ============================================================
     // VERIFICAR QUE LA RECOMPENSA SEA DEL DÍA DE HOY
