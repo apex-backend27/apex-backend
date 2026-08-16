@@ -1889,6 +1889,10 @@ function cargarConfiguracionDesdeAdmin() {
             claimBtn.textContent = '💰 Cobrar $' + monto.toFixed(2) + ' + puntos';
         }
     } else if (user.codigo_usado && !user.reclamado_hoy && user.recompensa_pendiente > 0) {
+    console.log('🎯 Entrando al caso de recompensa pendiente');
+    console.log('recompensa_pendiente:', user.recompensa_pendiente);
+    // ... el resto del código ...
+}
         // Verificar que la recompensa sea de hoy
         var hoy = new Date().toDateString();
         if (user.fecha_produccion && user.fecha_produccion !== hoy) {
@@ -2125,8 +2129,8 @@ try {
 }
         var montoGanado = (user.daily_earnings || 0) * 0.5;
 
-        user.recompensa_pendiente = montoGanado;
-        console.log('💰 Recompensa asignada:', montoGanado);
+        user.recompensa_pendiente = Number(montoGanado);
+console.log('💰 recompensa_pendiente asignada en validateCode():', user.recompensa_pendiente);
         user.puntosPendientes = puntosPorCodigo;
         user.codigo_usado = true;
         user.reclamado_hoy = false;
@@ -2320,8 +2324,8 @@ function buyPlan(planName) {
         // Ejecutar compra
         user.balance -= plan.amount;
         user.plan = planName;
+	user.daily_earnings = plan.daily;
         user.plan_amount = plan.amount;
-        user.daily_earnings = plan.daily;
         user.fecha_plan = new Date().toISOString();
  	saveUserData();
 	guardarEnBackend();
