@@ -151,6 +151,18 @@
 <script>
 
 // ============================================================
+// BLOQUEAR REDIRECCIÓN AUTOMÁTICA - FORZAR LOGIN
+// ============================================================
+(function() {
+    // Limpiar todo
+    localStorage.removeItem('apex_token');
+    localStorage.removeItem('apex_user');
+    sessionStorage.removeItem('apex_user');
+    localStorage.removeItem('apex_remember');
+    console.log('🧹 Sesión limpiada - Mostrando login');
+})();
+
+// ============================================================
 // CONTROL DE SESIÓN - FORZAR LOGIN
 // ============================================================
 (function() {
