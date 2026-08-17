@@ -1303,28 +1303,42 @@ function formatTime(seconds) {
 }
 
 function getUsers() {
-    // ✅ Primero intentar obtener del localStorage
     try {
-        var data = localStorage.getItem(STORAGE_KEY);
-        if (data) {
-            var users = JSON.parse(data);
-            if (users && users.length > 0) {
-                return users;
+        // ✅ PRIMERO intentar obtener de sessionStorage
+        var sessionData = sessionStorage.getItem('apex_users');
+        if (sessionData) {
+            var parsed = JSON.parse(sessionData);
+            if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
             }
         }
+        
+        // ✅ SEGUNDO intentar obtener de localStorage
+        var data = localStorage.getItem('apex_users');
+        if (data) {
+            var parsed = JSON.parse(data);
+            if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
+            }
+        }
+        
+        // ✅ TERCERO intentar obtener de STORAGE_KEY
+        var data2 = localStorage.getItem(STORAGE_KEY);
+        if (data2) {
+            var parsed = JSON.parse(data2);
+            if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+                return parsed;
+            }
+        }
+        
+        // ✅ SI NADA FUNCIONA, devolver un array vacío
+        console.warn('⚠️ getUsers() no encontró datos, devolviendo array vacío');
+        return [];
+        
     } catch(e) {
-        console.warn('Error al leer localStorage:', e);
+        console.warn('Error en getUsers():', e);
+        return [];
     }
-    
-    // ✅ Si no hay en localStorage, obtener del backend
-    var token = localStorage.getItem('apex_token');
-    if (token) {
-        // Hacer una solicitud sincrónica no es posible, así que usamos fetch
-        // pero getUsers() se llama en renderTree(), que es sincrónico.
-        // Por ahora, devolvemos un array vacío y confiamos en que los datos estén en sessionStorage
-    }
-    
-    return [];
 }
 
 function saveUsers(users) {
@@ -2402,6 +2416,8 @@ for (var i = 0; i < users.length; i++) {
                 // Guardar los cambios del referidor
                 saveUsers(users);
                 sincronizarUsuarioConBackend(u.telefono);
+ // ✅ GUARDAR EN SESSIONSTORAGE PARA QUE getUsers() LO VEA
+                sessionStorage.setItem('apex_users', JSON.stringify(users));
                 console.log('✅ Árbol actualizado para:', u.nombre);
                 break;
             }
@@ -2787,14 +2803,16 @@ function renderTree() {
     return null;
 }
 
-    // ✅ REFERIDOS CON PLAN ACTIVO (para el árbol)
+   // ✅ FILTRAR SOLO REFERIDOS CON PLAN ACTIVO (USANDO EL BACKEND DIRECTAMENTE)
 var referidosConPlan = [];
 for (var i = 0; i < listaReferidos.length; i++) {
     var ref = listaReferidos[i];
-    // ✅ PRIMERO BUSCAR EN getUsers()
+    
+    // ✅ BUSCAR EL PLAN EN getUsers() (que YA TIENE los datos del admin)
     var refUser = obtenerUsuario(ref.id);
+    
+    // ✅ SI NO ESTÁ EN getUsers(), usar los datos de la lista
     if (!refUser) {
-        // ✅ SI NO ESTÁ EN getUsers(), USAR EL PLAN DE LA LISTA
         refUser = {
             telefono: ref.id,
             nombre: ref.nombre || ref.id,
@@ -2803,13 +2821,17 @@ for (var i = 0; i < listaReferidos.length; i++) {
             referidos: { izquierda: null, derecha: null, lista: [] }
         };
     }
-    // ✅ MOSTRAR EN CONSOLA PARA VERIFICAR
-    console.log('🔍 Referido:', ref.id, 'Plan:', refUser.plan);
+    
     // ✅ VERIFICAR SI TIENE PLAN ACTIVO
+    console.log('🔍 Referido:', ref.id, 'Plan:', refUser.plan);
+    
     if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
         referidosConPlan.push(refUser);
+        console.log('✅ Agregado al árbol:', ref.id, '→', refUser.plan);
     }
 }
+
+console.log('📊 Referidos con plan:', referidosConPlan.length);
 
     // ✅ FUNCIONES PARA RENDERIZAR NODOS
     function getEstado(userObj) {
