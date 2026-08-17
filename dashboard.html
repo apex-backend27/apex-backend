@@ -2735,10 +2735,12 @@ function renderTree() {
 
     var users = getUsers();
     var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
+    
+    // ✅ OBTENER REFERIDOS DIRECTOS (izquierda y derecha)
     var izq = referidos.izquierda;
     var der = referidos.derecha;
 
-    // Buscar usuarios de los referidos directos
+    // ✅ BUSCAR LOS USUARIOS COMPLETOS DE LOS REFERIDOS DIRECTOS
     var izqUser = null, derUser = null;
     if (izq) {
         for (var i = 0; i < users.length; i++) {
@@ -2751,8 +2753,9 @@ function renderTree() {
         }
     }
 
-    // Buscar referidos de los directos (nivel 3)
+    // ✅ BUSCAR LOS REFERIDOS DE CADA DIRECTO (NIVEL 3)
     var izqIzq = null, izqDer = null, derIzq = null, derDer = null;
+    
     if (izqUser && izqUser.referidos) {
         if (izqUser.referidos.izquierda) {
             for (var i = 0; i < users.length; i++) {
@@ -2765,6 +2768,7 @@ function renderTree() {
             }
         }
     }
+    
     if (derUser && derUser.referidos) {
         if (derUser.referidos.izquierda) {
             for (var i = 0; i < users.length; i++) {
@@ -2778,32 +2782,16 @@ function renderTree() {
         }
     }
 
-// ✅ Función para obtener el estado de un usuario (MEJORADA)
+    // ✅ FUNCIONES PARA RENDERIZAR NODOS
     function getEstado(userObj) {
         if (!userObj) return 'empty';
-        // ✅ Verificar si tiene plan activo
         if (userObj.plan && userObj.plan !== 'Sin plan') {
-            // Verificar si ya tiene sus 2 referidos
             if (userObj.referidos && userObj.referidos.izquierda && userObj.referidos.derecha) {
-                return 'completed'; // Tiene plan y tiene 2 referidos
+                return 'completed';
             }
-            return 'pending'; // Tiene plan pero no tiene 2 referidos
+            return 'pending';
         }
-        return 'empty'; // No tiene plan
-    }
-
-    // Función para determinar el estado de un usuario
-    function getEstado(userObj) {
-        if (!userObj) return 'empty';
-        // Tiene plan activo?
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            // Verificar si ya tiene sus 2 referidos
-            if (userObj.referidos && userObj.referidos.izquierda && userObj.referidos.derecha) {
-                return 'completed'; // Tiene plan y tiene 2 referidos
-            }
-            return 'pending'; // Tiene plan pero no tiene 2 referidos
-        }
-        return 'empty'; // No tiene plan
+        return 'empty';
     }
 
     function getInicial(userObj) {
@@ -2820,7 +2808,7 @@ function renderTree() {
         if (!userObj) return 'Vacío';
         var estado = getEstado(userObj);
         if (estado === 'completed') return '✅ Completo';
-        if (estado === 'pending') return '📊 ' + userObj.plan
+        if (estado === 'pending') return '📊 ' + userObj.plan;
         return '❌ Sin plan';
     }
 
@@ -2866,7 +2854,7 @@ function renderTree() {
         '</div>';
     }
 
-    // Construir el árbol
+    // ✅ CONSTRUIR EL ÁRBOL BINARIO DE 3 NIVELES
     var html = '';
 
     // NIVEL 1: TÚ
@@ -2877,7 +2865,7 @@ function renderTree() {
     // Conector
     html += '<div class="tree-connector">│</div>';
 
-    // NIVEL 2: 2 directos
+    // NIVEL 2: 2 referidos directos (izquierda y derecha)
     html += '<div class="tree-level">';
     html += crearNodo(izqUser, 'directo');
     html += crearNodo(derUser, 'directo');
@@ -2886,7 +2874,7 @@ function renderTree() {
     // Conector
     html += '<div class="tree-connector">│</div>';
 
-    // NIVEL 3: 4 indirectos
+    // NIVEL 3: 4 referidos indirectos (referidos de los directos)
     html += '<div class="tree-level">';
     html += crearNodo(izqIzq, 'indirecto');
     html += crearNodo(izqDer, 'indirecto');
@@ -2896,15 +2884,15 @@ function renderTree() {
 
     container.innerHTML = html;
 
-    // Contar referidos totales
+    // ✅ CONTAR REFERIDOS
     var totalReferidos = (user.referidos && user.referidos.lista) ? user.referidos.lista.length : 0;
     document.getElementById('referralCount').textContent = totalReferidos;
 
-    // Mostrar link de referido
+    // ✅ MOSTRAR LINK DE REFERIDO
     var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
     document.getElementById('referralLink').textContent = baseUrl + 'ref/' + (user.codigo_referido || 'APEX000');
 
-    // Mostrar información de niveles
+    // ✅ MOSTRAR INFORMACIÓN DE NIVELES
     var nivelInfo = document.getElementById('nivelInfo');
     if (nivelInfo) {
         var planActual = user.plan || 'Sin plan';
