@@ -318,7 +318,7 @@ app.get('/api/verify', authenticate, async (req, res) => {
                 cuenta_habilitada: userData.cuenta_habilitada !== false,
                 produccion_pausada: userData.produccion_pausada || false,
 		password_retiro: userData.password_retiro_hash || '000000',
-                direccion_retiro: userData.direccion_retiro || null
+                direccion_retiro: userData.direccion_retiro || null,
                 // ✅ TODOS los campos que necesites
                 ruleta_usos: Number(userData.ruleta_usos || 0),
                 cofres_usos: Number(userData.cofres_usos || 0),
