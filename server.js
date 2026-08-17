@@ -194,7 +194,7 @@ app.post('/api/register', async (req, res) => {
         esAdmin, referralCodeGenerated, walletAddress, 0, 0,
         'Sin plan', 0, 0, true,
         false, false, null, false,
-        JSON.stringify(referidoData),
+        JSON.stringify({ izquierda: null, derecha: null, lista: [] }),
         JSON.stringify(fechasInvito),
         JSON.stringify({ izquierdaCompleto: false, derechaCompleto: false, puedeUsarCodigo: true }),
         JSON.stringify([]), JSON.stringify([]), JSON.stringify([]), JSON.stringify([]),
