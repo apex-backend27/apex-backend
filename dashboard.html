@@ -2763,13 +2763,23 @@ function renderTree() {
     }
 
     // ✅ FUNCIONES PARA RENDERIZAR NODOS
-    function getEstado(userObj) {
-        if (!userObj) return 'empty';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return 'pending';
+  function getEstado(userObj) {
+    if (!userObj) return 'empty';
+    // ✅ VERIFICAR SI TIENE PLAN ACTIVO (más robusto)
+    var tienePlan = userObj.plan && 
+                    userObj.plan !== 'Sin plan' && 
+                    userObj.plan !== 'null' && 
+                    userObj.plan !== 'undefined' &&
+                    userObj.plan !== '';
+    if (tienePlan) {
+        // Verificar si ya tiene sus 2 referidos
+        if (userObj.referidos && userObj.referidos.izquierda && userObj.referidos.derecha) {
+            return 'completed';
         }
-        return 'empty';
+        return 'pending';
     }
+    return 'empty';
+}
 
     function getInicial(userObj) {
         if (!userObj) return '?';
@@ -2781,13 +2791,13 @@ function renderTree() {
         return userObj.nombre || '';
     }
 
-    function getLabel(userObj) {
-        if (!userObj) return 'Vacío';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return '📊 ' + userObj.plan;
-        }
-        return '❌ Sin plan';
-    }
+   function getLabel(userObj) {
+    if (!userObj) return 'Vacío';
+    var estado = getEstado(userObj);
+    if (estado === 'completed') return '✅ Completo';
+    if (estado === 'pending') return '📊 ' + (userObj.plan || 'Sin plan');
+    return '❌ Sin plan';
+}
 
     function getColor(userObj) {
         if (!userObj) return '#f5f5f5';
