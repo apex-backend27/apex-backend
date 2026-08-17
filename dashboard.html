@@ -2736,59 +2736,36 @@ function renderTree() {
     var users = getUsers();
     var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
     
-    // ✅ OBTENER REFERIDOS DIRECTOS (izquierda y derecha)
-    var izq = referidos.izquierda;
-    var der = referidos.derecha;
+    // ✅ TODOS los referidos directos (de la lista)
+    var listaReferidos = referidos.lista || [];
 
-    // ✅ BUSCAR LOS USUARIOS COMPLETOS DE LOS REFERIDOS DIRECTOS
-    var izqUser = null, derUser = null;
-    if (izq) {
-        for (var i = 0; i < users.length; i++) {
-            if (users[i].telefono === izq) { izqUser = users[i]; break; }
-        }
-    }
-    if (der) {
-        for (var i = 0; i < users.length; i++) {
-            if (users[i].telefono === der) { derUser = users[i]; break; }
-        }
-    }
-
-    // ✅ BUSCAR LOS REFERIDOS DE CADA DIRECTO (NIVEL 3)
-    var izqIzq = null, izqDer = null, derIzq = null, derDer = null;
-    
-    if (izqUser && izqUser.referidos) {
-        if (izqUser.referidos.izquierda) {
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === izqUser.referidos.izquierda) { izqIzq = users[i]; break; }
+    // ✅ BUSCAR USUARIOS COMPLETOS DE CADA REFERIDO
+    var referidosUsers = [];
+    for (var i = 0; i < listaReferidos.length; i++) {
+        var ref = listaReferidos[i];
+        var refUser = null;
+        for (var j = 0; j < users.length; j++) {
+            if (users[j].telefono === ref.id) {
+                refUser = users[j];
+                break;
             }
         }
-        if (izqUser.referidos.derecha) {
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === izqUser.referidos.derecha) { izqDer = users[i]; break; }
-            }
+        if (!refUser) {
+            refUser = {
+                telefono: ref.id,
+                nombre: ref.nombre || ref.id,
+                apellido: '',
+                plan: 'Sin plan',
+                referidos: { lista: [] }
+            };
         }
-    }
-    
-    if (derUser && derUser.referidos) {
-        if (derUser.referidos.izquierda) {
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === derUser.referidos.izquierda) { derIzq = users[i]; break; }
-            }
-        }
-        if (derUser.referidos.derecha) {
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === derUser.referidos.derecha) { derDer = users[i]; break; }
-            }
-        }
+        referidosUsers.push(refUser);
     }
 
     // ✅ FUNCIONES PARA RENDERIZAR NODOS
     function getEstado(userObj) {
         if (!userObj) return 'empty';
         if (userObj.plan && userObj.plan !== 'Sin plan') {
-            if (userObj.referidos && userObj.referidos.izquierda && userObj.referidos.derecha) {
-                return 'completed';
-            }
             return 'pending';
         }
         return 'empty';
@@ -2806,25 +2783,25 @@ function renderTree() {
 
     function getLabel(userObj) {
         if (!userObj) return 'Vacío';
-        var estado = getEstado(userObj);
-        if (estado === 'completed') return '✅ Completo';
-        if (estado === 'pending') return '📊 ' + userObj.plan;
+        if (userObj.plan && userObj.plan !== 'Sin plan') {
+            return '📊 ' + userObj.plan;
+        }
         return '❌ Sin plan';
     }
 
     function getColor(userObj) {
         if (!userObj) return '#f5f5f5';
-        var estado = getEstado(userObj);
-        if (estado === 'completed') return '#4db6ac';
-        if (estado === 'pending') return '#f7971e';
+        if (userObj.plan && userObj.plan !== 'Sin plan') {
+            return '#f7971e';
+        }
         return '#f5f5f5';
     }
 
     function getBorder(userObj) {
         if (!userObj) return '#ddd';
-        var estado = getEstado(userObj);
-        if (estado === 'completed') return '#4db6ac';
-        if (estado === 'pending') return '#f7971e';
+        if (userObj.plan && userObj.plan !== 'Sin plan') {
+            return '#f7971e';
+        }
         return '#ddd';
     }
 
@@ -2833,8 +2810,6 @@ function renderTree() {
         var clase = 'circle';
         if (tipo === 'you') {
             clase += ' you';
-        } else if (estado === 'completed') {
-            clase += ' completed';
         } else if (estado === 'pending') {
             clase += ' pending';
         } else {
@@ -2854,7 +2829,7 @@ function renderTree() {
         '</div>';
     }
 
-    // ✅ CONSTRUIR EL ÁRBOL BINARIO DE 3 NIVELES
+    // ✅ CONSTRUIR EL ÁRBOL
     var html = '';
 
     // NIVEL 1: TÚ
@@ -2862,30 +2837,62 @@ function renderTree() {
     html += crearNodo(user, 'you');
     html += '</div>';
 
-    // Conector
     html += '<div class="tree-connector">│</div>';
 
-    // NIVEL 2: 2 referidos directos (izquierda y derecha)
-    html += '<div class="tree-level">';
-    html += crearNodo(izqUser, 'directo');
-    html += crearNodo(derUser, 'directo');
+    // NIVEL 2: TODOS los referidos directos
+    html += '<div class="tree-level" style="flex-wrap:wrap;gap:8px;">';
+    if (referidosUsers.length > 0) {
+        for (var i = 0; i < referidosUsers.length; i++) {
+            html += crearNodo(referidosUsers[i], 'directo');
+        }
+    } else {
+        html += crearNodo(null, 'directo');
+        html += crearNodo(null, 'directo');
+    }
     html += '</div>';
 
-    // Conector
     html += '<div class="tree-connector">│</div>';
 
-    // NIVEL 3: 4 referidos indirectos (referidos de los directos)
-    html += '<div class="tree-level">';
-    html += crearNodo(izqIzq, 'indirecto');
-    html += crearNodo(izqDer, 'indirecto');
-    html += crearNodo(derIzq, 'indirecto');
-    html += crearNodo(derDer, 'indirecto');
+    // NIVEL 3: Referidos de CADA referido directo
+    html += '<div class="tree-level" style="flex-wrap:wrap;gap:8px;">';
+    var hayIndirectos = false;
+    for (var i = 0; i < referidosUsers.length; i++) {
+        var refUser = referidosUsers[i];
+        var subReferidos = (refUser.referidos && refUser.referidos.lista) ? refUser.referidos.lista : [];
+        for (var j = 0; j < subReferidos.length; j++) {
+            var subRef = subReferidos[j];
+            var subRefUser = null;
+            for (var k = 0; k < users.length; k++) {
+                if (users[k].telefono === subRef.id) {
+                    subRefUser = users[k];
+                    break;
+                }
+            }
+            if (!subRefUser) {
+                subRefUser = {
+                    telefono: subRef.id,
+                    nombre: subRef.nombre || subRef.id,
+                    apellido: '',
+                    plan: 'Sin plan',
+                    referidos: { lista: [] }
+                };
+            }
+            html += crearNodo(subRefUser, 'indirecto');
+            hayIndirectos = true;
+        }
+    }
+    if (!hayIndirectos) {
+        html += crearNodo(null, 'indirecto');
+        html += crearNodo(null, 'indirecto');
+        html += crearNodo(null, 'indirecto');
+        html += crearNodo(null, 'indirecto');
+    }
     html += '</div>';
 
     container.innerHTML = html;
 
     // ✅ CONTAR REFERIDOS
-    var totalReferidos = (user.referidos && user.referidos.lista) ? user.referidos.lista.length : 0;
+    var totalReferidos = listaReferidos.length;
     document.getElementById('referralCount').textContent = totalReferidos;
 
     // ✅ MOSTRAR LINK DE REFERIDO
