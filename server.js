@@ -399,8 +399,7 @@ app.put('/api/user/update', async (req, res) => {
                 'tareas_asignadas', 'canjes_realizados', 'logros_reclamados', 'referidos',
                 'referidos_directos', 'fechas_invito', 'historial', 'historial_detallado',
                 'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
-                'direccion_retiro', 'password_retiro', 'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado',
-    'es_admin', 'es_super_admin'];
+                'direccion_retiro', 'password_retiro', 'historial', 'historial_detallado', 'historial_codigos',  			'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado', 'es_admin', 'es_super_admin'];
             
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
