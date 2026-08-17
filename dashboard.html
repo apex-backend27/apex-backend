@@ -2733,53 +2733,57 @@ function renderTree() {
     var container = document.getElementById('treeContainer');
     if (!container) return;
 
-    var users = getUsers();
+    // ✅ USAR EL USUARIO ACTUAL Y BUSCAR REFERIDOS EN EL BACKEND
     var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
-    
-    // ✅ TODOS los referidos directos (de la lista)
     var listaReferidos = referidos.lista || [];
 
-    // ✅ BUSCAR USUARIOS COMPLETOS DE CADA REFERIDO
+    // ✅ FUNCIÓN PARA OBTENER UN USUARIO DEL BACKEND POR TELÉFONO
+    function obtenerUsuario(telefono) {
+        if (!telefono) return null;
+        // Buscar en users local
+        var users = getUsers();
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].telefono === telefono) {
+                return users[i];
+            }
+        }
+        return null;
+    }
+
+    // ✅ CONSTRUIR LISTA DE REFERIDOS CON SUS DATOS REALES
     var referidosUsers = [];
     for (var i = 0; i < listaReferidos.length; i++) {
         var ref = listaReferidos[i];
-        var refUser = null;
-        for (var j = 0; j < users.length; j++) {
-            if (users[j].telefono === ref.id) {
-                refUser = users[j];
-                break;
-            }
-        }
+        var refUser = obtenerUsuario(ref.id);
         if (!refUser) {
+            // Si no se encuentra en localStorage, usar los datos básicos
             refUser = {
                 telefono: ref.id,
                 nombre: ref.nombre || ref.id,
                 apellido: '',
-                plan: 'Sin plan',
-                referidos: { lista: [] }
+                plan: ref.plan || 'Sin plan',  // ← USAR EL PLAN DE LA LISTA
+                referidos: { izquierda: null, derecha: null, lista: [] }
             };
         }
         referidosUsers.push(refUser);
     }
 
     // ✅ FUNCIONES PARA RENDERIZAR NODOS
-  function getEstado(userObj) {
-    if (!userObj) return 'empty';
-    // ✅ VERIFICAR SI TIENE PLAN ACTIVO (más robusto)
-    var tienePlan = userObj.plan && 
-                    userObj.plan !== 'Sin plan' && 
-                    userObj.plan !== 'null' && 
-                    userObj.plan !== 'undefined' &&
-                    userObj.plan !== '';
-    if (tienePlan) {
-        // Verificar si ya tiene sus 2 referidos
-        if (userObj.referidos && userObj.referidos.izquierda && userObj.referidos.derecha) {
-            return 'completed';
+    function getEstado(userObj) {
+        if (!userObj) return 'empty';
+        var tienePlan = userObj.plan && 
+                        userObj.plan !== 'Sin plan' && 
+                        userObj.plan !== 'null' && 
+                        userObj.plan !== 'undefined' &&
+                        userObj.plan !== '';
+        if (tienePlan) {
+            if (userObj.referidos && userObj.referidos.izquierda && userObj.referidos.derecha) {
+                return 'completed';
+            }
+            return 'pending';
         }
-        return 'pending';
+        return 'empty';
     }
-    return 'empty';
-}
 
     function getInicial(userObj) {
         if (!userObj) return '?';
@@ -2791,27 +2795,27 @@ function renderTree() {
         return userObj.nombre || '';
     }
 
-   function getLabel(userObj) {
-    if (!userObj) return 'Vacío';
-    var estado = getEstado(userObj);
-    if (estado === 'completed') return '✅ Completo';
-    if (estado === 'pending') return '📊 ' + (userObj.plan || 'Sin plan');
-    return '❌ Sin plan';
-}
+    function getLabel(userObj) {
+        if (!userObj) return 'Vacío';
+        var estado = getEstado(userObj);
+        if (estado === 'completed') return '✅ Completo';
+        if (estado === 'pending') return '📊 ' + (userObj.plan || 'Sin plan');
+        return '❌ Sin plan';
+    }
 
     function getColor(userObj) {
         if (!userObj) return '#f5f5f5';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return '#f7971e';
-        }
+        var estado = getEstado(userObj);
+        if (estado === 'completed') return '#4db6ac';
+        if (estado === 'pending') return '#f7971e';
         return '#f5f5f5';
     }
 
     function getBorder(userObj) {
         if (!userObj) return '#ddd';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return '#f7971e';
-        }
+        var estado = getEstado(userObj);
+        if (estado === 'completed') return '#4db6ac';
+        if (estado === 'pending') return '#f7971e';
         return '#ddd';
     }
 
@@ -2820,6 +2824,8 @@ function renderTree() {
         var clase = 'circle';
         if (tipo === 'you') {
             clase += ' you';
+        } else if (estado === 'completed') {
+            clase += ' completed';
         } else if (estado === 'pending') {
             clase += ' pending';
         } else {
@@ -2871,20 +2877,14 @@ function renderTree() {
         var subReferidos = (refUser.referidos && refUser.referidos.lista) ? refUser.referidos.lista : [];
         for (var j = 0; j < subReferidos.length; j++) {
             var subRef = subReferidos[j];
-            var subRefUser = null;
-            for (var k = 0; k < users.length; k++) {
-                if (users[k].telefono === subRef.id) {
-                    subRefUser = users[k];
-                    break;
-                }
-            }
+            var subRefUser = obtenerUsuario(subRef.id);
             if (!subRefUser) {
                 subRefUser = {
                     telefono: subRef.id,
                     nombre: subRef.nombre || subRef.id,
                     apellido: '',
-                    plan: 'Sin plan',
-                    referidos: { lista: [] }
+                    plan: subRef.plan || 'Sin plan',
+                    referidos: { izquierda: null, derecha: null, lista: [] }
                 };
             }
             html += crearNodo(subRefUser, 'indirecto');
