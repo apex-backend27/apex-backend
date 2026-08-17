@@ -317,6 +317,8 @@ app.get('/api/verify', authenticate, async (req, res) => {
                 daily_earnings: Number(userData.daily_earnings || 0),
                 cuenta_habilitada: userData.cuenta_habilitada !== false,
                 produccion_pausada: userData.produccion_pausada || false,
+		password_retiro: userData.password_retiro_hash || '000000',
+                direccion_retiro: userData.direccion_retiro || null
                 // ✅ TODOS los campos que necesites
                 ruleta_usos: Number(userData.ruleta_usos || 0),
                 cofres_usos: Number(userData.cofres_usos || 0),
@@ -397,7 +399,7 @@ app.put('/api/user/update', async (req, res) => {
                 'tareas_asignadas', 'canjes_realizados', 'logros_reclamados', 'referidos',
                 'referidos_directos', 'fechas_invito', 'historial', 'historial_detallado',
                 'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
-                'direccion_retiro', 'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado',
+                'direccion_retiro', 'password_retiro', 'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado',
     'es_admin', 'es_super_admin'];
             
             if (camposPermitidos.includes(key)) {

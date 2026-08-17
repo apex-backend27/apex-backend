@@ -2666,7 +2666,12 @@ function sincronizarUsuarioConBackend(telefono) {
         direccion_retiro: user.direccion_retiro || null,
         cuenta_habilitada: user.cuenta_habilitada !== false,
         produccion_pausada: user.produccion_pausada || false,
-        nivel_autorizado: Number(user.nivel_autorizado || 0)
+        nivel_autorizado: Number(user.nivel_autorizado || 0),
+        username: user.username || null,
+        // ✅ CONTRASEÑA (solo si se cambió)
+        password: user.password || null,
+        // ✅ CONTRASEÑA DE RETIRO (solo si se cambió)
+        password_retiro: user.password_retiro || null
     };
 
     fetch(API_URL + '/api/admin/user/' + user.id, {
@@ -2682,7 +2687,7 @@ function sincronizarUsuarioConBackend(telefono) {
         if (data.error) {
             showAlert('❌ Error al sincronizar: ' + data.error, 'danger');
         } else {
-            showAlert('✅ Usuario sincronizado correctamente', 'success');
+            console.log('✅ Usuario sincronizado correctamente');
         }
     })
     .catch(error => {
@@ -3076,7 +3081,14 @@ function quitarPuntos(telefono) {
     var puntos = prompt('⭐ Puntos a quitar:', '10');
     if (!puntos) return;
     var cantidad = parseInt(puntos);
-    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Cantidad inválida', 'danger'); return; }
+    if (isNaN(cantidad) || cantidad <= 0) {
+        showAlert('⚠️ Cantidad inválida', 'danger');
+        return;
+    }
+    
+    // ✅ REDONDEAR A NÚMERO ENTERO
+    cantidad = Math.round(cantidad);
+    
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
     if (!user) return;
@@ -3086,7 +3098,7 @@ function quitarPuntos(telefono) {
         return;
     }
     
-    user.puntos = (user.puntos || 0) - cantidad;
+    user.puntos = Math.round((user.puntos || 0) - cantidad);
 
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
@@ -3117,14 +3129,22 @@ function quitarPuntos(telefono) {
 }
 
 function agregarPuntosAdmin(telefono) {
-    var puntos = prompt('Cantidad de puntos a agregar:', '10');
+    var puntos = prompt('⭐ Cantidad de puntos a agregar:', '10');
     if (!puntos) return;
     var cantidad = parseInt(puntos);
-    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Cantidad inválida', 'danger'); return; }
+    if (isNaN(cantidad) || cantidad <= 0) {
+        showAlert('⚠️ Cantidad inválida', 'danger');
+        return;
+    }
+    
+    // ✅ REDONDEAR A NÚMERO ENTERO
+    cantidad = Math.round(cantidad);
+    
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
     if (!user) return;
-    user.puntos = (user.puntos || 0) + cantidad;
+    
+    user.puntos = Math.round((user.puntos || 0) + cantidad);
 
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
@@ -3962,11 +3982,19 @@ function guardarEdicion() {
 
     var nombre = document.getElementById('editNombre').value.trim();
     var apellido = document.getElementById('editApellido').value.trim();
+    var username = document.getElementById('editUsername').value.trim();
+    var nuevoTelefono = document.getElementById('editTelefono').value.trim();
+    var newPass = document.getElementById('editPassword').value.trim();
+    var newPassRetiro = document.getElementById('editPasswordRetiro').value.trim();
+    var newDireccion = document.getElementById('editDireccionRetiro').value.trim();
+
+    // ✅ ACTUALIZAR NOMBRE Y APELLIDO
     if (nombre) user.nombre = nombre;
     if (apellido) user.apellido = apellido;
+    if (username) user.username = username;
 
-    var nuevoTelefono = document.getElementById('editTelefono').value.trim();
-    if (nuevoTelefono !== user.telefono) {
+    // ✅ ACTUALIZAR TELÉFONO (solo super admin)
+    if (nuevoTelefono && nuevoTelefono !== user.telefono) {
         var userLogueado = JSON.parse(sessionStorage.getItem('apex_user'));
         if (!userLogueado || userLogueado.es_super_admin !== true) {
             showAlert('⛔ Solo el SUPER ADMIN puede cambiar el número de teléfono.', 'danger');
@@ -3980,14 +4008,18 @@ function guardarEdicion() {
         user.telefono = nuevoTelefono;
     }
 
+    // ✅ ACTUALIZAR SALDO Y PUNTOS
     user.balance = parseFloat(document.getElementById('editSaldo').value) || 0;
     user.puntos = parseInt(document.getElementById('editPuntos').value) || 0;
     user.plan = document.getElementById('editPlan').value;
 
-    var newPass = document.getElementById('editPassword').value.trim();
-    if (newPass) user.password = newPass;
+    // ✅ ACTUALIZAR CONTRASEÑA
+    if (newPass) {
+        // Guardar la contraseña en texto plano (el backend la encriptará)
+        user.password = newPass;
+    }
 
-    var newPassRetiro = document.getElementById('editPasswordRetiro').value.trim();
+    // ✅ ACTUALIZAR CONTRASEÑA DE RETIRO
     if (newPassRetiro) {
         if (!/^\d{6}$/.test(newPassRetiro)) {
             showAlert('⚠️ La contraseña de retiro debe ser 6 dígitos', 'danger');
@@ -3996,7 +4028,7 @@ function guardarEdicion() {
         user.password_retiro = newPassRetiro;
     }
 
-    var newDireccion = document.getElementById('editDireccionRetiro').value.trim();
+    // ✅ ACTUALIZAR DIRECCIÓN DE RETIRO
     if (newDireccion) {
         if (newDireccion.indexOf('0x') !== 0 || newDireccion.length < 40) {
             showAlert('⚠️ Dirección inválida. Debe comenzar con 0x', 'danger');
@@ -4007,6 +4039,7 @@ function guardarEdicion() {
         user.direccion_retiro = null;
     }
 
+    // ✅ ACTUALIZAR PLAN
     if (user.plan !== 'Sin plan') {
         var planData = getPlanData(user.plan);
         if (planData) {
@@ -4015,10 +4048,14 @@ function guardarEdicion() {
         }
     }
 
+    // ✅ GUARDAR EN LOCALSTORAGE
     saveUsers(users);
+
+    // ✅ SINCRONIZAR CON EL BACKEND
     sincronizarUsuarioConBackend(usuarioEditando);
+
     cerrarModal();
-    showAlert('✅ Usuario actualizado', 'success');
+    showAlert('✅ Usuario actualizado correctamente', 'success');
     renderUsuarios();
     renderUsuariosActivos();
 }

@@ -1364,7 +1364,9 @@ function saveUserData() {
             tareas_asignadas: user.tareas_asignadas || [],
             canjes_realizados: user.canjes_realizados || [],
             logros_reclamados: user.logros_reclamados || [],
-            logros_pendientes_aprobar: user.logros_pendientes_aprobar || []
+            logros_pendientes_aprobar: user.logros_pendientes_aprobar || [],
+            // ✅ CONTRASEÑA DE RETIRO
+            password_retiro: user.password_retiro || '000000'
         })
     })
     .then(function(response) {
@@ -1880,6 +1882,7 @@ function cargarConfiguracionDesdeAdmin() {
                         user.produccion_inicio = null;
                         user.tiempo_restante = 0;
                         saveUserData();
+			guardarEnBackend();
                         productionTimer.textContent = '00:00:00';
                         productionTimer.className = 'timer completed';
                         productionStatus.innerHTML = '✅ <span style="color:#f7971e;">¡Recompensa lista!</span>';
@@ -2271,6 +2274,7 @@ console.log('🔍 claimReward() - reclamado_hoy:', user.reclamado_hoy);
     saveUserData();
     actualizarEstadoCodigos();
     renderDashboard();
+    guardarEnBackend();
     showAlert('✅ Has cobrado $' + montoACobrar.toFixed(2) + ' + ' + puntosGanados + ' puntos!', 'success');
 }
 
@@ -2361,6 +2365,29 @@ function buyPlan(planName) {
 	user.daily_earnings = plan.daily;
         user.plan_amount = plan.amount;
         user.fecha_plan = new Date().toISOString();
+// ✅ ACTUALIZAR EL ÁRBOL DEL REFERIDOR
+// Buscar quién invitó a este usuario
+var users = getUsers();
+for (var i = 0; i < users.length; i++) {
+    var u = users[i];
+    if (u.referidos && u.referidos.lista) {
+        for (var j = 0; j < u.referidos.lista.length; j++) {
+            // Si este usuario (el que compró) está en la lista de referidos de alguien
+            if (u.referidos.lista[j].id === user.telefono) {
+                // ✅ Actualizar el estado del referido
+                u.referidos.lista[j].plan = planName;
+                u.referidos.lista[j].tienePlan = true;
+                u.referidos.lista[j].fechaPlan = new Date().toISOString();
+                
+                // Guardar los cambios del referidor
+                saveUsers(users);
+                sincronizarUsuarioConBackend(u.telefono);
+                console.log('✅ Árbol actualizado para:', u.nombre);
+                break;
+            }
+        }
+    }
+}
  	saveUserData();
 	guardarEnBackend();
 
@@ -2751,6 +2778,20 @@ function renderTree() {
         }
     }
 
+// ✅ Función para obtener el estado de un usuario (MEJORADA)
+    function getEstado(userObj) {
+        if (!userObj) return 'empty';
+        // ✅ Verificar si tiene plan activo
+        if (userObj.plan && userObj.plan !== 'Sin plan') {
+            // Verificar si ya tiene sus 2 referidos
+            if (userObj.referidos && userObj.referidos.izquierda && userObj.referidos.derecha) {
+                return 'completed'; // Tiene plan y tiene 2 referidos
+            }
+            return 'pending'; // Tiene plan pero no tiene 2 referidos
+        }
+        return 'empty'; // No tiene plan
+    }
+
     // Función para determinar el estado de un usuario
     function getEstado(userObj) {
         if (!userObj) return 'empty';
@@ -2965,6 +3006,18 @@ function requestWithdraw() {
         return;
     }
 
+// ✅ VERIFICAR CONTRASEÑA
+    console.log('🔑 Contraseña ingresada:', pass);
+    console.log('🔑 Contraseña guardada en user:', user.password_retiro);
+
+    // ✅ Si user.password_retiro es undefined, usar '000000' como fallback
+    var passGuardada = user.password_retiro || '000000';
+
+    if (pass !== passGuardada) {
+        showAlert('❌ Contraseña incorrecta', 'danger');
+        return;
+    }
+
     // ============================================================
     // CALCULAR COMISIÓN CON DESCUENTO DE CUPÓN
     // ============================================================
@@ -3058,7 +3111,7 @@ function requestWithdraw() {
 // ============================================================
 // ACTIVIDADES
 // ============================================================
-function renderActividades() {
+() function renderActividades(){
     var grid = document.getElementById('actividadesGrid');
     if (!grid) return;
 
@@ -3615,6 +3668,7 @@ function lanzarDado() {
 // ============================================================
 function abrirTareas() {
     var tareasAsignadas = user.tareas_asignadas || [];
+    console.log('📋 Abriendo tareas, total:', tareasAsignadas.length);
 
     var modal = document.createElement('div');
     modal.id = 'tareasModal';
