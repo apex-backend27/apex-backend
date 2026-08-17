@@ -3027,7 +3027,14 @@ function quitarSaldo(telefono) {
     var monto = prompt('💰 Monto a quitar del saldo:', '10');
     if (!monto) return;
     var cantidad = parseFloat(monto);
-    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Monto inválido', 'danger'); return; }
+    if (isNaN(cantidad) || cantidad <= 0) {
+        showAlert('⚠️ Monto inválido', 'danger');
+        return;
+    }
+    
+    // ✅ REDONDEAR A 2 DECIMALES
+    cantidad = Math.round(cantidad * 100) / 100;
+    
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
     if (!user) return;
@@ -3037,7 +3044,7 @@ function quitarSaldo(telefono) {
         return;
     }
     
-    user.balance = (user.balance || 0) - cantidad;
+    user.balance = Math.round(((user.balance || 0) - cantidad) * 100) / 100;
 
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
@@ -3054,13 +3061,13 @@ function quitarSaldo(telefono) {
         amount: -cantidad,
         date: new Date().toISOString(),
         status: 'completado',
-        concepto: '💰 -$' + Number(cantidad).toFixed(2) + ' por admin (removido)',
+        concepto: '💰 -$' + cantidad.toFixed(2) + ' por admin (removido)',
         origen: 'admin'
     });
 
     saveUsers(users);
     sincronizarUsuarioConBackend(telefono);
-    showAlert('✅ -$' + Number(cantidad).toFixed(2) + ' a ' + user.nombre + ' (saldo removido)', 'success');
+    showAlert('✅ -$' + cantidad.toFixed(2) + ' a ' + user.nombre + ' (saldo removido)', 'success');
     renderUsuarios();
     renderUsuariosActivos();
 }
@@ -3148,14 +3155,25 @@ function agregarPuntosAdmin(telefono) {
 }
 
 function agregarSaldo(telefono) {
-    var monto = prompt('Monto a agregar al saldo:', '10');
+    var monto = prompt('💰 Monto a agregar al saldo:', '10');
     if (!monto) return;
     var cantidad = parseFloat(monto);
-    if (isNaN(cantidad) || cantidad <= 0) { showAlert('⚠️ Monto inválido', 'danger'); return; }
+    if (isNaN(cantidad) || cantidad <= 0) {
+        showAlert('⚠️ Monto inválido', 'danger');
+        return;
+    }
+    
+    // ✅ REDONDEAR A 2 DECIMALES
+    cantidad = Math.round(cantidad * 100) / 100;
+    
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
-    user.balance = (user.balance || 0) + cantidad;
+    if (!user) {
+        showAlert('⚠️ Usuario no encontrado', 'danger');
+        return;
+    }
+    
+    user.balance = Math.round(((user.balance || 0) + cantidad) * 100) / 100;
 
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
@@ -3172,13 +3190,13 @@ function agregarSaldo(telefono) {
         amount: cantidad,
         date: new Date().toISOString(),
         status: 'completado',
-        concepto: '💰 +$' + Number(cantidad).toFixed(2) + ' por admin',
+        concepto: '💰 +$' + cantidad.toFixed(2) + ' por admin',
         origen: 'admin'
     });
 
     saveUsers(users);
     sincronizarUsuarioConBackend(telefono);
-    showAlert('✅ +$' + Number(cantidad).toFixed(2) + ' a ' + user.nombre, 'success');
+    showAlert('✅ +$' + cantidad.toFixed(2) + ' a ' + user.nombre, 'success');
     renderUsuarios();
     renderUsuariosActivos();
 }

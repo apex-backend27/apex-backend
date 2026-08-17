@@ -1347,7 +1347,24 @@ function saveUserData() {
             ultimo_reinicio_codigos: user.ultimo_reinicio_codigos || null,
             ruleta_usos: Number(user.ruleta_usos || 0),
             cofres_usos: Number(user.cofres_usos || 0),
-            dados_usos: Number(user.dados_usos || 0)
+            dados_usos: Number(user.dados_usos || 0),
+            premio_ruleta: Number(user.premio_ruleta || 0),
+            premio_cofre: Number(user.premio_cofre || 0),
+            premio_dados: Number(user.premio_dados || 0),
+            cofres_abiertos: user.cofres_abiertos || [],
+            // ✅ HISTORIAL - ESTO ES LO QUE FALTABA
+            historial: user.historial || [],
+            historial_detallado: user.historial_detallado || [],
+            historial_codigos: user.historial_codigos || [],
+            // ✅ DIRECCIÓN DE RETIRO
+            direccion_retiro: user.direccion_retiro || null,
+            // ✅ CUPONES, LOGROS, TAREAS
+            cupones_asignados: user.cupones_asignados || [],
+            logros_asignados: user.logros_asignados || [],
+            tareas_asignadas: user.tareas_asignadas || [],
+            canjes_realizados: user.canjes_realizados || [],
+            logros_reclamados: user.logros_reclamados || [],
+            logros_pendientes_aprobar: user.logros_pendientes_aprobar || []
         })
     })
     .then(function(response) {
@@ -2918,7 +2935,8 @@ function updateWithdrawAddress() {
         return;
     }
     user.direccion_retiro = address;
-    saveUserData();
+    saveUserData();         // Guarda en localStorage
+    guardarEnBackend();     // ✅ Guarda en el backend
     document.getElementById('currentWithdrawAddress').textContent = address;
     document.getElementById('currentWithdrawAddress').style.color = '#4db6ac';
     showAlert('✅ Dirección de retiro guardada', 'success');
