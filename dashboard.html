@@ -6,179 +6,226 @@
     <title>APEX - Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 0; color: #000000; }
-        .header { background: #ffffff; padding: 16px 20px 14px; border-bottom: 1px solid #e0e0e0; position: sticky; top: 0; z-index: 50; }
-        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; min-height: 100vh; padding: 0; color: #1a1a2e; }
+        
+        /* HEADER - ELEGANTE */
+        .header { background: #1a1a2e; padding: 14px 20px 12px; border-bottom: 2px solid #f7971e; position: sticky; top: 0; z-index: 50; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .header-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         .brand { display: flex; align-items: center; gap: 8px; }
-        .brand h1 { font-size: 24px; font-weight: 800; color: #000000; }
-        .brand .slogan { font-size: 7px; color: #999; letter-spacing: 4px; text-transform: uppercase; margin-top: -2px; }
-        .user { display: flex; align-items: center; gap: 12px; }
-        .user .avatar { width: 40px; height: 40px; border-radius: 50%; background: #000000; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #ffffff; font-size: 15px; }
+        .brand h1 { font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }
+        .brand h1 span { color: #f7971e; }
+        .brand .slogan { font-size: 7px; color: rgba(255,255,255,0.4); letter-spacing: 4px; text-transform: uppercase; margin-top: -2px; }
+        .user { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .user .avatar { width: 38px; height: 38px; border-radius: 50%; background: #f7971e; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #ffffff; font-size: 14px; }
         .user .info { text-align: right; }
-        .user .info .name { font-size: 14px; font-weight: 600; color: #000000; }
-        .user .info .phone { font-size: 11px; color: #999; }
-        .logout-btn { background: #f5f5f5; border: 1px solid #e0e0e0; color: #666; padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 11px; font-weight: 600; }
-        .logout-btn:hover { background: #e0e0e0; }
+        .user .info .name { font-size: 13px; font-weight: 600; color: #ffffff; }
+        .user .info .phone { font-size: 10px; color: rgba(255,255,255,0.5); }
+        .logout-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #ffffff; padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.3s; }
+        .logout-btn:hover { background: rgba(255,255,255,0.15); }
+        .dark-toggle { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #ffffff; padding: 5px 8px; border-radius: 20px; cursor: pointer; font-size: 16px; transition: all 0.3s; }
+        .dark-toggle:hover { background: rgba(255,255,255,0.15); }
+        
         .main { padding: 16px 16px 80px; max-width: 500px; margin: 0 auto; }
-        #adminAccess { display: none; background: #fff8f0; border: 2px solid #f7971e; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; text-align: center; }
-        #adminAccess .admin-text { font-size: 14px; color: #000; font-weight: 600; }
-        #adminAccess .admin-btn { display: inline-block; margin-left: 12px; background: #000000; color: #ffffff; padding: 8px 22px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600; border: none; cursor: pointer; }
-        #adminAccess .admin-btn:hover { background: #333; }
+        
+        /* ALERTAS */
+        #adminAccess { display: none; background: #f8f4e6; border: 2px solid #f7971e; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; text-align: center; }
+        #adminAccess .admin-text { font-size: 14px; color: #1a1a2e; font-weight: 600; }
+        #adminAccess .admin-btn { display: inline-block; margin-left: 12px; background: #1a1a2e; color: #ffffff; padding: 8px 22px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s; }
+        #adminAccess .admin-btn:hover { background: #2d2d44; }
         @media (max-width: 480px) { #adminAccess .admin-btn { display: block; margin: 8px auto 0; width: 100%; text-align: center; } }
-        #cuentaBloqueada { display: none; background: #fbe9e7; border: 2px solid #ef5350; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; text-align: center; }
+        
+        #cuentaBloqueada { display: none; background: #fce8e6; border: 2px solid #e53935; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; text-align: center; }
         #cuentaBloqueada .blocked-text { font-size: 16px; color: #c62828; font-weight: 700; }
         #cuentaBloqueada .blocked-sub { font-size: 13px; color: #666; margin-top: 4px; }
-        #produccionPausada { display: none; background: #fff8e1; border: 2px solid #f7971e; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; text-align: center; }
+        
+        #produccionPausada { display: none; background: #fef3e2; border: 2px solid #f7971e; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; text-align: center; }
         #produccionPausada .paused-text { font-size: 16px; color: #e65100; font-weight: 700; }
+        #produccionPausada .blocked-sub { font-size: 13px; color: #666; margin-top: 4px; }
+        
         .alert { padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; display: none; font-size: 13px; text-align: center; }
         .alert.show { display: block; }
         .alert-success { background: #e8f5e9; border: 1px solid #c8e6c9; color: #2e7d32; }
         .alert-danger { background: #fbe9e7; border: 1px solid #ffccbc; color: #c62828; }
         .alert-info { background: #e3f2fd; border: 1px solid #bbdefb; color: #0d47a1; }
         .alert-warning { background: #fff8e1; border: 1px solid #ffe0b2; color: #e65100; }
-        .card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 16px; padding: 20px; margin-bottom: 16px; }
-        .card-gold { border-color: #f7971e; background: #fffbf0; }
-        .card-blue { border-color: #64b5f6; background: #f5f9ff; }
-        .card-green { border-color: #4db6ac; background: #f5fcfb; }
+        
+        /* CARDS - ELEGANTES */
+        .card { background: #ffffff; border: none; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: transform 0.2s, box-shadow 0.2s; }
+        .card-gold { border: 2px solid #f7971e; background: #fffcf5; }
+        .card-blue { border: 2px solid #64b5f6; background: #f5f9ff; }
+        .card-green { border: 2px solid #4db6ac; background: #f5fcfb; }
         .card .label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+        
+        /* BALANCE */
         .balance-card { text-align: center; }
-        .balance-card .amount { font-size: 44px; font-weight: 700; color: #000000; margin: 4px 0; }
+        .balance-card .amount { font-size: 44px; font-weight: 800; color: #1a1a2e; margin: 4px 0; }
         .balance-card .sub { font-size: 12px; color: #999; }
         .balance-card .points { font-size: 13px; color: #666; margin-top: 8px; }
-        .balance-card .points span { color: #f7971e; font-weight: 600; }
+        .balance-card .points span { color: #f7971e; font-weight: 700; }
+        
+        /* PRODUCCIÓN */
         .production-card { text-align: center; }
-        .production-card .timer { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; color: #000000; margin: 6px 0; }
+        .production-card .timer { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; color: #1a1a2e; margin: 6px 0; }
         .production-card .timer.active { color: #4db6ac; }
         .production-card .timer.completed { color: #f7971e; }
-        .production-card .timer.paused { color: #ff6b6b; }
+        .production-card .timer.paused { color: #e53935; }
         .production-card .status { font-size: 12px; color: #999; }
+        
+        /* ADDRESS */
         .address-box { display: flex; align-items: center; gap: 10px; background: #f8f9fa; border-radius: 12px; padding: 12px 14px; border: 1px solid #e0e0e0; margin-top: 8px; }
         .address-box .addr { flex: 1; font-size: 12px; color: #666; font-family: monospace; word-break: break-all; overflow: hidden; }
-        .copy-btn { background: #000000; border: none; color: #ffffff; padding: 6px 16px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; }
-        .copy-btn:hover { background: #333; }
-        .code-input-group { display: flex; gap: 10px; margin-top: 8px; }
-        .code-input-group input { flex: 1; padding: 14px 16px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 12px; color: #000000; font-size: 18px; font-weight: 600; letter-spacing: 4px; outline: none; text-align: center; font-family: monospace; }
-        .code-input-group input:focus { border-color: #000000; background: #ffffff; }
+        .copy-btn { background: #1a1a2e; border: none; color: #ffffff; padding: 6px 16px; border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .copy-btn:hover { background: #2d2d44; }
+        
+        /* CÓDIGOS */
+        .code-input-group { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+        .code-input-group input { flex: 1; min-width: 120px; padding: 14px 16px; background: #f8f9fa; border: 2px solid #e0e0e0; border-radius: 12px; color: #1a1a2e; font-size: 18px; font-weight: 600; letter-spacing: 4px; outline: none; text-align: center; font-family: monospace; transition: all 0.3s; }
+        .code-input-group input:focus { border-color: #f7971e; background: #ffffff; box-shadow: 0 0 0 4px rgba(247,151,30,0.1); }
         .code-input-group input::placeholder { color: #ccc; font-weight: 400; letter-spacing: 0; font-family: Arial, sans-serif; }
         .code-input-group input:disabled { background: #f0f0f0; color: #999; }
-        .code-input-group .validate-btn { padding: 14px 24px; background: #000000; border: none; border-radius: 12px; color: #ffffff; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+        .code-input-group .validate-btn { padding: 14px 24px; background: #1a1a2e; border: none; border-radius: 12px; color: #ffffff; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.3s; }
+        .code-input-group .validate-btn:hover:not(:disabled) { background: #2d2d44; }
         .code-input-group .validate-btn:active { transform: scale(0.95); }
         .code-input-group .validate-btn:disabled { opacity: 0.3; cursor: not-allowed; }
         .code-hint { font-size: 11px; color: #999; margin-top: 8px; }
-        .claim-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 16px; }
-        .claim-btn.active { background: #000000; color: #ffffff; }
+        .code-hint strong { color: #f7971e; font-size: 14px; }
+        
+        /* CLAIM BTN */
+        .claim-btn { width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 16px; transition: all 0.3s; }
+        .claim-btn.active { background: #f7971e; color: #ffffff; box-shadow: 0 4px 16px rgba(247,151,30,0.3); }
+        .claim-btn.active:hover { background: #e6891a; }
         .claim-btn.active:active { transform: scale(0.97); }
         .claim-btn.disabled { background: #f5f5f5; color: #ccc; cursor: not-allowed; border: 1px solid #e0e0e0; }
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-around; padding: 8px 0 12px; z-index: 100; }
-        .bottom-nav .nav-item { background: none; border: none; color: #999; display: flex; flex-direction: column; align-items: center; gap: 0px; font-size: 9px; cursor: pointer; padding: 4px 6px; font-weight: 500; min-width: 40px; position: relative; }
-        .bottom-nav .nav-item .icon { font-size: 22px; }
-        .bottom-nav .nav-item .label { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; color: #999; }
-        .bottom-nav .nav-item.active { color: #000000; }
-        .bottom-nav .nav-item.active .label { color: #000000; }
-        .tab-content { display: none; }
+        
+        /* BOTTOM NAV */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid #e8ecf1; display: flex; justify-content: space-around; padding: 6px 0 10px; z-index: 100; box-shadow: 0 -4px 20px rgba(0,0,0,0.05); max-width: 500px; margin: 0 auto; }
+        .bottom-nav .nav-item { background: none; border: none; color: #999; display: flex; flex-direction: column; align-items: center; gap: 0px; font-size: 9px; cursor: pointer; padding: 4px 6px; font-weight: 500; min-width: 40px; position: relative; transition: all 0.3s; }
+        .bottom-nav .nav-item .icon { font-size: 22px; transition: all 0.3s; }
+        .bottom-nav .nav-item .label { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; color: #999; transition: all 0.3s; }
+        .bottom-nav .nav-item.active { color: #f7971e; }
+        .bottom-nav .nav-item.active .icon { transform: scale(1.1); }
+        .bottom-nav .nav-item.active .label { color: #f7971e; font-weight: 700; }
+        
+        /* TABS */
+        .tab-content { display: none; animation: fadeIn 0.3s ease; }
         .tab-content.active { display: block; }
+        @keyframes fadeIn { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
+        
+        /* GANANCIAS STATS */
         .ganancias-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-        .ganancia-stat { background: #f8f9fa; border-radius: 12px; padding: 12px 14px; text-align: center; border: 1px solid #e0e0e0; }
+        .ganancia-stat { background: #ffffff; border-radius: 14px; padding: 14px 16px; text-align: center; border: 2px solid #e8ecf1; box-shadow: 0 2px 8px rgba(0,0,0,0.03); transition: all 0.3s; }
+        .ganancia-stat:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
         .ganancia-stat .label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
-        .ganancia-stat .number { font-size: 22px; font-weight: 700; color: #000000; margin-top: 2px; }
+        .ganancia-stat .number { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-top: 2px; }
         .ganancia-stat .number.gold { color: #f7971e; }
         .ganancia-stat .number.green { color: #4db6ac; }
+        
+        /* FILTER TABS */
+        .filter-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+        .filter-tabs .filter-btn { padding: 6px 14px; border: 2px solid #e0e0e0; border-radius: 20px; background: transparent; color: #999; font-size: 10px; cursor: pointer; font-weight: 500; transition: all 0.3s; }
+        .filter-tabs .filter-btn:hover { border-color: #f7971e; color: #f7971e; }
+        .filter-tabs .filter-btn.active { background: #1a1a2e; border-color: #1a1a2e; color: #ffffff; }
+        
+        /* HISTORIAL ITEMS */
+        .historial-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f2f5; transition: background 0.2s; }
+        .historial-item:last-child { border-bottom: none; }
+        .historial-item:hover { background: #f8f9fb; padding-left: 8px; padding-right: 8px; border-radius: 8px; margin-left: -8px; margin-right: -8px; }
+        .historial-item .left .desc { font-size: 13px; color: #1a1a2e; font-weight: 500; }
+        .historial-item .left .date { font-size: 10px; color: #999; }
+        .historial-item .right { text-align: right; }
+        .historial-item .right .amount { font-size: 13px; font-weight: 700; }
+        .historial-item .right .amount.positive { color: #4db6ac; }
+        .historial-item .right .amount.negative { color: #e53935; }
+        .historial-item .right .amount.pending { color: #f7971e; }
+        .historial-item .right .status { font-size: 9px; color: #999; font-weight: 600; }
+        .historial-item .right .origen { font-size: 8px; color: #999; }
+        
+        /* ACTIVIDADES */
         .actividad-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .actividad-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 16px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
-        .actividad-card:active { transform: scale(0.97); }
-        .actividad-card .icono { font-size: 36px; display: block; margin-bottom: 6px; }
-        .actividad-card .nombre { font-size: 13px; font-weight: 600; color: #000; }
-        .actividad-card .desc { font-size: 10px; color: #999; margin-top: 2px; }
-        .actividad-card .estado { font-size: 9px; color: #4db6ac; font-weight: 600; margin-top: 4px; }
-        .actividad-card .badge-prox { position: absolute; top: 8px; right: 8px; background: #f5f5f5; color: #999; font-size: 7px; padding: 2px 8px; border-radius: 10px; font-weight: 600; text-transform: uppercase; }
-        .actividad-card.bloqueada { opacity: 0.5; pointer-events: none; }
-        .cofres-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
-        .cofre-item { background: #1a1a2e; border: 2px solid #e0e0e0; border-radius: 14px; padding: 16px 8px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .cofre-item:hover:not(.abierto):not(.bloqueado) { border-color: #f7971e; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .actividad-card { background: #ffffff; border: 2px solid #e8ecf1; border-radius: 16px; padding: 18px 12px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; }
+        .actividad-card:hover:not(.bloqueada) { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); border-color: #f7971e; }
+        .actividad-card:active:not(.bloqueada) { transform: scale(0.97); }
+        .actividad-card .icono { font-size: 32px; display: block; margin-bottom: 4px; }
+        .actividad-card .nombre { font-size: 12px; font-weight: 600; color: #1a1a2e; }
+        .actividad-card .desc { font-size: 9px; color: #999; margin-top: 2px; line-height: 1.3; }
+        .actividad-card .estado { font-size: 8px; color: #4db6ac; font-weight: 600; margin-top: 4px; }
+        .actividad-card .badge-prox { position: absolute; top: 6px; right: 6px; background: #f0f2f5; color: #999; font-size: 6px; padding: 2px 6px; border-radius: 8px; font-weight: 600; text-transform: uppercase; }
+        .actividad-card .badge-prox.disponible { background: #e8f5e9; color: #2e7d32; }
+        .actividad-card.bloqueada { opacity: 0.5; pointer-events: none; filter: grayscale(0.5); }
+        
+        /* COFRES */
+        .cofres-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+        .cofre-item { background: #1a1a2e; border: 2px solid #3a3a55; border-radius: 14px; padding: 14px 6px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .cofre-item:hover:not(.abierto):not(.bloqueado) { border-color: #f7971e; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
         .cofre-item:active:not(.abierto):not(.bloqueado) { transform: scale(0.95); }
-        .cofre-item .icono { font-size: 32px; }
-        .cofre-item .numero { font-size: 11px; color: #fff; margin-top: 2px; }
+        .cofre-item .icono { font-size: 28px; }
+        .cofre-item .numero { font-size: 10px; color: #fff; margin-top: 2px; }
         .cofre-item.abierto { opacity: 0.7; cursor: default; border-color: #4db6ac; background: #0f2a1f; }
-        .cofre-item .cofre-resultado { font-size: 13px; font-weight: 700; color: #4db6ac; margin-top: 2px; }
-        .profile-field { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+        .cofre-item .cofre-resultado { font-size: 12px; font-weight: 700; color: #4db6ac; margin-top: 2px; }
+        
+        /* PERFIL */
+        .profile-field { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f2f5; }
         .profile-field .label { font-size: 12px; color: #999; font-weight: 600; }
-        .profile-field .value { font-size: 13px; color: #000000; text-align: right; }
+        .profile-field .value { font-size: 13px; color: #1a1a2e; text-align: right; font-weight: 500; }
         .profile-section { margin-bottom: 20px; }
         .profile-section .section-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; display: block; font-weight: 600; }
-        .profile-input-group { display: flex; gap: 10px; }
-        .profile-input-group input { flex: 1; padding: 12px 14px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 12px; color: #000000; font-size: 14px; outline: none; }
-        .profile-input-group input:focus { border-color: #000000; background: #ffffff; }
+        .profile-input-group { display: flex; gap: 10px; flex-wrap: wrap; }
+        .profile-input-group input { flex: 1; min-width: 140px; padding: 12px 14px; background: #f8f9fa; border: 2px solid #e0e0e0; border-radius: 12px; color: #1a1a2e; font-size: 14px; outline: none; transition: all 0.3s; }
+        .profile-input-group input:focus { border-color: #f7971e; background: #ffffff; box-shadow: 0 0 0 4px rgba(247,151,30,0.1); }
         .profile-input-group input::placeholder { color: #ccc; }
-        .profile-input-group .btn-action { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        .profile-input-group .btn-action { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; transition: all 0.3s; }
+        .profile-input-group .btn-action:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .profile-input-group .btn-action:active { transform: scale(0.95); }
-        .btn-save { background: #000000; color: #ffffff; }
-        .btn-withdraw { background: #000000; color: #ffffff; width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+        .btn-save { background: #1a1a2e; color: #ffffff; }
+        .btn-save:hover { background: #2d2d44; }
+        .btn-withdraw { background: #f7971e; color: #ffffff; width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: all 0.3s; }
+        .btn-withdraw:hover { background: #e6891a; }
         .btn-withdraw:active { transform: scale(0.97); }
         .btn-withdraw:disabled { opacity: 0.3; cursor: not-allowed; }
         .withdraw-hint { font-size: 11px; color: #999; margin-top: 8px; text-align: center; }
         .withdraw-info { font-size: 12px; color: #999; margin-bottom: 8px; }
-        .withdraw-info strong { color: #000000; }
-        .historial-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
-        .historial-item:last-child { border-bottom: none; }
-        .historial-item .left .desc { font-size: 13px; color: #000000; }
-        .historial-item .left .date { font-size: 10px; color: #999; }
-        .historial-item .right { text-align: right; }
-        .historial-item .right .amount { font-size: 13px; font-weight: 600; }
-        .historial-item .right .amount.positive { color: #4db6ac; }
-        .historial-item .right .amount.negative { color: #ef5350; }
-        .historial-item .right .status { font-size: 9px; color: #999; }
-        .historial-item .right .origen { font-size: 8px; color: #999; }
-        .filter-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-        .filter-tabs .filter-btn { padding: 6px 16px; border: 1px solid #e0e0e0; border-radius: 20px; background: transparent; color: #999; font-size: 11px; cursor: pointer; font-weight: 500; }
-        .filter-tabs .filter-btn.active { background: #000000; border-color: #000000; color: #ffffff; }
-        .plan-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .plan-card.active-plan { border-color: #f7971e; background: #fffbf0; }
-        .plan-card.locked { opacity: 0.6; border-color: #ccc; background: #f5f5f5; }
-        .plan-card.locked .buy-btn { background: #ccc; cursor: not-allowed; }
-        .plan-card .info { display: flex; align-items: center; gap: 14px; }
-        .plan-card .info .icon { font-size: 28px; }
-        .plan-card .info .name { font-size: 15px; font-weight: 600; color: #000000; }
-        .plan-card .info .name .badge { font-size: 9px; font-weight: 400; color: #999; margin-left: 4px; }
-        .plan-card .info .name .lock-icon { font-size: 12px; margin-left: 4px; }
-        .plan-card .info .details { font-size: 11px; color: #999; margin-top: 2px; }
-        .plan-card .info .details strong { color: #000000; }
-        .plan-card .info .upgrade-info { font-size: 10px; color: #f7971e; margin-top: 2px; }
-        .plan-card .info .locked-info { font-size: 10px; color: #ef5350; margin-top: 2px; }
+        .withdraw-info strong { color: #1a1a2e; }
+        
+        /* PLANES */
+        .plan-card { background: #ffffff; border: 2px solid #e8ecf1; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; }
+        .plan-card:hover { transform: translateX(4px); }
+        .plan-card.active-plan { border-color: #f7971e; background: #fffcf5; }
+        .plan-card.locked { opacity: 0.6; border-color: #e0e0e0; background: #f5f5f5; }
+        .plan-card .info { display: flex; align-items: center; gap: 12px; }
+        .plan-card .info .icon { font-size: 24px; }
+        .plan-card .info .name { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+        .plan-card .info .details { font-size: 10px; color: #999; margin-top: 2px; }
+        .plan-card .info .details strong { color: #1a1a2e; }
+        .plan-card .info .upgrade-info { font-size: 10px; color: #f7971e; margin-top: 2px; font-weight: 600; }
+        .plan-card .info .locked-info { font-size: 10px; color: #e53935; margin-top: 2px; }
         .plan-card .action { text-align: right; }
-        .plan-card .action .price { font-size: 16px; font-weight: 700; color: #000000; }
+        .plan-card .action .price { font-size: 15px; font-weight: 700; color: #1a1a2e; }
         .plan-card .action .sub { font-size: 9px; color: #999; }
-        .plan-card .action .buy-btn { margin-top: 4px; padding: 6px 18px; border: none; border-radius: 10px; background: #000000; color: #ffffff; font-weight: 700; font-size: 11px; cursor: pointer; width: 100%; }
+        .plan-card .action .buy-btn { margin-top: 4px; padding: 5px 14px; border: none; border-radius: 8px; background: #1a1a2e; color: #ffffff; font-weight: 700; font-size: 10px; cursor: pointer; width: 100%; transition: all 0.3s; }
+        .plan-card .action .buy-btn:hover:not(:disabled) { background: #2d2d44; }
         .plan-card .action .buy-btn:active { transform: scale(0.95); }
         .plan-card .action .buy-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .plan-card .action .active-tag { font-size: 10px; color: #4db6ac; font-weight: 600; }
-        .plan-card .action .locked-tag { font-size: 10px; color: #ef5350; font-weight: 600; }
-        .tree-container { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 0; }
-        .tree-level { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+        .plan-card .action .active-tag { font-size: 10px; color: #4db6ac; font-weight: 700; }
+        .plan-card .action .locked-tag { font-size: 10px; color: #e53935; font-weight: 600; }
+        
+        /* ÁRBOL DE REFERIDOS - LLAMATIVO (como te gusta) */
+        .tree-container { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0; }
+        .tree-level { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
         .tree-node { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-        .tree-node .circle { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; border: 2px solid #ddd; background: #f5f5f5; color: #999; }
-        .tree-node .circle.you { background: #000000; color: #ffffff; border-color: #000000; }
-        .tree-node .circle.completed { background: #4db6ac; color: #fff; border-color: #4db6ac; }
-        .tree-node .circle.pending { background: #fff8e1; color: #e65100; border-color: #f7971e; }
+        .tree-node .circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; border: 2px solid #ddd; background: #f5f5f5; color: #999; transition: all 0.3s; }
+        .tree-node .circle.you { background: linear-gradient(135deg, #1a1a2e, #2d2d44); color: #ffffff; border-color: #1a1a2e; box-shadow: 0 2px 12px rgba(26,26,46,0.3); }
+        .tree-node .circle.completed { background: #4db6ac; color: #fff; border-color: #4db6ac; box-shadow: 0 2px 12px rgba(77,182,172,0.3); }
+        .tree-node .circle.pending { background: linear-gradient(135deg, #f7971e, #ff6b35); color: #fff; border-color: #f7971e; box-shadow: 0 2px 12px rgba(247,151,30,0.3); }
         .tree-node .circle.empty { background: #f5f5f5; color: #ccc; border-color: #ddd; }
-        .tree-node .label { font-size: 7px; color: #999; text-transform: uppercase; letter-spacing: 0.3px; text-align: center; max-width: 55px; word-break: break-all; }
-        .tree-connector { color: #ccc; font-size: 16px; }
+        .tree-node .label { font-size: 7px; color: #999; text-transform: uppercase; letter-spacing: 0.3px; text-align: center; max-width: 50px; word-break: break-all; }
+        .tree-connector { color: #ccc; font-size: 14px; }
         .referral-count { text-align: center; font-size: 12px; color: #666; margin-top: 8px; }
-        .referral-count strong { color: #000; }
+        .referral-count strong { color: #1a1a2e; }
         .nivel-info { font-size: 11px; color: #999; text-align: center; padding: 8px; background: #f8f9fa; border-radius: 10px; margin-top: 8px; }
         .nivel-info .desbloqueado { color: #4db6ac; font-weight: 600; }
-        .nivel-info .bloqueado { color: #ef5350; font-weight: 600; }
-        @media (max-width: 480px) {
-            .ganancias-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
-            .actividad-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-            .cofres-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-            .cofre-item { padding: 12px 4px; min-height: 70px; }
-            .cofre-item .icono { font-size: 24px; }
-            .tree-level { gap: 10px; }
-            .tree-node .circle { width: 34px; height: 34px; font-size: 11px; }
-        }
-    	        /* ============================================================
-           MODAL DE ALERTAS - CENTRADO
-           ============================================================ */
+        .nivel-info .bloqueado { color: #e53935; font-weight: 600; }
+        
+        /* MODAL DE ALERTAS */
         .alert-modal {
             position: fixed;
             top: 50%;
@@ -186,874 +233,104 @@
             transform: translate(-50%, -50%);
             z-index: 9999;
             background: #ffffff;
-            padding: 24px 32px;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            padding: 28px 32px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             max-width: 90%;
-            width: 420px;
+            width: 400px;
             text-align: center;
             animation: alertFadeIn 0.3s ease;
-            border: 2px solid #000;
+            border: 3px solid #1a1a2e;
         }
-
-        .alert-modal .alert-icon {
-            font-size: 48px;
-            margin-bottom: 8px;
-        }
-
-        .alert-modal .alert-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 6px;
-        }
-
-        .alert-modal .alert-message {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 16px;
-            line-height: 1.5;
-        }
-
-        .alert-modal .alert-btn {
-            padding: 10px 32px;
-            border: none;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 700;
-            cursor: pointer;
-            background: #000000;
-            color: #ffffff;
-            transition: all 0.2s;
-        }
-
-        .alert-modal .alert-btn:hover {
-            background: #333;
-        }
-
-        .alert-modal .alert-btn:active {
-            transform: scale(0.95);
-        }
-
+        .alert-modal .alert-icon { font-size: 48px; margin-bottom: 8px; }
+        .alert-modal .alert-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; color: #1a1a2e; }
+        .alert-modal .alert-message { font-size: 14px; color: #666; margin-bottom: 18px; line-height: 1.6; }
+        .alert-modal .alert-btn { padding: 10px 36px; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; background: #1a1a2e; color: #ffffff; transition: all 0.2s; }
+        .alert-modal .alert-btn:hover { background: #2d2d44; }
         .alert-modal.success { border-color: #4db6ac; }
-        .alert-modal.danger { border-color: #ef5350; }
+        .alert-modal.danger { border-color: #e53935; }
         .alert-modal.warning { border-color: #f7971e; }
         .alert-modal.info { border-color: #64b5f6; }
-
         .alert-modal.success .alert-icon { color: #4db6ac; }
-        .alert-modal.danger .alert-icon { color: #ef5350; }
+        .alert-modal.danger .alert-icon { color: #e53935; }
         .alert-modal.warning .alert-icon { color: #f7971e; }
         .alert-modal.info .alert-icon { color: #64b5f6; }
-
         .alert-modal.success .alert-title { color: #2e7d32; }
         .alert-modal.danger .alert-title { color: #c62828; }
         .alert-modal.warning .alert-title { color: #e65100; }
         .alert-modal.info .alert-title { color: #0d47a1; }
-
-        @keyframes alertFadeIn {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        }
-
-        .alert-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 9998;
-            animation: backdropFadeIn 0.3s ease;
-        }
-
-        @keyframes backdropFadeIn {
-            0% { opacity: 0; }
-            100% { opacity: 1; }
-        }
-        /* ============================================================
-           MODO OSCURO
-           ============================================================ */
-        body.dark-mode {
+        @keyframes alertFadeIn { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+        .alert-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9998; animation: backdropFadeIn 0.3s ease; }
+        @keyframes backdropFadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
         
+        /* MODO OSCURO */
+        body.dark-mode {
             background: #121212;
             color: #e0e0e0;
-                
-}
-
-        body.dark-mode .header,
-        body.dark-mode .sidebar,
-        body.dark-mode .card,
-        body.dark-mode .stat-card,
-        body.dark-mode .modal,
-        body.dark-mode .notification-dropdown,
-        body.dark-mode .bottom-nav {
-            background: #1e1e1e;
-            border-color: #333;
         }
-
-        body.dark-mode .header h1,
-        body.dark-mode .card .card-title,
-        body.dark-mode .stat-card .number,
-        body.dark-mode .modal .modal-title {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .user .info .name,
-        body.dark-mode .user .info .phone,
-        body.dark-mode .profile-field .value,
-        body.dark-mode .detalle-item .value {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .form-group input,
-        body.dark-mode .form-group select,
-        body.dark-mode .form-group textarea,
-        body.dark-mode .code-input-group input,
-        body.dark-mode .profile-input-group input {
-            background: #2a2a2a;
-            border-color: #444;
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .form-group label,
-        body.dark-mode .profile-field .label,
-        body.dark-mode .detalle-item .label {
-            color: #999;
-        }
-
-        body.dark-mode .alert-modal {
-            background: #1e1e1e;
-            border-color: #444;
-        }
-
-        body.dark-mode .alert-modal .alert-message {
-            color: #bbb;
-        }
-
-        body.dark-mode .config-bar {
-            background: #1a1a1a;
-            border-color: #333;
-        }
-
-        body.dark-mode .table-wrapper table,
-        body.dark-mode table {
-            background: #1e1e1e;
-        }
-
-        body.dark-mode th {
-            background: #2a2a2a;
-            color: #999;
-        }
-
-        body.dark-mode td {
-            color: #e0e0e0;
-            border-color: #333;
-        }
-
-        body.dark-mode tr:hover td {
-            background: #2a2a2a;
-        }
-
-        body.dark-mode .badge-default {
-            background: #333;
-            color: #999;
-        }
-
-        body.dark-mode .codigo-generado {
-            background: #2a2a2a;
-            border-color: #444;
-        }
-
-        body.dark-mode .codigo-generado .codigo-texto {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .bottom-nav .nav-item {
-            color: #666;
-        }
-
-        body.dark-mode .bottom-nav .nav-item.active {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .bottom-nav .nav-item.active .label {
-            color: #e0e0e0;
-        }
-
-        /* ============================================================
-           HISTORIAL - DASHBOARD USUARIO
-           ============================================================ */
-        body.dark-mode .historial-item {
-            background: #1a1a1a;
-            border-bottom: 2px solid #333;
-            padding: 10px 12px;
-            border-radius: 8px;
-            margin-bottom: 4px;
-        }
-
-        body.dark-mode .historial-item .left .desc {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .historial-item .left .date {
-            color: #666;
-        }
-
-        body.dark-mode .historial-item .right .amount.positive {
-            color: #4db6ac;
-        }
-
-        body.dark-mode .historial-item .right .amount.negative {
-            color: #ef5350;
-        }
-
-        body.dark-mode .historial-item .right .status {
-            color: #999;
-        }
-
-        body.dark-mode .historial-item .right .origen {
-            color: #666;
-        }
-
-        body.dark-mode .filter-tabs .filter-btn {
-            background: transparent;
-            border: 1px solid #444;
-            color: #999;
-        }
-
-        body.dark-mode .filter-tabs .filter-btn.active {
-            background: #000000;
-            border-color: #000000;
-            color: #ffffff;
-        }
-
-        body.dark-mode .filter-tabs .filter-btn:hover:not(.active) {
-            background: #2a2a2a;
-        }
-
-        body.dark-mode .ganancia-stat {
-            background: #1e1e1e;
-            border: 1px solid #333;
-        }
-
-        body.dark-mode .ganancia-stat .label {
-            color: #999;
-        }
-
-        body.dark-mode .ganancia-stat .number {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .ganancia-stat .number.gold {
-            color: #f7971e;
-        }
-
-        body.dark-mode .ganancia-stat .number.green {
-            color: #4db6ac;
-        }
-
-        /* ============================================================
-           ACTIVIDADES - MODALES (Canjes, Tareas, Puntos, Logros, Cupones)
-           ============================================================ */
-        body.dark-mode #puntosModal,
-        body.dark-mode #tareasModal,
-        body.dark-mode #logrosModal,
-        body.dark-mode #cuponesModal,
-        body.dark-mode #ruletaModal,
-        body.dark-mode #cofresModal,
-        body.dark-mode #dadosModal {
-            background: rgba(0,0,0,0.9) !important;
-        }
-
-        body.dark-mode #puntosModal > div,
-        body.dark-mode #tareasModal > div,
-        body.dark-mode #logrosModal > div,
-        body.dark-mode #cuponesModal > div,
-        body.dark-mode #ruletaModal > div,
-        body.dark-mode #cofresModal > div,
-        body.dark-mode #dadosModal > div {
-            background: #1e1e1e !important;
-            border: 2px solid #333 !important;
-        }
-
-        body.dark-mode #puntosModal h2,
-        body.dark-mode #tareasModal h2,
-        body.dark-mode #logrosModal h2,
-        body.dark-mode #cuponesModal h2 {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-mode #puntosModal .puntos-display,
-        body.dark-mode #puntosModal .puntos-total {
-            color: #f7971e !important;
-        }
-
-        body.dark-mode .tarea-item-modal {
-            background: #1a1a1a !important;
-            border: 2px solid #333 !important;
-            border-radius: 12px !important;
-            padding: 14px !important;
-            margin-bottom: 10px !important;
-        }
-
-        body.dark-mode .tarea-item-modal .tarea-nombre {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-mode .tarea-item-modal .tarea-desc {
-            color: #999 !important;
-        }
-
-        body.dark-mode .tarea-item-modal .tarea-estado {
-            color: #f7971e !important;
-        }
-
-        body.dark-mode .tarea-item-modal .tarea-estado.completado {
-            color: #4db6ac !important;
-        }
-
-        body.dark-mode .tarea-item-modal .tarea-estado.rechazado {
-            color: #ef5350 !important;
-        }
-
-        body.dark-mode .tarea-item-modal .tarea-fecha {
-            color: #666 !important;
-        }
-
-        body.dark-mode .tarea-item-modal .tarea-btn {
-            background: #333 !important;
-            color: #fff !important;
-            border: none !important;
-            padding: 6px 16px !important;
-            border-radius: 8px !important;
-            cursor: pointer !important;
-        }
-
-        body.dark-mode .tarea-item-modal .tarea-btn:hover {
-            background: #444 !important;
-        }
-
-        body.dark-mode .canje-item-modal {
-            background: #1a1a1a !important;
-            border: 2px solid #333 !important;
-            border-radius: 12px !important;
-            padding: 14px !important;
-            margin-bottom: 10px !important;
-        }
-
-        body.dark-mode .canje-item-modal .canje-nombre {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-mode .canje-item-modal .canje-desc {
-            color: #999 !important;
-        }
-
-        body.dark-mode .canje-item-modal .canje-info {
-            color: #666 !important;
-        }
-
-        body.dark-mode .canje-item-modal .canje-btn {
-            background: #4db6ac !important;
-            color: #000 !important;
-            border: none !important;
-            padding: 8px 20px !important;
-            border-radius: 8px !important;
-            cursor: pointer !important;
-            font-weight: 600 !important;
-        }
-
-        body.dark-mode .canje-item-modal .canje-btn:disabled {
-            background: #333 !important;
-            color: #666 !important;
-            cursor: not-allowed !important;
-        }
-
-        body.dark-mode .canje-item-modal .canje-btn:hover:not(:disabled) {
-            background: #3da89e !important;
-        }
-
-        body.dark-mode .logro-item-modal {
-            background: rgba(255,255,255,0.05) !important;
-            border: 2px solid #333 !important;
-            border-radius: 16px !important;
-            padding: 16px !important;
-            margin-bottom: 10px !important;
-        }
-
-        body.dark-mode .logro-item-modal .logro-nombre {
-            color: #fff !important;
-        }
-
-        body.dark-mode .logro-item-modal .logro-desc {
-            color: #999 !important;
-        }
-
-        body.dark-mode .logro-item-modal .logro-progreso {
-            color: #666 !important;
-        }
-
-        body.dark-mode .logro-item-modal .logro-recompensa {
-            color: #f7971e !important;
-        }
-
-        body.dark-mode .logro-item-modal .logro-estado {
-            color: #f7971e !important;
-        }
-
-        body.dark-mode .logro-item-modal .logro-estado.completado {
-            color: #4db6ac !important;
-        }
-
-        body.dark-mode .logro-item-modal .logro-btn {
-            background: #f7971e !important;
-            color: #000 !important;
-            border: none !important;
-            padding: 8px !important;
-            border-radius: 8px !important;
-            cursor: pointer !important;
-            font-weight: 600 !important;
-            width: 100% !important;
-        }
-
-        body.dark-mode .logro-item-modal .logro-btn:hover {
-            background: #e6891a !important;
-        }
-
-        body.dark-mode .cupon-item-modal {
-            background: #1a1a1a !important;
-            border: 2px solid #333 !important;
-            border-radius: 12px !important;
-            padding: 14px !important;
-            margin-bottom: 10px !important;
-        }
-
-        body.dark-mode .cupon-item-modal .cupon-titulo {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-mode .cupon-item-modal .cupon-desc {
-            color: #999 !important;
-        }
-
-        body.dark-mode .cupon-item-modal .cupon-info {
-            color: #666 !important;
-        }
-
-        body.dark-mode .cupon-item-modal .cupon-estado {
-            color: #4db6ac !important;
-        }
-
-        body.dark-mode .cupon-item-modal .cupon-estado.usado {
-            color: #666 !important;
-        }
-
-        body.dark-mode .cupon-item-modal.usado {
-            opacity: 0.5 !important;
-        }
-
-        body.dark-mode .ruleta-btn,
-        body.dark-mode .cofre-btn,
-        body.dark-mode .dados-btn {
-            background: #333 !important;
-            color: #fff !important;
-            border: none !important;
-            padding: 14px 40px !important;
-            border-radius: 30px !important;
-            font-size: 16px !important;
-            font-weight: 700 !important;
-            cursor: pointer !important;
-        }
-
-        body.dark-mode .ruleta-btn:hover,
-        body.dark-mode .cofre-btn:hover,
-        body.dark-mode .dados-btn:hover {
-            background: #444 !important;
-        }
-
-        body.dark-mode .ruleta-btn:disabled,
-        body.dark-mode .cofre-btn:disabled,
-        body.dark-mode .dados-btn:disabled {
-            background: #2a2a2a !important;
-            color: #666 !important;
-            cursor: not-allowed !important;
-        }
-
-        body.dark-mode .cofre-item {
-            background: #1a1a2e !important;
-            border: 2px solid #444 !important;
-        }
-
-        body.dark-mode .cofre-item .icono {
-            color: #fff !important;
-        }
-
-        body.dark-mode .cofre-item .numero {
-            color: #999 !important;
-        }
-
-        body.dark-mode .cofre-item.abierto {
-            background: #0f2a1f !important;
-            border-color: #4db6ac !important;
-        }
-
-        body.dark-mode .cofre-item.abierto .cofre-resultado {
-            color: #4db6ac !important;
-        }
-
-        body.dark-mode .cofre-item:hover:not(.abierto):not(.bloqueado) {
-            border-color: #f7971e !important;
-        }
-
-        body.dark-mode #maquinaResultado,
-        body.dark-mode #cofreResultado,
-        body.dark-mode #dadoResultado {
-            color: #4db6ac !important;
-        }
-
-        body.dark-mode #maquinaResultado span,
-        body.dark-mode #cofreResultado span,
-        body.dark-mode #dadoResultado span {
-            color: #f7971e !important;
-        }
-
-        body.dark-mode #maquinaTexto {
-            color: #f7971e !important;
-        }
-
-        body.dark-mode #dadoContainer {
-            background: rgba(255,255,255,0.05) !important;
-            border: 2px solid #333 !important;
-        }
-
-        body.dark-mode .modal-close {
-            color: #999 !important;
-        }
-
-        body.dark-mode .modal-close:hover {
-            color: #e0e0e0 !important;
-        }
-
-        /* ============================================================
-           PERFIL Y RETIROS - DASHBOARD USUARIO
-           ============================================================ */
-        body.dark-mode .profile-field {
-            border-bottom: 2px solid #333 !important;
-        }
-
-        body.dark-mode .profile-field .label {
-            color: #999 !important;
-        }
-
-        body.dark-mode .profile-field .value {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-mode .profile-section .section-label {
-            color: #999 !important;
-        }
-
-        body.dark-mode .profile-input-group input {
-            background: #2a2a2a !important;
-            border: 1px solid #444 !important;
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-mode .profile-input-group input:focus {
-            border-color: #666 !important;
-            background: #333 !important;
-        }
-
-        body.dark-mode .profile-input-group input::placeholder {
-            color: #666 !important;
-        }
-
-        body.dark-mode .profile-input-group .btn-action {
-            background: #333 !important;
-            color: #fff !important;
-        }
-
-        body.dark-mode .profile-input-group .btn-action:hover {
-            background: #444 !important;
-        }
-
-        body.dark-mode .profile-input-group .btn-action.btn-save {
-            background: #333 !important;
-            color: #fff !important;
-        }
-
-        body.dark-mode .profile-input-group .btn-action.btn-save:hover {
-            background: #444 !important;
-        }
-
-        body.dark-mode .withdraw-info {
-            color: #999 !important;
-        }
-
-        body.dark-mode .withdraw-info strong {
-            color: #e0e0e0 !important;
-        }
-
-        body.dark-mode .withdraw-hint {
-            color: #666 !important;
-        }
-
-        body.dark-mode #currentWithdrawAddress {
-            color: #999 !important;
-        }
-
-        body.dark-mode .btn-withdraw {
-            background: #333 !important;
-            color: #fff !important;
-        }
-
-        body.dark-mode .btn-withdraw:hover {
-            background: #444 !important;
-        }
-
-        body.dark-mode .btn-withdraw:disabled {
-            background: #2a2a2a !important;
-            color: #666 !important;
-        }
-
-        body.dark-mode .address-box {
-            background: #2a2a2a;
-            border-color: #444;
-        }
-
-        body.dark-mode .address-box .addr {
-            color: #bbb;
-        }
-
-        body.dark-mode .copy-btn {
-            background: #444;
-            color: #fff;
-        }
-
-        body.dark-mode .copy-btn:hover {
-            background: #555;
-        }
-
-        body.dark-mode .plan-card {
-            background: #1e1e1e;
-            border-color: #333;
-        }
-
-        body.dark-mode .plan-card.active-plan {
-            background: #1a1a1a;
-            border-color: #f7971e;
-        }
-
-        body.dark-mode .plan-card .info .name {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .plan-card .info .details {
-            color: #999;
-        }
-
-        body.dark-mode .plan-card .info .details strong {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .plan-card .action .price {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .plan-card .action .sub {
-            color: #999;
-        }
-
-        body.dark-mode .plan-card.locked {
-            background: #1a1a1a;
-            border-color: #333;
-            opacity: 0.7;
-        }
-
-        body.dark-mode .plan-card.superado {
-            background: #1a1a1a;
-            border-color: #0d47a1;
-        }
-
-        body.dark-mode .tree-node .label {
-            color: #999;
-        }
-
-        body.dark-mode .tree-node .circle.empty {
-            background: #2a2a2a;
-            border-color: #444;
-            color: #666;
-        }
-
-        body.dark-mode .cofre-item {
-            background: #1a1a2e;
-        }
-
-        body.dark-mode .cofre-item.abierto {
-            background: #0f2a1f;
-        }
-
-        body.dark-mode .actividad-card {
-            background: #1e1e1e;
-            border-color: #333;
-        }
-
-        body.dark-mode .actividad-card .nombre {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .actividad-card .desc {
-            color: #999;
-        }
-
-        body.dark-mode .usos-badge {
-            background: #2a2a2a;
-            color: #999;
-        }
-
-        body.dark-mode .usos-badge .numero {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .filter-tabs .filter-btn {
-            background: transparent;
-            border-color: #444;
-            color: #999;
-        }
-
-        body.dark-mode .filter-tabs .filter-btn.active {
-            background: #000000;
-            border-color: #000000;
-            color: #ffffff;
-        }
-
-        body.dark-mode .filter-tabs .filter-btn:hover:not(.active) {
-            background: #2a2a2a;
-        }
-
-        body.dark-mode .historial-item {
-            border-bottom-color: #333;
-        }
-
-        body.dark-mode .historial-item .left .desc {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .historial-item .left .date {
-            color: #999;
-        }
-
-        body.dark-mode .historial-item .right .status {
-            color: #999;
-        }
-
-        body.dark-mode .withdraw-info {
-            color: #999;
-        }
-
-        body.dark-mode .withdraw-info strong {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .ganancia-stat {
-            background: #1e1e1e;
-            border-color: #333;
-        }
-
-        body.dark-mode .ganancia-stat .label {
-            color: #999;
-        }
-
-        body.dark-mode .ganancia-stat .number {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .profile-section .section-label {
-            color: #999;
-        }
-
-        body.dark-mode .profile-field {
-            border-bottom-color: #333;
-        }
-
-        body.dark-mode .invite-item {
-            background: #1e1e1e;
-            border-color: #333;
-        }
-
-        body.dark-mode .invite-item .invite-header .title {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .invite-footer {
-            color: #999;
-        }
-
-        body.dark-mode .tree-card {
-            background: #1a1a1a;
-            border-color: #333;
-        }
-
-        body.dark-mode .tree-card .label {
-            color: #999;
-        }
-
-        body.dark-mode .nivel-info {
-            background: #1a1a1a;
-            color: #999;
-        }
-
-        body.dark-mode .referral-link-box {
-            background: #1a1a1a;
-            border-color: #333;
-        }
-
-        body.dark-mode .referral-link-box .link {
-            color: #bbb;
-        }
-
-        body.dark-mode .referral-stats {
-            background: #1a1a1a;
-            border-color: #333;
-        }
-
-        body.dark-mode .referral-stats .stat {
-            color: #999;
-        }
-
-        body.dark-mode .referral-stats .stat strong {
-            color: #e0e0e0;
-        }
-
-        body.dark-mode .referral-item {
-            border-bottom-color: #333;
-        }
-
-        body.dark-mode .referral-item .name {
-            color: #e0e0e0;
-        }
-
-        /* ============================================================
-           BOTÓN TOGGLE MODO OSCURO
-           ============================================================ */
-        .dark-mode-toggle {
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 8px;
-            transition: background 0.2s;
-        }
-
-        .dark-mode-toggle:hover {
-            background: #f0f0f0;
-        }
-
-        body.dark-mode .dark-mode-toggle:hover {
-            background: #333;
-        }
-
-	</style>
+        body.dark-mode .header { background: #0d0d1a; border-bottom-color: #f7971e; }
+        body.dark-mode .card { background: #1e1e1e; border-color: #2d2d44; }
+        body.dark-mode .card-gold { background: #1a1a0a; border-color: #f7971e; }
+        body.dark-mode .card-blue { background: #0a1a2a; border-color: #64b5f6; }
+        body.dark-mode .card-green { background: #0a1a1a; border-color: #4db6ac; }
+        body.dark-mode .balance-card .amount { color: #e0e0e0; }
+        body.dark-mode .historial-item { border-bottom-color: #2d2d44; }
+        body.dark-mode .historial-item:hover { background: #2a2a2a; }
+        body.dark-mode .historial-item .left .desc { color: #e0e0e0; }
+        body.dark-mode .ganancia-stat { background: #1e1e1e; border-color: #2d2d44; }
+        body.dark-mode .ganancia-stat .number { color: #e0e0e0; }
+        body.dark-mode .actividad-card { background: #1e1e1e; border-color: #2d2d44; }
+        body.dark-mode .actividad-card .nombre { color: #e0e0e0; }
+        body.dark-mode .plan-card { background: #1e1e1e; border-color: #2d2d44; }
+        body.dark-mode .plan-card .info .name { color: #e0e0e0; }
+        body.dark-mode .plan-card .action .price { color: #e0e0e0; }
+        body.dark-mode .plan-card.active-plan { background: #1a1a0a; }
+        body.dark-mode .profile-field { border-bottom-color: #2d2d44; }
+        body.dark-mode .profile-field .value { color: #e0e0e0; }
+        body.dark-mode .filter-tabs .filter-btn { border-color: #2d2d44; color: #888; }
+        body.dark-mode .filter-tabs .filter-btn.active { background: #0d0d1a; border-color: #0d0d1a; color: #ffffff; }
+        body.dark-mode .bottom-nav { background: #1e1e1e; border-color: #2d2d44; }
+        body.dark-mode .bottom-nav .nav-item { color: #666; }
+        body.dark-mode .bottom-nav .nav-item.active { color: #f7971e; }
+        body.dark-mode .bottom-nav .nav-item.active .label { color: #f7971e; }
+        body.dark-mode .code-input-group input { background: #2a2a2a; border-color: #3a3a55; color: #e0e0e0; }
+        body.dark-mode .code-input-group input:focus { border-color: #f7971e; background: #1e1e1e; }
+        body.dark-mode .profile-input-group input { background: #2a2a2a; border-color: #3a3a55; color: #e0e0e0; }
+        body.dark-mode .profile-input-group input:focus { border-color: #f7971e; background: #1e1e1e; }
+        body.dark-mode .address-box { background: #2a2a2a; border-color: #3a3a55; }
+        body.dark-mode .address-box .addr { color: #bbb; }
+        body.dark-mode .cofre-item { background: #1a1a2e; border-color: #3a3a55; }
+        body.dark-mode .cofre-item.abierto { background: #0f2a1f; border-color: #4db6ac; }
+        body.dark-mode .tree-node .circle.empty { background: #2a2a2a; border-color: #3a3a55; color: #666; }
+        body.dark-mode .nivel-info { background: #1a1a2e; color: #999; }
+        body.dark-mode .alert-modal { background: #1e1e1e; border-color: #3a3a55; }
+        body.dark-mode .alert-modal .alert-message { color: #bbb; }
+        body.dark-mode .alert-modal .alert-title { color: #e0e0e0; }
+        
+        @media (max-width: 480px) {
+            .ganancias-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .actividad-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .actividad-card { padding: 14px 8px; }
+            .actividad-card .icono { font-size: 28px; }
+            .cofres-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+            .cofre-item { padding: 10px 4px; min-height: 65px; }
+            .cofre-item .icono { font-size: 22px; }
+            .tree-level { gap: 10px; }
+            .tree-node .circle { width: 32px; height: 32px; font-size: 10px; }
+            .profile-input-group input { min-width: 100px; font-size: 12px; padding: 10px 12px; }
+            .profile-input-group .btn-action { padding: 10px 14px; font-size: 11px; }
+            .bottom-nav { padding: 4px 0 8px; }
+            .bottom-nav .nav-item .icon { font-size: 18px; }
+            .bottom-nav .nav-item .label { font-size: 6px; }
+            .balance-card .amount { font-size: 34px; }
+            .production-card .timer { font-size: 32px; }
+            .code-input-group input { font-size: 16px; padding: 10px 12px; }
+            .code-input-group .validate-btn { padding: 10px 16px; font-size: 12px; }
+            .plan-card .info .icon { font-size: 20px; }
+            .plan-card .info .name { font-size: 12px; }
+            .plan-card .action .price { font-size: 13px; }
+        }
+    </style>
 </head>
 <body>
 
@@ -1067,7 +344,7 @@
             </div>
             <div class="avatar" id="userAvatar">JP</div>
             <button class="logout-btn" onclick="logout()">✕</button>
-            <button onclick="toggleDarkMode()">🌙</button>
+            <button class="dark-toggle" onclick="toggleDarkMode()">🌙</button>
         </div>
     </div>
 </header>
@@ -1090,6 +367,7 @@
 
     <div id="alertMessage" class="alert"></div>
 
+    <!-- TAB INICIO -->
     <div id="tab-inicio" class="tab-content active">
         <div class="card card-gold balance-card">
             <div class="label">💰 Saldo Actual</div>
@@ -1110,7 +388,7 @@
                 <span class="addr" id="walletAddress">0x0000000000000000000000000000000000000000</span>
                 <button class="copy-btn" onclick="copyAddress()">Copiar</button>
             </div>
-            <div style="font-size:11px;color:#999;margin-top:8px;">⚠️ Usa solo red <strong style="color:#000;">Polygon</strong> (USDT - Polygon). Mínimo 10 USDT.</div>
+            <div style="font-size:11px;color:#999;margin-top:8px;">⚠️ Usa solo red <strong style="color:#1a1a2e;">Polygon</strong> (USDT - Polygon). Mínimo 10 USDT.</div>
         </div>
 
         <div class="card">
@@ -1119,14 +397,16 @@
                 <input type="text" id="dailyCode" placeholder="8 dígitos" maxlength="8" inputmode="numeric" pattern="[0-9]*">
                 <button class="validate-btn" id="validateCodeBtn" onclick="validateCode()">Validar</button>
             </div>
-            <div class="code-hint" id="codeHint">⏳ Códigos usados hoy: 0/2</div>
+            <div class="code-hint" id="codeHint">⏳ Códigos usados hoy: <strong id="codigosUsadosDisplay">0</strong>/2</div>
         </div>
 
         <button class="claim-btn disabled" id="claimBtn" onclick="claimReward()">🔑 Usa un código</button>
     </div>
 
+    <!-- TAB PLANES -->
     <div id="tab-planes" class="tab-content"><div id="planesContainer"></div></div>
 
+    <!-- TAB REFERIDOS -->
     <div id="tab-referidos" class="tab-content">
         <div class="card">
             <div class="label" style="margin-bottom:12px;">🌳 Tu Árbol de Referidos</div>
@@ -1134,14 +414,9 @@
             <div class="referral-count">👥 Referidos directos: <strong id="referralCount">0</strong></div>
             <div class="nivel-info" id="nivelInfo"></div>
         </div>
-        
-            
-            
-                
-            </div>
-        </div>
     </div>
 
+    <!-- TAB HISTORIAL -->
     <div id="tab-historial" class="tab-content">
         <div class="ganancias-stats">
             <div class="ganancia-stat"><div class="label">📊 Esta semana</div><div class="number gold" id="gananciaSemanal">$0.00</div></div>
@@ -1158,17 +433,19 @@
         <div id="historyList"><div style="text-align:center;color:#ccc;padding:20px 0;font-size:14px;">No hay historial</div></div>
     </div>
 
+    <!-- TAB ACTIVIDADES -->
     <div id="tab-actividades" class="tab-content">
         <div class="actividad-grid" id="actividadesGrid"></div>
     </div>
 
+    <!-- TAB PERFIL -->
     <div id="tab-perfil" class="tab-content">
         <div class="profile-section">
             <span class="section-label">👤 DATOS PERSONALES</span>
             <div class="profile-field"><span class="label">NOMBRE</span><span class="value" id="profileName">Juan Pérez</span></div>
             <div class="profile-field"><span class="label">TELÉFONO</span><span class="value" id="profilePhone">+51 987654321</span></div>
             <div class="profile-field"><span class="label">PLAN</span><span class="value" id="profilePlan">Sin plan</span></div>
-            <div class="profile-field"><span class="label">CÓDIGO REFERIDO</span><span class="value" style="font-family:monospace;color:#f7971e;font-weight:600;" id="profileReferralCode">APEX000</span></div>
+            <div class="profile-field"><span class="label">CÓDIGO REFERIDO</span><span class="value" style="font-family:monospace;color:#f7971e;font-weight:700;" id="profileReferralCode">APEX000</span></div>
         </div>
         <div class="profile-section">
             <span class="section-label">🏦 DIRECCIÓN DE RETIRO</span>
@@ -1180,10 +457,10 @@
         </div>
         <div class="profile-section">
             <span class="section-label">💸 SOLICITAR RETIRO</span>
-            <div class="withdraw-info">Mínimo: <strong>$30.00</strong> · Comisión: <strong>23%</strong> · Saldo: <strong style="color:#f7971e;font-size:16px;" id="withdrawBalance">$0.00</strong></div>
+            <div class="withdraw-info">Mínimo: <strong>$30.00</strong> · Comisión: <strong id="comisionDisplay">23%</strong> · Saldo: <strong style="color:#f7971e;font-size:16px;" id="withdrawBalance">$0.00</strong></div>
             <div class="profile-input-group" style="margin-bottom:6px;">
                 <input type="number" id="withdrawAmount" placeholder="Monto a retirar" min="30" step="1">
-                <button class="btn-action" onclick="requestWithdraw()" style="background:#000000;color:#ffffff;font-weight:700;">Solicitar</button>
+                <button class="btn-action" onclick="requestWithdraw()" style="background:#f7971e;color:#ffffff;font-weight:700;">Solicitar</button>
             </div>
             <div class="withdraw-hint">⏳ Los retiros se procesan en <strong>72 horas</strong></div>
         </div>
@@ -1201,7 +478,7 @@
 
 <script>
 // ============================================================
-// CONFIGURACIÓN
+// CONFIGURACIÓN - TODAS LAS VARIABLES ORIGINALES
 // ============================================================
 var STORAGE_KEY = 'apex_users';
 var REMEMBER_KEY = 'apex_remember';
@@ -1234,7 +511,7 @@ var PLANS = [
 ];
 
 // ============================================================
-// UTILIDADES
+// UTILIDADES - TODAS LAS FUNCIONES ORIGINALES
 // ============================================================
 function showAlert(msg, type) {
     if (type === undefined) type = 'danger';
@@ -1285,6 +562,7 @@ function cerrarAlerta() {
     if (backdrop) backdrop.remove();
     clearTimeout(window.alertTimeout);
 }
+
 function formatDate(d) {
     if (!d) return '--/--/----';
     try { var date = new Date(d); if (isNaN(date.getTime())) return '--/--/----'; return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }); } catch { return '--/--/----'; }
@@ -1304,7 +582,6 @@ function formatTime(seconds) {
 
 function getUsers() {
     try {
-        // ✅ PRIMERO intentar obtener de sessionStorage
         var sessionData = sessionStorage.getItem('apex_users');
         if (sessionData) {
             var parsed = JSON.parse(sessionData);
@@ -1312,8 +589,6 @@ function getUsers() {
                 return parsed;
             }
         }
-        
-        // ✅ SEGUNDO intentar obtener de localStorage
         var data = localStorage.getItem('apex_users');
         if (data) {
             var parsed = JSON.parse(data);
@@ -1321,8 +596,6 @@ function getUsers() {
                 return parsed;
             }
         }
-        
-        // ✅ TERCERO intentar obtener de STORAGE_KEY
         var data2 = localStorage.getItem(STORAGE_KEY);
         if (data2) {
             var parsed = JSON.parse(data2);
@@ -1330,11 +603,7 @@ function getUsers() {
                 return parsed;
             }
         }
-        
-        // ✅ SI NADA FUNCIONA, devolver un array vacío
-        console.warn('⚠️ getUsers() no encontró datos, devolviendo array vacío');
         return [];
-        
     } catch(e) {
         console.warn('Error en getUsers():', e);
         return [];
@@ -1343,11 +612,19 @@ function getUsers() {
 
 function saveUsers(users) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+    sessionStorage.setItem('apex_users', JSON.stringify(users));
 }
 
 function saveUserData() {
     if (!user) return;
     sessionStorage.setItem('apex_user', JSON.stringify(user));
+    
+    // ✅ GUARDAR EN SESSIONSTORAGE PARA PERSISTENCIA DE CÓDIGOS
+    sessionStorage.setItem('apex_user_codigos', JSON.stringify({
+        codigos_usados_hoy: user.codigos_usados_hoy || 0,
+        codigos_usados: user.codigos_usados || [],
+        ultimo_reinicio_codigos: user.ultimo_reinicio_codigos || null
+    }));
     
     var token = localStorage.getItem('apex_token');
     if (!token) {
@@ -1386,20 +663,16 @@ function saveUserData() {
             premio_cofre: Number(user.premio_cofre || 0),
             premio_dados: Number(user.premio_dados || 0),
             cofres_abiertos: user.cofres_abiertos || [],
-            // ✅ HISTORIAL - ESTO ES LO QUE FALTABA
             historial: user.historial || [],
             historial_detallado: user.historial_detallado || [],
             historial_codigos: user.historial_codigos || [],
-            // ✅ DIRECCIÓN DE RETIRO
             direccion_retiro: user.direccion_retiro || null,
-            // ✅ CUPONES, LOGROS, TAREAS
             cupones_asignados: user.cupones_asignados || [],
             logros_asignados: user.logros_asignados || [],
             tareas_asignadas: user.tareas_asignadas || [],
             canjes_realizados: user.canjes_realizados || [],
             logros_reclamados: user.logros_reclamados || [],
             logros_pendientes_aprobar: user.logros_pendientes_aprobar || [],
-            // ✅ CONTRASEÑA DE RETIRO
             password_retiro: user.password_retiro || '000000'
         })
     })
@@ -1418,9 +691,12 @@ function saveUserData() {
     });
 }
 
-
 function getCodigosSistema() {
     try { return JSON.parse(localStorage.getItem(CODIGOS_KEY)) || []; } catch { return []; }
+}
+
+function saveCodigos(codigos) {
+    localStorage.setItem(CODIGOS_KEY, JSON.stringify(codigos));
 }
 
 function getPremiosRuleta() {
@@ -1482,11 +758,9 @@ function getPlanData(nombre) {
 function getCostoUpgrade(planName) {
     var planData = getPlanData(planName);
     if (!planData) return 0;
-    
     var planActual = user.plan || 'Sin plan';
     var planActualData = getPlanData(planActual);
     if (!planActualData) return planData.amount;
-    
     var costo = planData.amount - planActualData.amount;
     return costo > 0 ? costo : 0;
 }
@@ -1502,14 +776,9 @@ function getNivelAutorizado() {
 function puedeComprarPlan(planName) {
     var planData = getPlanData(planName);
     if (!planData) return false;
-    
-    // Si es el primer plan (Trader), siempre se puede comprar
     if (planName === 'Trader') return true;
-    
     var indicePlan = getIndicePlan(planName);
     var nivelAutorizado = getNivelAutorizado();
-    
-    // El usuario solo puede comprar planes hasta el nivel autorizado
     return indicePlan <= nivelAutorizado;
 }
 
@@ -1521,12 +790,10 @@ function logout() {
     localStorage.removeItem('apex_user');
     localStorage.removeItem(REMEMBER_KEY);
     sessionStorage.removeItem('apex_user');
+    sessionStorage.removeItem('apex_user_codigos');
     window.location.href = 'index.html';
 }
 
-// ============================================================
-// CHECK SESSION
-// ============================================================
 // ============================================================
 // CHECK SESSION - CON BACKEND
 // ============================================================
@@ -1551,7 +818,6 @@ function checkSession() {
         }
 
         if (data.user) {
-            // Convertir el usuario del backend al formato que espera el dashboard
             user = {
                 telefono: data.user.telefono,
                 nombre: data.user.nombre,
@@ -1564,7 +830,6 @@ function checkSession() {
                 polygon_address: data.user.polygon_address || generarDireccionPolygon(),
                 direccion_retiro: data.user.direccion_retiro || null,
                 password_retiro: data.user.password_retiro || '000000',
-                // Inicializar estructuras vacías si no existen
                 referidos: data.user.referidos || { izquierda: null, derecha: null, lista: [] },
                 fechas_invito: data.user.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
                 verificado: data.user.verificado || { izquierdaCompleto: false, derechaCompleto: false, puedeUsarCodigo: true },
@@ -1604,16 +869,24 @@ function checkSession() {
                 fecha_registro: data.user.fecha_registro || new Date().toISOString()
             };
             
-            // Guardar en sessionStorage para compatibilidad
+            // ✅ RECUPERAR CÓDIGOS DE SESSIONSTORAGE
+            var codigosGuardados = sessionStorage.getItem('apex_user_codigos');
+            if (codigosGuardados) {
+                try {
+                    var codigos = JSON.parse(codigosGuardados);
+                    user.codigos_usados_hoy = codigos.codigos_usados_hoy || 0;
+                    user.codigos_usados = codigos.codigos_usados || [];
+                    user.ultimo_reinicio_codigos = codigos.ultimo_reinicio_codigos || null;
+                    console.log('✅ Códigos recuperados de sessionStorage:', user.codigos_usados_hoy);
+                } catch(e) {
+                    console.warn('Error al recuperar códigos:', e);
+                }
+            }
+            
             sessionStorage.setItem('apex_user', JSON.stringify(user));
             
-            // Verificar reinicio diario
             verificarReinicioCodigosDiarios();
-            
-            // Renderizar dashboard
             renderDashboard();
-            
-            // Iniciar vigilante de actualizaciones
             iniciarVigilante();
         } else {
             localStorage.removeItem('apex_token');
@@ -1630,46 +903,6 @@ function checkSession() {
 }
 
 // ============================================================
-// VERIFICAR ACTUALIZACIONES DEL ADMIN
-// ============================================================
-function verificarActualizaciones() {
-    var users = getUsers();
-    var usuarioActualizado = users.find(function(u) { return u.telefono === user.telefono; });
-    if (usuarioActualizado) {
-        var huboCambios = false;
-        if (usuarioActualizado.balance !== user.balance) huboCambios = true;
-        if (usuarioActualizado.puntos !== user.puntos) huboCambios = true;
-        if (usuarioActualizado.plan !== user.plan) huboCambios = true;
-        if (usuarioActualizado.produccion_pausada !== user.produccion_pausada) huboCambios = true;
-        if (usuarioActualizado.cuenta_habilitada !== user.cuenta_habilitada) huboCambios = true;
-        if (usuarioActualizado.ruleta_usos !== user.ruleta_usos) huboCambios = true;
-        if (usuarioActualizado.cofres_usos !== user.cofres_usos) huboCambios = true;
-        if (usuarioActualizado.dados_usos !== user.dados_usos) huboCambios = true;
-        if (usuarioActualizado.premio_ruleta !== user.premio_ruleta) huboCambios = true;
-        if (usuarioActualizado.premio_cofre !== user.premio_cofre) huboCambios = true;
-        if (usuarioActualizado.premio_dados !== user.premio_dados) huboCambios = true;
-        
-        if (usuarioActualizado.tareas_asignadas && user.tareas_asignadas) {
-            if (usuarioActualizado.tareas_asignadas.length !== user.tareas_asignadas.length) huboCambios = true;
-        }
-        
-        if (usuarioActualizado.logros_asignados && user.logros_asignados) {
-            if (usuarioActualizado.logros_asignados.length !== user.logros_asignados.length) huboCambios = true;
-        }
-        
-        if (huboCambios) {
-            Object.assign(user, usuarioActualizado);
-            sessionStorage.setItem('apex_user', JSON.stringify(user));
-            renderDashboard();
-            showAlert('🔄 Datos actualizados automáticamente', 'info');
-            setTimeout(function() {
-                document.getElementById('alertMessage').className = 'alert';
-            }, 3000);
-        }
-    }
-}
-
-// ============================================================
 // VERIFICAR REINICIO
 // ============================================================
 function verificarReinicioCodigosDiarios() {
@@ -1678,15 +911,10 @@ function verificarReinicioCodigosDiarios() {
     var ultimoReinicio = user.ultimo_reinicio_codigos || '';
     
     if (hoy !== ultimoReinicio) {
-        // Reiniciar códigos
         user.codigos_usados_hoy = 0;
         user.codigos_usados = [];
         user.ultimo_reinicio_codigos = hoy;
         
-        // ============================================================
-        // SI PASÓ LA MEDIANOCHE, REINICIAR PRODUCCIÓN
-        // ============================================================
-        // Si tenía producción activa o recompensa pendiente, se pierde
         if (user.produccion_activa || user.recompensa_pendiente > 0 || user.codigo_usado) {
             user.produccion_activa = false;
             user.produccion_inicio = null;
@@ -1697,7 +925,6 @@ function verificarReinicioCodigosDiarios() {
             user.codigo_usado = false;
             user.reclamado_hoy = false;
             
-            // Registrar que se perdió la producción por no cobrar
             if (!user.historial_detallado) user.historial_detallado = [];
             user.historial_detallado.push({
                 tipo: 'produccion',
@@ -1751,7 +978,6 @@ function renderPerfil() {
         currentEl.style.color = '#999';
     }
     
-    // Mostrar descuento activo en la comisión
     var comisionDisplay = document.getElementById('comisionDisplay');
     if (comisionDisplay) {
         var comisionBase = 0.23;
@@ -1774,28 +1000,24 @@ function renderPerfil() {
 }
 
 // ============================================================
-// RENDER DASHBOARD
+// RENDER DASHBOARD - COMPLETO
 // ============================================================
 function renderDashboard() {
-// ✅ Cargar configuración del admin
-function cargarConfiguracionDesdeAdmin() {
-    var configData = localStorage.getItem('apex_configuracion');
-    if (configData) {
-        try {
-            var config = JSON.parse(configData);
-            window.tiempoProduccion = config.tiempo_produccion || 10;
-            window.puntosPorCodigo = config.puntos_por_codigo || 10;
-            console.log('✅ Configuración cargada:', window.tiempoProduccion, 'segundos,', window.puntosPorCodigo, 'puntos');
-        } catch(e) {
-            console.warn('Error al leer configuración:', e);
+    function cargarConfiguracionDesdeAdmin() {
+        var configData = localStorage.getItem('apex_configuracion');
+        if (configData) {
+            try {
+                var config = JSON.parse(configData);
+                window.tiempoProduccion = config.tiempo_produccion || 10;
+                window.puntosPorCodigo = config.puntos_por_codigo || 10;
+            } catch(e) {
+                console.warn('Error al leer configuración:', e);
+            }
+        } else {
+            window.tiempoProduccion = 10;
+            window.puntosPorCodigo = 10;
         }
-    } else {
-        // Si no hay configuración, usar valores por defecto
-        window.tiempoProduccion = 10;
-        window.puntosPorCodigo = 10;
-        console.log('⚠️ Usando valores por defecto: 10 segundos, 10 puntos');
     }
-}
     if (!user) return;
 
     var hoy = new Date().toDateString();
@@ -1814,7 +1036,7 @@ function cargarConfiguracionDesdeAdmin() {
         document.querySelector('.main').style.pointerEvents = 'none';
         document.getElementById('productionTimer').textContent = '⏸️ Pausada';
         document.getElementById('productionTimer').className = 'timer paused';
-        document.getElementById('productionStatus').innerHTML = '⏸️ <span style="color:#ff6b6b;">Producción pausada por el administrador</span>';
+        document.getElementById('productionStatus').innerHTML = '⏸️ <span style="color:#e53935;">Producción pausada por el administrador</span>';
         document.getElementById('claimBtn').className = 'claim-btn disabled';
         document.getElementById('claimBtn').textContent = '⏸️ Pausada';
         actualizarEstadoCodigos();
@@ -1850,10 +1072,11 @@ function cargarConfiguracionDesdeAdmin() {
     calcularGanancias();
     verificarAdmin();
 
+    // ✅ ACTUALIZAR CONTADOR DE CÓDIGOS
+    var codigosUsadosHoy = user.codigos_usados_hoy || 0;
+    document.getElementById('codigosUsadosDisplay').textContent = codigosUsadosHoy;
 
-    // ============================================================
-    // PRODUCCIÓN - VERSIÓN ÚNICA Y CORRECTA
-    // ============================================================
+    // PRODUCCIÓN
     var productionTimer = document.getElementById('productionTimer');
     var productionStatus = document.getElementById('productionStatus');
     var claimBtn = document.getElementById('claimBtn');
@@ -1863,10 +1086,8 @@ function cargarConfiguracionDesdeAdmin() {
         var tiempoTranscurrido = Math.floor((ahora - new Date(user.produccion_inicio).getTime()) / 1000);
         var tiempoRestante = Math.max(0, user.produccion_duracion - tiempoTranscurrido);
 
-        // VERIFICAR QUE LA PRODUCCIÓN SEA DE HOY
         var hoy = new Date().toDateString();
         if (user.fecha_produccion && user.fecha_produccion !== hoy) {
-            // Producción de otro día, reiniciar
             user.produccion_activa = false;
             user.produccion_inicio = null;
             user.produccion_duracion = 0;
@@ -1882,15 +1103,12 @@ function cargarConfiguracionDesdeAdmin() {
             productionStatus.innerHTML = '<span style="color:#999;">Usa un código para comenzar</span>';
             claimBtn.className = 'claim-btn disabled';
             claimBtn.textContent = '🔑 Usa un código';
-	    claimBtn.onclick = claimReward;
+            claimBtn.onclick = claimReward;
             
             actualizarEstadoCodigos();
             renderActividades();
             return;
         }
-
-
-
 
         if (tiempoRestante > 0) {
             user.tiempo_restante = tiempoRestante;
@@ -1916,12 +1134,11 @@ function cargarConfiguracionDesdeAdmin() {
                         user.produccion_inicio = null;
                         user.tiempo_restante = 0;
                         saveUserData();
-			guardarEnBackend();
+                        guardarEnBackend();
                         productionTimer.textContent = '00:00:00';
                         productionTimer.className = 'timer completed';
                         productionStatus.innerHTML = '✅ <span style="color:#f7971e;">¡Recompensa lista!</span>';
                         var monto = user.recompensa_pendiente || 0;
-			console.log('🎯 Recompensa al terminar:', monto);
                         claimBtn.className = 'claim-btn active';
                         claimBtn.textContent = '💰 Cobrar $' + Number(monto).toFixed(2) + ' + puntos';
                         renderDashboard();
@@ -1943,13 +1160,8 @@ function cargarConfiguracionDesdeAdmin() {
             claimBtn.textContent = '💰 Cobrar $' + monto.toFixed(2) + ' + puntos';
         }
     } else if (user.codigo_usado && !user.reclamado_hoy && user.recompensa_pendiente > 0) {
-    console.log('🎯 Entrando al caso de recompensa pendiente');
-    console.log('recompensa_pendiente:', user.recompensa_pendiente);
-   
-        // Verificar que la recompensa sea de hoy
         var hoy = new Date().toDateString();
         if (user.fecha_produccion && user.fecha_produccion !== hoy) {
-            // Recompensa de otro día, reiniciar
             user.recompensa_pendiente = 0;
             user.puntosPendientes = 0;
             user.codigo_usado = false;
@@ -1993,8 +1205,6 @@ function cargarConfiguracionDesdeAdmin() {
     actualizarEstadoCodigos();
     renderActividades();
 }
-
-
 
 function guardarEnBackend() {
     var token = localStorage.getItem('apex_token');
@@ -2045,7 +1255,7 @@ function verificarAdmin() {
 }
 
 // ============================================================
-// CÓDIGOS
+// CÓDIGOS - VERSIÓN CORREGIDA CON FALLBACK LOCAL
 // ============================================================
 function actualizarEstadoCodigos() {
     if (!user) return;
@@ -2053,6 +1263,8 @@ function actualizarEstadoCodigos() {
     var input = document.getElementById('dailyCode');
     var btn = document.getElementById('validateCodeBtn');
     var hint = document.getElementById('codeHint');
+
+    document.getElementById('codigosUsadosDisplay').textContent = codigosUsadosHoy;
 
     if (user.cuenta_habilitada === false) {
         if (input) { input.disabled = true; input.value = ''; }
@@ -2125,9 +1337,30 @@ function validateCode() {
     btn.disabled = true;
     input.disabled = true;
 
+    // ✅ PRIMERO: Validar localmente (fallback)
+    var codigosLocales = getCodigosSistema();
+    var codigoValidoLocal = false;
+    var puntosPorCodigoLocal = 10;
+    
+    for (var i = 0; i < codigosLocales.length; i++) {
+        if (codigosLocales[i].codigo === code && codigosLocales[i].estado === 'disponible') {
+            codigoValidoLocal = true;
+            puntosPorCodigoLocal = codigosLocales[i].puntos || 10;
+            // Marcar como usado localmente
+            codigosLocales[i].estado = 'usado';
+            saveCodigos(codigosLocales);
+            break;
+        }
+    }
+
+    // ✅ SEGUNDO: Intentar validar en el backend
     var token = localStorage.getItem('apex_token');
     if (!token) {
-        showAlert('⚠️ No hay sesión activa', 'danger');
+        if (codigoValidoLocal) {
+            procesarCodigoValido(code, puntosPorCodigoLocal);
+            return;
+        }
+        showAlert('⚠️ No hay sesión activa y el código no es válido localmente', 'danger');
         btn.disabled = false;
         input.disabled = false;
         return;
@@ -2146,6 +1379,11 @@ function validateCode() {
     })
     .then(function(data) {
         if (data.error) {
+            if (codigoValidoLocal) {
+                showAlert('⚠️ Error en el servidor, pero el código es válido localmente. Continuando...', 'warning');
+                procesarCodigoValido(code, puntosPorCodigoLocal);
+                return;
+            }
             showAlert('❌ ' + data.error, 'danger');
             btn.disabled = false;
             input.disabled = false;
@@ -2153,88 +1391,98 @@ function validateCode() {
         }
 
         if (!data.valid) {
+            if (codigoValidoLocal) {
+                var codigos = getCodigosSistema();
+                for (var i = 0; i < codigos.length; i++) {
+                    if (codigos[i].codigo === code) {
+                        codigos[i].estado = 'disponible';
+                        saveCodigos(codigos);
+                        break;
+                    }
+                }
+            }
             showAlert('❌ Código inválido', 'danger');
             btn.disabled = false;
             input.disabled = false;
             return;
         }
 
-        // ✅ USAR EL CÓDIGO
-        if (!user.codigos_usados) user.codigos_usados = [];
-        user.codigos_usados.push(code);
-        user.codigos_usados_hoy = (user.codigos_usados_hoy || 0) + 1;
-        user.ultimo_reinicio_codigos = new Date().toDateString();
-
-        // ✅ OBTENER CONFIGURACIÓN
-        var tiempoProduccion = 10;
-        var puntosPorCodigo = 10;
-
-        try {
-            var configData = localStorage.getItem('apex_configuracion');
-            if (configData) {
-                var config = JSON.parse(configData);
-                tiempoProduccion = config.tiempo_produccion || 10;
-                puntosPorCodigo = config.puntos_por_codigo || 10;
-            }
-        } catch(e) {
-            console.warn('Error al leer configuración:', e);
-        }
-
-        // ✅ CALCULAR RECOMPENSA - FORZANDO VALOR SEGÚN PLAN
-        var dailyEarnings = user.daily_earnings || 0;
-        
-        // Si daily_earnings es 0 o undefined, calcular según el plan
-        if (dailyEarnings === 0 || isNaN(dailyEarnings)) {
-            if (user.plan === 'Trader') dailyEarnings = 6;
-            else if (user.plan === 'Analista') dailyEarnings = 10;
-            else if (user.plan === 'Gestor') dailyEarnings = 17;
-            else if (user.plan === 'Master') dailyEarnings = 27;
-            else if (user.plan === 'Elite') dailyEarnings = 42;
-            else dailyEarnings = 0;
-            console.log('⚠️ daily_earnings forzado a:', dailyEarnings, 'para el plan:', user.plan);
-        }
-
-        var montoGanado = Number(dailyEarnings * 0.5);
-        user.recompensa_pendiente = montoGanado;
-        user.puntosPendientes = puntosPorCodigo;
-        
-        console.log('💰 DAILY_EARNINGS:', dailyEarnings);
-        console.log('💰 PLAN:', user.plan);
-        console.log('💰 MONTO GANADO:', montoGanado);
-        console.log('💰 RECOMPENSA PENDIENTE ASIGNADA:', user.recompensa_pendiente);
-
-        user.codigo_usado = true;
-        user.reclamado_hoy = false;
-        user.produccion_activa = true;
-        user.produccion_inicio = new Date().toISOString();
-        user.produccion_duracion = tiempoProduccion;
-        user.fecha_produccion = new Date().toDateString();
-
-        if (!user.historial_codigos) user.historial_codigos = [];
-        user.historial_codigos.push({
-            codigo: code,
-            puntos: puntosPorCodigo,
-            fecha: new Date().toISOString(),
-            estado: 'usado'
-        });
-
-        saveUserData();
-        guardarEnBackend();
-        actualizarEstadoCodigos();
-        renderDashboard();
-        showAlert('✅ Código validado! Producción iniciada.', 'success');
-        input.value = '';
-
-        btn.disabled = false;
-        input.disabled = false;
-        actualizarEstadoCodigos();
+        var puntos = data.puntos || 10;
+        procesarCodigoValido(code, puntos);
     })
     .catch(function(error) {
         console.error('Error al validar código:', error);
+        if (codigoValidoLocal) {
+            showAlert('⚠️ Error de conexión, pero el código es válido localmente. Continuando...', 'warning');
+            procesarCodigoValido(code, puntosPorCodigoLocal);
+            return;
+        }
         showAlert('❌ Error al conectar con el servidor', 'danger');
         btn.disabled = false;
         input.disabled = false;
     });
+}
+
+function procesarCodigoValido(code, puntosPorCodigo) {
+    var btn = document.getElementById('validateCodeBtn');
+    var input = document.getElementById('dailyCode');
+    
+    if (!user.codigos_usados) user.codigos_usados = [];
+    user.codigos_usados.push(code);
+    user.codigos_usados_hoy = (user.codigos_usados_hoy || 0) + 1;
+    user.ultimo_reinicio_codigos = new Date().toDateString();
+
+    var tiempoProduccion = 10;
+    try {
+        var configData = localStorage.getItem('apex_configuracion');
+        if (configData) {
+            var config = JSON.parse(configData);
+            tiempoProduccion = config.tiempo_produccion || 10;
+        }
+    } catch(e) {
+        console.warn('Error al leer configuración:', e);
+    }
+
+    var dailyEarnings = user.daily_earnings || 0;
+    
+    if (dailyEarnings === 0 || isNaN(dailyEarnings)) {
+        if (user.plan === 'Trader') dailyEarnings = 6;
+        else if (user.plan === 'Analista') dailyEarnings = 10;
+        else if (user.plan === 'Gestor') dailyEarnings = 17;
+        else if (user.plan === 'Master') dailyEarnings = 27;
+        else if (user.plan === 'Elite') dailyEarnings = 42;
+        else dailyEarnings = 0;
+    }
+
+    var montoGanado = Number(dailyEarnings * 0.5);
+    user.recompensa_pendiente = montoGanado;
+    user.puntosPendientes = puntosPorCodigo;
+
+    user.codigo_usado = true;
+    user.reclamado_hoy = false;
+    user.produccion_activa = true;
+    user.produccion_inicio = new Date().toISOString();
+    user.produccion_duracion = tiempoProduccion;
+    user.fecha_produccion = new Date().toDateString();
+
+    if (!user.historial_codigos) user.historial_codigos = [];
+    user.historial_codigos.push({
+        codigo: code,
+        puntos: puntosPorCodigo,
+        fecha: new Date().toISOString(),
+        estado: 'usado'
+    });
+
+    saveUserData();
+    guardarEnBackend();
+    actualizarEstadoCodigos();
+    renderDashboard();
+    showAlert('✅ Código validado! Producción iniciada.', 'success');
+    input.value = '';
+
+    btn.disabled = false;
+    input.disabled = false;
+    actualizarEstadoCodigos();
 }
 
 function claimReward() {
@@ -2244,18 +1492,9 @@ function claimReward() {
     if (user.produccion_activa) { showAlert('⏳ Espera a que termine', 'warning'); return; }
     if (!user.codigo_usado || user.reclamado_hoy) { showAlert('⚠️ No hay recompensa', 'warning'); return; }
 
-console.log('💥 claimReward() ejecutada');
-console.log('🔍 claimReward() - recompensa_pendiente:', user.recompensa_pendiente);
-console.log('🔍 claimReward() - codigo_usado:', user.codigo_usado);
-console.log('🔍 claimReward() - reclamado_hoy:', user.reclamado_hoy);
-
-    // ============================================================
-    // VERIFICAR QUE LA RECOMPENSA SEA DEL DÍA DE HOY
-    // ============================================================
     var hoy = new Date().toDateString();
     var fechaProduccion = user.fecha_produccion || '';
     if (fechaProduccion !== hoy) {
-        // La producción es de otro día, reiniciar
         user.produccion_activa = false;
         user.recompensa_pendiente = 0;
         user.puntosPendientes = 0;
@@ -2277,7 +1516,7 @@ console.log('🔍 claimReward() - reclamado_hoy:', user.reclamado_hoy);
     user.balance = (user.balance || 0) + montoACobrar;
     user.puntos = (user.puntos || 0) + puntosGanados;
 
-        if (!user.historial_detallado) user.historial_detallado = [];
+    if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
         tipo: 'produccion',
         concepto: '💰 Cobro de código',
@@ -2313,7 +1552,7 @@ console.log('🔍 claimReward() - reclamado_hoy:', user.reclamado_hoy);
 }
 
 // ============================================================
-// PLANES (CON SISTEMA DE NIVELES)
+// PLANES
 // ============================================================
 function renderPlans() {
     var container = document.getElementById('planesContainer');
@@ -2352,7 +1591,6 @@ function renderPlans() {
             var textoBoton = canBuy ? 'Subir por $' + costoUpgrade : 'Saldo insuficiente (necesitas $' + costoUpgrade + ')';
             html += '<div class="plan-card"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + ' <span class="badge badge-unlocked">🔓 Disponible</span></div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div><div class="upgrade-info">💡 Subes de ' + currentPlan + ' a ' + plan.name + ', pagas solo <strong>$' + costoUpgrade + '</strong></div></div></div><div class="action"><div class="price">$' + plan.amount + '</div><div class="sub">' + plan.daily + '/día</div><button class="buy-btn" ' + (!canBuy ? 'disabled' : '') + ' onclick="buyPlan(\'' + plan.name + '\')">' + textoBoton + '</button></div></div>';
         } else if (indicePlan === 0 && indiceActual === 0) {
-            // Primer plan (Trader) - siempre disponible si no tiene plan
             var canBuy = user.balance >= plan.amount;
             var textoBoton = canBuy ? 'Comprar $' + plan.amount : 'Saldo insuficiente (necesitas $' + plan.amount + ')';
             html += '<div class="plan-card"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + ' <span class="badge badge-unlocked">🔓 Disponible</span></div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div></div></div><div class="action"><div class="price">$' + plan.amount + '</div><div class="sub">' + plan.daily + '/día</div><button class="buy-btn" ' + (!canBuy ? 'disabled' : '') + ' onclick="buyPlan(\'' + plan.name + '\')">' + textoBoton + '</button></div></div>';
@@ -2373,19 +1611,16 @@ function buyPlan(planName) {
     var indicePlan = getIndicePlan(planName);
     var nivelAutorizado = getNivelAutorizado();
     
-    // Caso 1: Ya tiene este plan activo
     if (planName === currentPlan) {
         showAlert('⚠️ Ya tienes el plan ' + planName + ' activo', 'warning');
         return;
     }
     
-    // Caso 2: Tiene un plan superior
     if (indicePlan < indiceActual && currentPlan !== 'Sin plan') {
         showAlert('⚠️ Ya tienes un plan superior (' + currentPlan + '). No puedes comprar ' + planName, 'warning');
         return;
     }
     
-    // Caso 3: Sin plan - comprar Trader
     if (currentPlan === 'Sin plan' && planName === 'Trader') {
         if (user.balance < plan.amount) {
             showAlert('⚠️ Saldo insuficiente. Necesitas $' + plan.amount.toFixed(2), 'danger');
@@ -2393,145 +1628,117 @@ function buyPlan(planName) {
         }
         if (!confirm('¿Confirmar compra del plan ' + planName + ' por $' + plan.amount + '?')) return;
         
-        // Ejecutar compra
         user.balance -= plan.amount;
         user.plan = planName;
-	user.daily_earnings = plan.daily;
+        user.daily_earnings = plan.daily;
         user.plan_amount = plan.amount;
         user.fecha_plan = new Date().toISOString();
-// ✅ ACTUALIZAR EL ÁRBOL DEL REFERIDOR
-// Buscar quién invitó a este usuario
-var users = getUsers();
-for (var i = 0; i < users.length; i++) {
-    var u = users[i];
-    if (u.referidos && u.referidos.lista) {
-        for (var j = 0; j < u.referidos.lista.length; j++) {
-            // Si este usuario (el que compró) está en la lista de referidos de alguien
-            if (u.referidos.lista[j].id === user.telefono) {
-                // ✅ Actualizar el estado del referido
-                u.referidos.lista[j].plan = planName;
-                u.referidos.lista[j].tienePlan = true;
-                u.referidos.lista[j].fechaPlan = new Date().toISOString();
-                
-                // Guardar los cambios del referidor
-                saveUsers(users);
-                sincronizarUsuarioConBackend(u.telefono);
- // ✅ GUARDAR EN SESSIONSTORAGE PARA QUE getUsers() LO VEA
-                sessionStorage.setItem('apex_users', JSON.stringify(users));
-                console.log('✅ Árbol actualizado para:', u.nombre);
-                break;
-            }
-        }
-    }
-}
- 	saveUserData();
-	guardarEnBackend();
 
-        // ============================================================
-// OTORGAR COMISIÓN AL REFERIDOR (SOLO SI TIENE LOGRO ASIGNADO)
-// ============================================================
-var users = getUsers();
-var comisionPorcentaje = 0; // Por defecto 0%
-var bonoExtra = 0;
-
-// Verificar si el usuario referidor tiene un LOGRO DE REFERIDOS asignado
-var logrosSistema = getLogrosSistema();
-var tieneLogroReferidos = false;
-
-// Buscar si este usuario fue referido por alguien
-for (var i = 0; i < users.length; i++) {
-    var u = users[i];
-    if (u.referidos && u.referidos.lista) {
-        for (var j = 0; j < u.referidos.lista.length; j++) {
-            if (u.referidos.lista[j].id === user.telefono) {
-                // Este usuario fue referido por 'u'
-                // Verificar si 'u' tiene un logro de referidos asignado
-                if (u.logros_asignados && u.logros_asignados.length > 0) {
-                    for (var l = 0; l < u.logros_asignados.length; l++) {
-                        for (var ls = 0; ls < logrosSistema.length; ls++) {
-                            if (logrosSistema[ls].id === u.logros_asignados[l] && logrosSistema[ls].tipo === 'referidos') {
-                                tieneLogroReferidos = true;
-                                // La comisión es el valor del logro (porcentaje)
-                                comisionPorcentaje = logrosSistema[ls].recompensa || 0;
-                                break;
-                            }
-                        }
-                        if (tieneLogroReferidos) break;
+        var users = getUsers();
+        for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            if (u.referidos && u.referidos.lista) {
+                for (var j = 0; j < u.referidos.lista.length; j++) {
+                    if (u.referidos.lista[j].id === user.telefono) {
+                        u.referidos.lista[j].plan = planName;
+                        u.referidos.lista[j].tienePlan = true;
+                        u.referidos.lista[j].fechaPlan = new Date().toISOString();
+                        saveUsers(users);
+                        sincronizarUsuarioConBackend(u.telefono);
+                        sessionStorage.setItem('apex_users', JSON.stringify(users));
+                        break;
                     }
                 }
-                
-                // Si tiene logro de referidos, calcular comisión
-                if (tieneLogroReferidos && comisionPorcentaje > 0) {
-                    // Verificar si el referidor tiene un bono extra activo (cupón)
-                    if (u.bonusReferidoActivo && u.bonusReferidoActivo.activo) {
-                        var expiracionBono = new Date(u.bonusReferidoActivo.expiracion);
-                        var ahora = new Date();
-                        if (ahora < expiracionBono) {
-                            bonoExtra = u.bonusReferidoActivo.porcentaje / 100;
-                        } else {
-                            u.bonusReferidoActivo = null;
-                            saveUsers(users);
+            }
+        }
+
+        var users = getUsers();
+        var comisionPorcentaje = 0;
+        var bonoExtra = 0;
+
+        var logrosSistema = getLogrosSistema();
+        var tieneLogroReferidos = false;
+
+        for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            if (u.referidos && u.referidos.lista) {
+                for (var j = 0; j < u.referidos.lista.length; j++) {
+                    if (u.referidos.lista[j].id === user.telefono) {
+                        if (u.logros_asignados && u.logros_asignados.length > 0) {
+                            for (var l = 0; l < u.logros_asignados.length; l++) {
+                                for (var ls = 0; ls < logrosSistema.length; ls++) {
+                                    if (logrosSistema[ls].id === u.logros_asignados[l] && logrosSistema[ls].tipo === 'referidos') {
+                                        tieneLogroReferidos = true;
+                                        comisionPorcentaje = logrosSistema[ls].recompensa || 0;
+                                        break;
+                                    }
+                                }
+                                if (tieneLogroReferidos) break;
+                            }
                         }
-                    }
-                    
-                    var comisionTotal = plan.amount * ((comisionPorcentaje + (bonoExtra * 100)) / 100);
-                    
-                    // Otorgar comisión al referidor
-                    u.balance = (u.balance || 0) + comisionTotal;
-                    
-                    // Actualizar la comisión en la lista de referidos
-                    u.referidos.lista[j].commission = comisionTotal;
-                    
-                    // Registrar en el historial del referidor
-                    if (!u.historial) u.historial = [];
-                    u.historial.push({
-                        type: 'ganancia',
-                        amount: comisionTotal,
-                        date: new Date().toISOString(),
-                        status: 'completado',
-                        concepto: '👥 Comisión por plan de referido: ' + user.nombre + ' ' + user.apellido + ' (' + (comisionPorcentaje + (bonoExtra * 100)) + '% de $' + plan.amount + ')' + (bonoExtra > 0 ? ' 💚 Bono extra aplicado!' : ''),
-                        origen: 'referido'
-                    });
-                    
-                    // Registrar en historial detallado
-                    if (!u.historial_detallado) u.historial_detallado = [];
-                    u.historial_detallado.push({
-                        tipo: 'referido',
-                        concepto: '👥 Comisión por plan de referido: ' + user.nombre + ' ' + user.apellido + ' (' + (comisionPorcentaje + (bonoExtra * 100)) + '% de $' + plan.amount + ')' + (bonoExtra > 0 ? ' 💚 Bono extra aplicado!' : ''),
-                        monto: comisionTotal,
-                        fecha: new Date().toISOString(),
-                        estado: 'completado'
-                    });
-                    
-                    // Si se usó un bono, marcar el cupón como usado
-                    if (bonoExtra > 0 && u.bonusReferidoActivo && u.bonusReferidoActivo.cuponUsado) {
-                        if (u.cupones_asignados) {
-                            for (var k = 0; k < u.cupones_asignados.length; k++) {
-                                if (u.cupones_asignados[k].id === u.bonusReferidoActivo.cuponUsado) {
-                                    u.cupones_asignados[k].usado = true;
-                                    u.cupones_asignados[k].fechaUso = new Date().toISOString();
-                                    break;
+                        
+                        if (tieneLogroReferidos && comisionPorcentaje > 0) {
+                            if (u.bonusReferidoActivo && u.bonusReferidoActivo.activo) {
+                                var expiracionBono = new Date(u.bonusReferidoActivo.expiracion);
+                                var ahora = new Date();
+                                if (ahora < expiracionBono) {
+                                    bonoExtra = u.bonusReferidoActivo.porcentaje / 100;
+                                } else {
+                                    u.bonusReferidoActivo = null;
+                                    saveUsers(users);
                                 }
                             }
+                            
+                            var comisionTotal = plan.amount * ((comisionPorcentaje + (bonoExtra * 100)) / 100);
+                            
+                            u.balance = (u.balance || 0) + comisionTotal;
+                            u.referidos.lista[j].commission = comisionTotal;
+                            
+                            if (!u.historial) u.historial = [];
+                            u.historial.push({
+                                type: 'ganancia',
+                                amount: comisionTotal,
+                                date: new Date().toISOString(),
+                                status: 'completado',
+                                concepto: '👥 Comisión por plan de referido: ' + user.nombre + ' ' + user.apellido + ' (' + (comisionPorcentaje + (bonoExtra * 100)) + '% de $' + plan.amount + ')' + (bonoExtra > 0 ? ' 💚 Bono extra aplicado!' : ''),
+                                origen: 'referido'
+                            });
+                            
+                            if (!u.historial_detallado) u.historial_detallado = [];
+                            u.historial_detallado.push({
+                                tipo: 'referido',
+                                concepto: '👥 Comisión por plan de referido: ' + user.nombre + ' ' + user.apellido + ' (' + (comisionPorcentaje + (bonoExtra * 100)) + '% de $' + plan.amount + ')' + (bonoExtra > 0 ? ' 💚 Bono extra aplicado!' : ''),
+                                monto: comisionTotal,
+                                fecha: new Date().toISOString(),
+                                estado: 'completado'
+                            });
+                            
+                            if (bonoExtra > 0 && u.bonusReferidoActivo && u.bonusReferidoActivo.cuponUsado) {
+                                if (u.cupones_asignados) {
+                                    for (var k = 0; k < u.cupones_asignados.length; k++) {
+                                        if (u.cupones_asignados[k].id === u.bonusReferidoActivo.cuponUsado) {
+                                            u.cupones_asignados[k].usado = true;
+                                            u.cupones_asignados[k].fechaUso = new Date().toISOString();
+                                            break;
+                                        }
+                                    }
+                                }
+                                u.bonusReferidoActivo = null;
+                            }
+                            
+                            var mensajeComision = '✅ ' + u.nombre + ' recibió $' + comisionTotal.toFixed(2) + ' por tu compra de plan! (Logro de referidos)';
+                            if (bonoExtra > 0) {
+                                mensajeComision += ' 💚 Bono extra de ' + (bonoExtra * 100) + '% aplicado!';
+                            }
+                            showAlert(mensajeComision, 'success');
+                            
+                            saveUsers(users);
                         }
-                        u.bonusReferidoActivo = null;
+                        break;
                     }
-                    
-                    // Mostrar mensaje
-                    var mensajeComision = '✅ ' + u.nombre + ' recibió $' + comisionTotal.toFixed(2) + ' por tu compra de plan! (Logro de referidos)';
-                    if (bonoExtra > 0) {
-                        mensajeComision += ' 💚 Bono extra de ' + (bonoExtra * 100) + '% aplicado!';
-                    }
-                    showAlert(mensajeComision, 'success');
-                    
-                    // Guardar cambios del referidor
-                    saveUsers(users);
                 }
-                break;
             }
         }
-    }
-}
 
         if (!user.fechas_invito) {
             user.fechas_invito = { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null };
@@ -2566,7 +1773,6 @@ for (var i = 0; i < users.length; i++) {
         return;
     }
     
-    // Caso 4: Subir de nivel (debe ser el siguiente)
     var costoUpgrade = getCostoUpgrade(planName);
     
     if (indicePlan !== indiceActual + 1) {
@@ -2586,147 +1792,120 @@ for (var i = 0; i < users.length; i++) {
     
     if (!confirm('¿Confirmar upgrade de ' + currentPlan + ' a ' + planName + ' por $' + costoUpgrade + '?')) return;
 
-    // Ejecutar upgrade
     user.balance -= costoUpgrade;
     user.plan = planName;
     user.plan_amount = plan.amount;
     user.daily_earnings = plan.daily;
     user.fecha_plan = new Date().toISOString();
 
-    // ============================================================
-    // OTORGAR COMISIÓN AL REFERIDOR (cuando el usuario COMPRA un plan)
-    // ============================================================
-    // ============================================================
-// OTORGAR COMISIÓN AL REFERIDOR (SOLO SI TIENE LOGRO O CUPÓN ACTIVO)
-// ============================================================
-var users = getUsers();
-var comisionPorcentaje = 0;
-var bonoExtra = 0;
-var tieneComision = false;
-var mensajeComisionFinal = '';
+    var users = getUsers();
+    var comisionPorcentaje = 0;
+    var bonoExtra = 0;
+    var tieneComision = false;
 
-// Buscar si este usuario fue referido por alguien
-for (var i = 0; i < users.length; i++) {
-    var u = users[i];
-    if (u.referidos && u.referidos.lista) {
-        for (var j = 0; j < u.referidos.lista.length; j++) {
-            if (u.referidos.lista[j].id === user.telefono) {
-                // Este usuario fue referido por 'u'
-                // Verificar si 'u' tiene un logro de referidos asignado
-                var logrosSistema = getLogrosSistema();
-                var tieneLogroReferidos = false;
-                var logroReferido = null;
-                
-                // VERIFICAR LOGROS ASIGNADOS AL REFERIDOR
-                if (u.logros_asignados && u.logros_asignados.length > 0) {
-                    for (var l = 0; l < u.logros_asignados.length; l++) {
-                        for (var ls = 0; ls < logrosSistema.length; ls++) {
-                            if (logrosSistema[ls].id === u.logros_asignados[l] && logrosSistema[ls].tipo === 'referidos') {
-                                tieneLogroReferidos = true;
-                                logroReferido = logrosSistema[ls];
-                                comisionPorcentaje = logrosSistema[ls].recompensa || 0;
-                                break;
-                            }
-                        }
-                        if (tieneLogroReferidos) break;
-                    }
-                }
-                
-                // VERIFICAR SI TIENE CUPÓN DE BONO POR REFERIDO ACTIVO
-                var tieneCuponBono = false;
-                var bonoPorcentaje = 0;
-                
-                if (u.bonusReferidoActivo && u.bonusReferidoActivo.activo) {
-                    var expiracionBono = new Date(u.bonusReferidoActivo.expiracion);
-                    var ahora = new Date();
-                    if (ahora < expiracionBono) {
-                        tieneCuponBono = true;
-                        bonoPorcentaje = u.bonusReferidoActivo.porcentaje;
-                    } else {
-                        u.bonusReferidoActivo = null;
-                        saveUsers(users);
-                    }
-                }
-                
-                // SOLO SI TIENE LOGRO O CUPÓN, SE DA COMISIÓN
-                if (tieneLogroReferidos || tieneCuponBono) {
-                    tieneComision = true;
+    for (var i = 0; i < users.length; i++) {
+        var u = users[i];
+        if (u.referidos && u.referidos.lista) {
+            for (var j = 0; j < u.referidos.lista.length; j++) {
+                if (u.referidos.lista[j].id === user.telefono) {
+                    var logrosSistema = getLogrosSistema();
+                    var tieneLogroReferidos = false;
+                    var logroReferido = null;
                     
-                    // La comisión base es del logro (si tiene)
-                    var comisionBase = comisionPorcentaje;
-                    
-                    // Si tiene cupón de bono, se suma al porcentaje
-                    if (tieneCuponBono && bonoPorcentaje > 0) {
-                        bonoExtra = bonoPorcentaje / 100;
-                        // Marcar el bono como usado
-                        u.bonusReferidoActivo = null;
-                        // Buscar y marcar el cupón como usado
-                        if (u.cupones_asignados) {
-                            for (var k = 0; k < u.cupones_asignados.length; k++) {
-                                if (u.cupones_asignados[k].tipo === 'bonus_referido' && !u.cupones_asignados[k].usado) {
-                                    u.cupones_asignados[k].usado = true;
-                                    u.cupones_asignados[k].fechaUso = new Date().toISOString();
+                    if (u.logros_asignados && u.logros_asignados.length > 0) {
+                        for (var l = 0; l < u.logros_asignados.length; l++) {
+                            for (var ls = 0; ls < logrosSistema.length; ls++) {
+                                if (logrosSistema[ls].id === u.logros_asignados[l] && logrosSistema[ls].tipo === 'referidos') {
+                                    tieneLogroReferidos = true;
+                                    logroReferido = logrosSistema[ls];
+                                    comisionPorcentaje = logrosSistema[ls].recompensa || 0;
                                     break;
                                 }
                             }
+                            if (tieneLogroReferidos) break;
                         }
                     }
                     
-                    // Calcular comisión total
-                    var porcentajeTotal = comisionBase + (bonoExtra * 100);
-                    var comisionTotal = plan.amount * (porcentajeTotal / 100);
+                    var tieneCuponBono = false;
+                    var bonoPorcentaje = 0;
                     
-                    if (comisionTotal > 0) {
-                        // Otorgar comisión al referidor
-                        u.balance = (u.balance || 0) + comisionTotal;
-                        u.referidos.lista[j].commission = comisionTotal;
-                        u.referidos.lista[j].plan_comprado = true;
-                        
-                        // Registrar en el historial del referidor
-                        if (!u.historial) u.historial = [];
-                        u.historial.push({
-                            type: 'ganancia',
-                            amount: comisionTotal,
-                            date: new Date().toISOString(),
-                            status: 'completado',
-                            concepto: '👥 Comisión por plan de referido: ' + user.nombre + ' ' + user.apellido + 
-                                ' (' + porcentajeTotal + '% de $' + plan.amount + ')' + 
-                                (bonoExtra > 0 ? ' 💚 Bono extra de ' + (bonoExtra * 100) + '% aplicado!' : '') +
-                                (tieneLogroReferidos ? ' (Logro: ' + logroReferido.nombre + ')' : ''),
-                            origen: 'referido'
-                        });
-                        
-                        if (!u.historial_detallado) u.historial_detallado = [];
-                        u.historial_detallado.push({
-                            tipo: 'referido',
-                            concepto: '👥 Comisión por plan de referido: ' + user.nombre + ' ' + user.apellido + 
-                                ' (' + porcentajeTotal + '% de $' + plan.amount + ')' + 
-                                (bonoExtra > 0 ? ' 💚 Bono extra de ' + (bonoExtra * 100) + '% aplicado!' : ''),
-                            monto: comisionTotal,
-                            fecha: new Date().toISOString(),
-                            estado: 'completado'
-                        });
-                        
-                        mensajeComisionFinal = '✅ ' + u.nombre + ' recibió $' + comisionTotal.toFixed(2) + ' por tu compra de plan!';
-                        if (bonoExtra > 0) {
-                            mensajeComisionFinal += ' 💚 Bono extra de ' + (bonoExtra * 100) + '% aplicado!';
+                    if (u.bonusReferidoActivo && u.bonusReferidoActivo.activo) {
+                        var expiracionBono = new Date(u.bonusReferidoActivo.expiracion);
+                        var ahora = new Date();
+                        if (ahora < expiracionBono) {
+                            tieneCuponBono = true;
+                            bonoPorcentaje = u.bonusReferidoActivo.porcentaje;
+                        } else {
+                            u.bonusReferidoActivo = null;
+                            saveUsers(users);
                         }
-                        showAlert(mensajeComisionFinal, 'success');
+                    }
+                    
+                    if (tieneLogroReferidos || tieneCuponBono) {
+                        tieneComision = true;
                         
-                        saveUsers(users);
+                        var comisionBase = comisionPorcentaje;
+                        
+                        if (tieneCuponBono && bonoPorcentaje > 0) {
+                            bonoExtra = bonoPorcentaje / 100;
+                            u.bonusReferidoActivo = null;
+                            if (u.cupones_asignados) {
+                                for (var k = 0; k < u.cupones_asignados.length; k++) {
+                                    if (u.cupones_asignados[k].tipo === 'bonus_referido' && !u.cupones_asignados[k].usado) {
+                                        u.cupones_asignados[k].usado = true;
+                                        u.cupones_asignados[k].fechaUso = new Date().toISOString();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        var porcentajeTotal = comisionBase + (bonoExtra * 100);
+                        var comisionTotal = plan.amount * (porcentajeTotal / 100);
+                        
+                        if (comisionTotal > 0) {
+                            u.balance = (u.balance || 0) + comisionTotal;
+                            u.referidos.lista[j].commission = comisionTotal;
+                            u.referidos.lista[j].plan_comprado = true;
+                            
+                            if (!u.historial) u.historial = [];
+                            u.historial.push({
+                                type: 'ganancia',
+                                amount: comisionTotal,
+                                date: new Date().toISOString(),
+                                status: 'completado',
+                                concepto: '👥 Comisión por plan de referido: ' + user.nombre + ' ' + user.apellido + 
+                                    ' (' + porcentajeTotal + '% de $' + plan.amount + ')' + 
+                                    (bonoExtra > 0 ? ' 💚 Bono extra de ' + (bonoExtra * 100) + '% aplicado!' : '') +
+                                    (tieneLogroReferidos ? ' (Logro: ' + logroReferido.nombre + ')' : ''),
+                                origen: 'referido'
+                            });
+                            
+                            if (!u.historial_detallado) u.historial_detallado = [];
+                            u.historial_detallado.push({
+                                tipo: 'referido',
+                                concepto: '👥 Comisión por plan de referido: ' + user.nombre + ' ' + user.apellido + 
+                                    ' (' + porcentajeTotal + '% de $' + plan.amount + ')' + 
+                                    (bonoExtra > 0 ? ' 💚 Bono extra de ' + (bonoExtra * 100) + '% aplicado!' : ''),
+                                monto: comisionTotal,
+                                fecha: new Date().toISOString(),
+                                estado: 'completado'
+                            });
+                            
+                            var mensajeComisionFinal = '✅ ' + u.nombre + ' recibió $' + comisionTotal.toFixed(2) + ' por tu compra de plan!';
+                            if (bonoExtra > 0) {
+                                mensajeComisionFinal += ' 💚 Bono extra de ' + (bonoExtra * 100) + '% aplicado!';
+                            }
+                            showAlert(mensajeComisionFinal, 'success');
+                            
+                            saveUsers(users);
+                        }
                     }
-                } else {
-                    // No tiene ni logro ni cupón, no hay comisión
-                    // Mostrar mensaje solo si es un referido válido
-                    if (u.referidos.lista[j].id === user.telefono) {
-                        // No mostrar mensaje para no confundir al usuario
-                    }
+                    break;
                 }
-                break;
             }
         }
     }
-}
 
     if (!user.fechas_invito) {
         user.fechas_invito = { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null };
@@ -2759,11 +1938,9 @@ for (var i = 0; i < users.length; i++) {
     showAlert('✅ Upgrade a ' + planName + ' completado! Pagaste $' + costoUpgrade.toFixed(2), 'success');
     renderDashboard();
 }
+
 // ============================================================
-// ÁRBOL DE REFERIDOS
-// ============================================================
-// ============================================================
-// ÁRBOL DE REFERIDOS - COMPLETO (6 personas)
+// ÁRBOL DE REFERIDOS - COMPLETO Y LLAMATIVO
 // ============================================================
 function renderTree() {
     var container = document.getElementById('treeContainer');
@@ -2773,67 +1950,47 @@ function renderTree() {
     var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
     var listaReferidos = referidos.lista || [];
 
-    // ✅ OBTENER USUARIO POR TELÉFONO
     function obtenerUsuario(telefono) {
-    if (!telefono) return null;
-    
-    // ✅ 1. Buscar en getUsers() (localStorage)
-    var users = getUsers();
-    for (var i = 0; i < users.length; i++) {
-        if (users[i].telefono === telefono) {
-            return users[i];
+        if (!telefono) return null;
+        var users = getUsers();
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].telefono === telefono) {
+                return users[i];
+            }
         }
+        var referidos = user.referidos || { lista: [] };
+        for (var i = 0; i < referidos.lista.length; i++) {
+            if (referidos.lista[i].id === telefono) {
+                return {
+                    telefono: referidos.lista[i].id,
+                    nombre: referidos.lista[i].nombre || telefono,
+                    apellido: '',
+                    plan: referidos.lista[i].plan || 'Sin plan',
+                    referidos: { izquierda: null, derecha: null, lista: [] }
+                };
+            }
+        }
+        return null;
     }
-    
-    // ✅ 2. Si no está en localStorage, buscar en user.referidos.lista
-    var referidos = user.referidos || { lista: [] };
-    for (var i = 0; i < referidos.lista.length; i++) {
-        if (referidos.lista[i].id === telefono) {
-            // Usar los datos de la lista
-            return {
-                telefono: referidos.lista[i].id,
-                nombre: referidos.lista[i].nombre || telefono,
+
+    var referidosConPlan = [];
+    for (var i = 0; i < listaReferidos.length; i++) {
+        var ref = listaReferidos[i];
+        var refUser = obtenerUsuario(ref.id);
+        if (!refUser) {
+            refUser = {
+                telefono: ref.id,
+                nombre: ref.nombre || ref.id,
                 apellido: '',
-                plan: referidos.lista[i].plan || 'Sin plan',
+                plan: ref.plan || 'Sin plan',
                 referidos: { izquierda: null, derecha: null, lista: [] }
             };
         }
+        if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
+            referidosConPlan.push(refUser);
+        }
     }
-    
-    return null;
-}
 
-   // ✅ FILTRAR SOLO REFERIDOS CON PLAN ACTIVO (USANDO EL BACKEND DIRECTAMENTE)
-var referidosConPlan = [];
-for (var i = 0; i < listaReferidos.length; i++) {
-    var ref = listaReferidos[i];
-    
-    // ✅ BUSCAR EL PLAN EN getUsers() (que YA TIENE los datos del admin)
-    var refUser = obtenerUsuario(ref.id);
-    
-    // ✅ SI NO ESTÁ EN getUsers(), usar los datos de la lista
-    if (!refUser) {
-        refUser = {
-            telefono: ref.id,
-            nombre: ref.nombre || ref.id,
-            apellido: '',
-            plan: ref.plan || 'Sin plan',
-            referidos: { izquierda: null, derecha: null, lista: [] }
-        };
-    }
-    
-    // ✅ VERIFICAR SI TIENE PLAN ACTIVO
-    console.log('🔍 Referido:', ref.id, 'Plan:', refUser.plan);
-    
-    if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
-        referidosConPlan.push(refUser);
-        console.log('✅ Agregado al árbol:', ref.id, '→', refUser.plan);
-    }
-}
-
-console.log('📊 Referidos con plan:', referidosConPlan.length);
-
-    // ✅ FUNCIONES PARA RENDERIZAR NODOS
     function getEstado(userObj) {
         if (!userObj) return 'empty';
         if (userObj.plan && userObj.plan !== 'Sin plan') {
@@ -2863,22 +2020,6 @@ console.log('📊 Referidos con plan:', referidosConPlan.length);
         return ' ';
     }
 
-    function getColor(userObj) {
-        if (!userObj) return '#f5f5f5';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return '#4db6ac';
-        }
-        return '#f5f5f5';
-    }
-
-    function getBorder(userObj) {
-        if (!userObj) return '#ddd';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return '#4db6ac';
-        }
-        return '#ddd';
-    }
-
     function crearNodo(userObj, tipo) {
         var estado = getEstado(userObj);
         var clase = 'circle';
@@ -2895,41 +2036,29 @@ console.log('📊 Referidos con plan:', referidosConPlan.length);
         var nombre = getNombre(userObj);
         var label = getLabel(userObj);
         var inicial = getInicial(userObj);
-        var color = getColor(userObj);
-        var border = getBorder(userObj);
 
         return '<div class="tree-node">' +
-            '<div class="' + clase + '" style="background:' + color + ';border-color:' + border + ';">' + inicial + '</div>' +
+            '<div class="' + clase + '">' + inicial + '</div>' +
             '<div class="label">' + (nombre || 'Vacío') + '</div>' +
             '<div class="label" style="font-size:6px;color:#999;">' + label + '</div>' +
         '</div>';
     }
 
-    // ============================================================
-    // 1. CONSTRUIR EL ÁRBOL DE 3 NIVELES
-    // ============================================================
     var html = '';
-
     html += '<div style="text-align:center; margin-bottom:12px; font-weight:700; font-size:16px; color:#000;">🌳 Tu Árbol de Referidos</div>';
 
-    // NIVEL 1: TÚ
     html += '<div class="tree-level">';
     html += crearNodo(user, 'you');
     html += '</div>';
-
     html += '<div class="tree-connector">│</div>';
 
-    // NIVEL 2: 2 referidos directos con plan (izquierda y derecha)
     html += '<div class="tree-level">';
-    // Tomar los primeros 2 referidos con plan (o mostrar vacíos)
     var nivel2 = referidosConPlan.slice(0, 2);
     html += crearNodo(nivel2[0] || null, 'directo');
     html += crearNodo(nivel2[1] || null, 'directo');
     html += '</div>';
-
     html += '<div class="tree-connector">│</div>';
 
-    // NIVEL 3: 4 referidos de los referidos directos
     html += '<div class="tree-level">';
     var nivel3 = [];
     for (var i = 0; i < nivel2.length; i++) {
@@ -2945,7 +2074,6 @@ console.log('📊 Referidos con plan:', referidosConPlan.length);
             }
         }
     }
-    // Mostrar hasta 4 referidos en el nivel 3
     while (nivel3.length < 4) {
         nivel3.push(null);
     }
@@ -2954,22 +2082,16 @@ console.log('📊 Referidos con plan:', referidosConPlan.length);
     }
     html += '</div>';
 
-    // ============================================================
-    // 2. LINK DE REFERIDO
-    // ============================================================
     var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
     var referralLink = baseUrl + 'ref/' + (user.codigo_referido || 'APEX000');
     
     html += '<div style="margin-top:16px; background:#f8f9fa; border-radius:12px; padding:12px 16px; border:1px solid #e0e0e0;">';
     html += '<div style="font-size:12px; color:#666; font-weight:600; margin-bottom:4px;">🔗 Tu Link de Referido</div>';
     html += '<div style="display:flex; align-items:center; gap:10px;">';
-    html += '<span style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;">' + referralLink + '</span>';
+    html += '<span id="referralLink" style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;">' + referralLink + '</span>';
     html += '<button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>';
     html += '</div></div>';
 
-    // ============================================================
-    // 3. ESTADÍSTICAS: ACTIVOS y TOTALES
-    // ============================================================
     var totalReferidos = listaReferidos.length;
     var activos = referidosConPlan.length;
     
@@ -2984,9 +2106,6 @@ console.log('📊 Referidos con plan:', referidosConPlan.length);
     html += '</div>';
     html += '</div>';
 
-    // ============================================================
-    // 4. LISTA DE TODOS LOS REFERIDOS
-    // ============================================================
     if (listaReferidos.length > 0) {
         html += '<div style="margin-top:16px;">';
         html += '<div style="font-size:14px; font-weight:600; color:#333; margin-bottom:10px;">📋 Tus Referidos</div>';
@@ -3026,9 +2145,6 @@ console.log('📊 Referidos con plan:', referidosConPlan.length);
         html += '</div></div>';
     }
 
-    // ============================================================
-    // 5. INFORMACIÓN DE NIVELES
-    // ============================================================
     var planActual = user.plan || 'Sin plan';
     var indiceActual = getIndicePlan(planActual);
     var siguienteIndice = indiceActual + 1;
@@ -3045,7 +2161,7 @@ console.log('📊 Referidos con plan:', referidosConPlan.length);
     } else if (nivelAutorizado >= siguienteIndice) {
         htmlNivel = '🔓 <span style="color:#4db6ac; font-weight:600;">' + siguientePlan + ' desbloqueado</span> - Puedes comprarlo en la pestaña Planes';
     } else {
-        htmlNivel = '🔒 <span style="color:#ef5350; font-weight:600;">' + siguientePlan + ' bloqueado</span> - Completa las tareas asignadas y espera autorización del administrador';
+        htmlNivel = '🔒 <span style="color:#e53935; font-weight:600;">' + siguientePlan + ' bloqueado</span> - Completa las tareas asignadas y espera autorización del administrador';
     }
     if (planesSuperados.length > 0) {
         htmlNivel += '<br><span style="color:#0d47a1; font-size:11px;">✅ Niveles superados: ' + planesSuperados.join(' → ') + '</span>';
@@ -3055,18 +2171,13 @@ console.log('📊 Referidos con plan:', referidosConPlan.length);
     html += htmlNivel;
     html += '</div>';
 
-    // ============================================================
-    // 6. PINTAR TODO EN EL CONTENEDOR
-    // ============================================================
     container.innerHTML = html;
-
-    // ✅ ACTUALIZAR EL CONTADOR DE REFERIDOS (arriba)
     document.getElementById('referralCount').textContent = totalReferidos;
 }
+
 // ============================================================
 // HISTORIAL DETALLADO
 // ============================================================
-
 function filterHistory(filter) {
     var btns = document.querySelectorAll('#filterTabs .filter-btn');
     for (var b = 0; b < btns.length; b++) {
@@ -3108,8 +2219,8 @@ function updateWithdrawAddress() {
         return;
     }
     user.direccion_retiro = address;
-    saveUserData();         // Guarda en localStorage
-    guardarEnBackend();     // ✅ Guarda en el backend
+    saveUserData();
+    guardarEnBackend();
     document.getElementById('currentWithdrawAddress').textContent = address;
     document.getElementById('currentWithdrawAddress').style.color = '#4db6ac';
     showAlert('✅ Dirección de retiro guardada', 'success');
@@ -3133,31 +2244,16 @@ function requestWithdraw() {
 
     var pass = prompt('🔐 Contraseña de retiro (6 dígitos):');
     if (!pass) return;
-    if (pass !== (user.password_retiro || '000000')) {
-        showAlert('❌ Contraseña incorrecta', 'danger');
-        return;
-    }
-
-// ✅ VERIFICAR CONTRASEÑA
-    console.log('🔑 Contraseña ingresada:', pass);
-    console.log('🔑 Contraseña guardada en user:', user.password_retiro);
-
-    // ✅ Si user.password_retiro es undefined, usar '000000' como fallback
     var passGuardada = user.password_retiro || '000000';
-
     if (pass !== passGuardada) {
         showAlert('❌ Contraseña incorrecta', 'danger');
         return;
     }
 
-    // ============================================================
-    // CALCULAR COMISIÓN CON DESCUENTO DE CUPÓN
-    // ============================================================
     var comisionBase = 0.23;
     var descuentoAplicado = 0;
     var cuponUsado = null;
 
-    // Verificar si tiene descuento activo
     if (user.descuentoRetiroActivo) {
         var expiracion = new Date(user.descuentoRetiroActivo.expiracion);
         var ahora = new Date();
@@ -3165,7 +2261,6 @@ function requestWithdraw() {
             descuentoAplicado = user.descuentoRetiroActivo.porcentaje / 100;
             cuponUsado = user.descuentoRetiroActivo.cuponUsado;
         } else {
-            // Si expiró, limpiar
             user.descuentoRetiroActivo = null;
             saveUserData();
         }
@@ -3218,7 +2313,6 @@ function requestWithdraw() {
         origen: 'retiro'
     });
 
-    // Marcar el cupón como usado si se aplicó descuento
     if (cuponUsado && user.cupones_asignados) {
         for (var i = 0; i < user.cupones_asignados.length; i++) {
             if (user.cupones_asignados[i].id === cuponUsado) {
@@ -3229,7 +2323,6 @@ function requestWithdraw() {
         }
     }
 
-    // Limpiar el descuento activo después de usarlo
     if (descuentoAplicado > 0) {
         user.descuentoRetiroActivo = null;
     }
@@ -3265,7 +2358,7 @@ function renderActividades() {
         logrosPendientes = user.logros_pendientes_aprobar.length;
     }
 
-var cuponesDisponibles = 0;
+    var cuponesDisponibles = 0;
     if (user.cupones_asignados) {
         for (var i = 0; i < user.cupones_asignados.length; i++) {
             if (!user.cupones_asignados[i].usado) cuponesDisponibles++;
@@ -3277,7 +2370,7 @@ var cuponesDisponibles = 0;
         { id: 'cofres', icono: '🎁', nombre: '9 Cofres', desc: 'Elige un cofre y descubre premio', badge: usosCofres > 0 ? usosCofres + ' usos' : 'Sin usos', disponible: usosCofres > 0 && user.cuenta_habilitada !== false && !user.produccion_pausada },
         { id: 'dados', icono: '🎲', nombre: 'Dados', desc: 'Lanza el dado y gana premio', badge: usosDados > 0 ? usosDados + ' usos' : 'Sin usos', disponible: usosDados > 0 && user.cuenta_habilitada !== false && !user.produccion_pausada },
         { id: 'cupones', icono: '🎫', nombre: 'Mis Cupones', desc: 'Activa cupones de descuento y bonos', badge: cuponesDisponibles > 0 ? cuponesDisponibles + ' disponibles' : 'Sin cupones', disponible: cuponesDisponibles > 0 && user.cuenta_habilitada !== false && !user.produccion_pausada },
-	{ id: 'tareas', icono: '📋', nombre: 'Mis Tareas', desc: tareasPendientes > 0 ? 'Tienes ' + tareasPendientes + ' tareas pendientes' : 'Completa tareas', badge: tareasPendientes > 0 ? tareasPendientes + ' pendientes' : 'Sin tareas', disponible: user.cuenta_habilitada !== false && !user.produccion_pausada },
+        { id: 'tareas', icono: '📋', nombre: 'Mis Tareas', desc: tareasPendientes > 0 ? 'Tienes ' + tareasPendientes + ' tareas pendientes' : 'Completa tareas', badge: tareasPendientes > 0 ? tareasPendientes + ' pendientes' : 'Sin tareas', disponible: user.cuenta_habilitada !== false && !user.produccion_pausada },
         { id: 'logros', icono: '🏆', nombre: 'Mis Logros', desc: 'Completa logros y gana recompensas', badge: (user.logros_reclamados || []).length + ' obtenidos', disponible: user.cuenta_habilitada !== false && !user.produccion_pausada },
         { id: 'puntos', icono: '⭐', nombre: 'Mis Puntos', desc: 'Canjea tus puntos por USDT', badge: (user.puntos || 0) + ' pts', disponible: user.cuenta_habilitada !== false && !user.produccion_pausada }
     ];
@@ -3287,8 +2380,9 @@ var cuponesDisponibles = 0;
         var act = actividades[a];
         var onclick = act.disponible ? "abrirActividad('" + act.id + "')" : '';
         var estadoText = act.disponible ? '🎯 Disponible' : (user.produccion_pausada ? '⏸️ Pausada' : '🔒 Bloqueado');
+        var badgeClass = act.disponible ? 'badge-prox disponible' : 'badge-prox';
         html += '<div class="actividad-card ' + (act.disponible ? '' : 'bloqueada') + '" onclick="' + onclick + '">' +
-            '<span class="badge-prox">' + act.badge + '</span>' +
+            '<span class="' + badgeClass + '">' + act.badge + '</span>' +
             '<span class="icono">' + act.icono + '</span>' +
             '<div class="nombre">' + act.nombre + '</div>' +
             '<div class="desc">' + act.desc + '</div>' +
@@ -3309,7 +2403,7 @@ function abrirActividad(id) {
 }
 
 // ============================================================
-// CUPONES (Dashboard)
+// CUPONES
 // ============================================================
 function abrirCupones() {
     var cupones = user.cupones_asignados || [];
@@ -3331,17 +2425,17 @@ function abrirCupones() {
     for (var i = 0; i < cupones.length; i++) {
         var c = cupones[i];
         var tipoLabel = c.tipo === 'descuento_retiro' ? '🔽 Descuento Retiro' : c.tipo === 'bonus_referido' ? '👥 Bono Referido' : '💰 Bono Depósito';
-        var tipoClass = c.tipo === 'descuento_retiro' ? 'badge-success' : c.tipo === 'bonus_referido' ? 'badge-warning' : 'badge-info';
         var usado = c.usado || false;
+        var estiloCupon = usado ? 'opacity:0.5;' : 'cursor:pointer;';
         
-        html += '<div class="cupon-modal-item ' + (usado ? 'usado' : '') + '" onclick="' + (!usado ? 'activarCupon(' + i + ')' : '') + '">' +
+        html += '<div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:10px;border-left:4px solid ' + (usado ? '#999' : '#4db6ac') + ';' + estiloCupon + '" onclick="' + (!usado ? 'activarCupon(' + i + ')' : '') + '">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                '<span class="titulo">' + (c.titulo || 'Cupón') + '</span>' +
-                '<span class="estado" style="color:' + (usado ? '#999' : '#4db6ac') + ';">' + (usado ? '✅ USADO' : '🔓 ACTIVAR') + '</span>' +
+                '<span style="font-weight:600;font-size:15px;">' + (c.titulo || 'Cupón') + '</span>' +
+                '<span style="color:' + (usado ? '#999' : '#4db6ac') + ';font-weight:600;font-size:12px;">' + (usado ? '✅ USADO' : '🔓 ACTIVAR') + '</span>' +
             '</div>' +
-            '<div class="desc">' + (c.descripcion || '') + '</div>' +
-            '<div class="info">' + tipoLabel + ' · <strong>' + c.valor + '%</strong></div>' +
-            (usado ? '<div class="info" style="color:#999;">Usado: ' + formatDate(c.fechaUso) + '</div>' : '') +
+            '<div style="font-size:13px;color:#666;margin-top:4px;">' + (c.descripcion || '') + '</div>' +
+            '<div style="font-size:11px;color:#999;margin-top:4px;">' + tipoLabel + ' · <strong>' + c.valor + '%</strong></div>' +
+            (usado ? '<div style="font-size:10px;color:#999;margin-top:4px;">Usado: ' + formatDate(c.fechaUso) + '</div>' : '') +
         '</div>';
     }
 
@@ -3413,7 +2507,6 @@ function activarCupon(index) {
             return;
     }
 
-    // Registrar en el historial detallado
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
         tipo: 'cupon',
@@ -3430,16 +2523,11 @@ function activarCupon(index) {
         estado: 'completado'
     });
 
-    // Marcar el cupón como usado y GUARDAR CAMBIOS
     cupon.usado = true;
     cupon.fechaUso = new Date().toISOString();
     user.cupones_asignados[index] = cupon;
     
-    // ============================================================
-    // CORRECCIÓN: Llamar a saveUserData() para guardar en localStorage
-    // ============================================================
-    saveUserData(); 
-    
+    saveUserData();
     showAlert(mensaje, 'success');
     renderDashboard();
     cerrarCupones();
@@ -3572,7 +2660,7 @@ function sacarBola() {
     }
     agregarBola();
 }
-                
+
 // ============================================================
 // COFRES
 // ============================================================
@@ -3681,6 +2769,7 @@ function abrirCofre(index) {
     }
     setTimeout(function() { abriendoCofre = false; }, 1000);
 }
+
 function cerrarCofres() {
     var modal = document.getElementById('cofresModal');
     if (modal) modal.remove();
@@ -3795,12 +2884,12 @@ function lanzarDado() {
         }
     }, 150);
 }
+
 // ============================================================
-// TAREAS (Dashboard)
+// TAREAS
 // ============================================================
 function abrirTareas() {
     var tareasAsignadas = user.tareas_asignadas || [];
-    console.log('📋 Abriendo tareas, total:', tareasAsignadas.length);
 
     var modal = document.createElement('div');
     modal.id = 'tareasModal';
@@ -3818,7 +2907,7 @@ function abrirTareas() {
             var estadoTexto = '⏳ Pendiente';
             if (t.estado === 'completada') { estadoColor = '#4db6ac'; estadoTexto = '📤 En revisión'; }
             else if (t.estado === 'aprobada') { estadoColor = '#4db6ac'; estadoTexto = '✅ Aprobada (+' + t.puntos + ' pts)'; }
-            else if (t.estado === 'rechazada') { estadoColor = '#ef5350'; estadoTexto = '❌ Rechazada'; }
+            else if (t.estado === 'rechazada') { estadoColor = '#e53935'; estadoTexto = '❌ Rechazada'; }
 
             var boton = '';
             if (t.estado === 'pendiente') {
@@ -3864,7 +2953,7 @@ function completarTarea(index) {
 }
 
 // ============================================================
-// PUNTOS Y CANJES (Dashboard)
+// PUNTOS Y CANJES
 // ============================================================
 function abrirPuntos() {
     var canjes = getCanjes();
@@ -3900,14 +2989,7 @@ function abrirPuntos() {
         }
     }
 
-    // ============================================================
-    // CORRECCIÓN AQUÍ: Usar user.historial_detallado en lugar de user.canjes_realizados
-    // ============================================================
-        // ============================================================
-    // CORRECCIÓN DEFINITIVA: Leer estado y monto desde historial_detallado
-    // ============================================================
     var historialCanjes = user.historial_detallado || [];
-    // Filtramos solo los que son de tipo 'canje'
     var canjesFiltrados = historialCanjes.filter(function(item) { return item.tipo === 'canje'; });
     
     if (canjesFiltrados.length > 0) {
@@ -3915,24 +2997,16 @@ function abrirPuntos() {
         for (var i = 0; i < canjesFiltrados.length; i++) {
             var c = canjesFiltrados[i];
             
-            // El ESTADO real que guardó el Admin (aprobado, pendiente, etc.)
             var estadoReal = c.estado || 'pendiente';
-            var color = estadoReal === 'aprobado' ? '#4db6ac' : (estadoReal === 'rechazado' ? '#ef5350' : '#f7971e');
+            var color = estadoReal === 'aprobado' ? '#4db6ac' : (estadoReal === 'rechazado' ? '#e53935' : '#f7971e');
             var icono = estadoReal === 'aprobado' ? '✅' : (estadoReal === 'rechazado' ? '❌' : '⏳');
-            
-            // El MONTO real que se suma/resta
             var montoReal = c.monto || 0;
-            var signo = estadoReal === 'aprobado' ? '+' : '-';
-            var claseMonto = estadoReal === 'aprobado' ? 'positive' : 'negative';
             
             html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;">' +
-                '<div>' +
-                    '<span>' + (c.concepto || 'Canje') + '</span>' +
-                    (montoReal > 0 ? '<div style="font-size:11px;color:' + (estadoReal === 'aprobado' ? '#4db6ac' : '#999') + ';">' + signo + '$' + montoReal.toFixed(2) + '</div>' : '') +
+                '<div><span>' + (c.concepto || 'Canje') + '</span>' +
+                (montoReal > 0 ? '<div style="font-size:11px;color:' + (estadoReal === 'aprobado' ? '#4db6ac' : '#999') + ';">+' + '$' + montoReal.toFixed(2) + '</div>' : '') +
                 '</div>' +
-                '<div style="text-align:right;">' +
-                    '<span style="color:' + color + ';font-weight:600;">' + icono + ' ' + estadoReal.charAt(0).toUpperCase() + estadoReal.slice(1) + '</span>' +
-                '</div>' +
+                '<div style="text-align:right;"><span style="color:' + color + ';font-weight:600;">' + icono + ' ' + estadoReal.charAt(0).toUpperCase() + estadoReal.slice(1) + '</span></div>' +
             '</div>';
         }
         html += '</div>';
@@ -3962,10 +3036,8 @@ function solicitarCanje(canjeId) {
 
     if (!confirm('¿Canjear ' + canje.costoPuntos + ' puntos por $' + canje.montoUSDT + ' USDT?')) return;
 
-    // 1. Restar puntos
     user.puntos = (user.puntos || 0) - canje.costoPuntos;
     
-    // 2. Guardar en la lista de canjes realizados
     if (!user.canjes_realizados) user.canjes_realizados = [];
     user.canjes_realizados.push({
         canjeId: canje.id,
@@ -3977,7 +3049,6 @@ function solicitarCanje(canjeId) {
         direccionRetiro: user.direccion_retiro
     });
 
-    // 3. Guardar en el historial detallado (el que se ve en el modal de puntos)
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
         tipo: 'canje',
@@ -3988,16 +3059,13 @@ function solicitarCanje(canjeId) {
         estado: 'pendiente'
     });
 
-    // ============================================================
-    // 4. CORRECCIÓN CRUCIAL: Guardar en el HISTORIAL GENERAL (Pestaña Historial)
-    // ============================================================
     if (!user.historial) user.historial = [];
     user.historial.push({
-        type: 'canje',           // AHORA EL TIPO ES 'canje' (El Admin lo buscará con esto)
-        amount: canje.montoUSDT, // El monto en USDT
+        type: 'canje',
+        amount: canje.montoUSDT,
         puntos: -canje.costoPuntos,
         date: new Date().toISOString(),
-        status: 'pendiente',     // El estado que el Admin debe cambiar a 'aprobado'
+        status: 'pendiente',
         concepto: '🔄 Canje de ' + canje.costoPuntos + ' pts → $' + canje.montoUSDT + ' USDT',
         origen: 'canje'
     });
@@ -4007,13 +3075,11 @@ function solicitarCanje(canjeId) {
     renderDashboard();
     showAlert('✅ Solicitud de canje enviada!', 'success');
 }
+
 // ============================================================
-// LOGROS (Dashboard) - El usuario reclama, admin aprueba
+// LOGROS
 // ============================================================
 function abrirLogros() {
-    // ============================================================
-    // RECARGAR USUARIO DESDE LOCALSTORAGE PARA TENER DATOS FRESCOS
-    // ============================================================
     var users = getUsers();
     var usuarioActualizado = users.find(function(u) { return u.telefono === user.telefono; });
     if (usuarioActualizado) {
@@ -4027,12 +3093,7 @@ function abrirLogros() {
         return;
     }
 
-    // ============================================================
-    // VERIFICAR QUÉ LOGROS ESTÁN ASIGNADOS
-    // ============================================================
     var logrosAsignados = user.logros_asignados || [];
-    console.log('📋 Logros asignados al usuario:', logrosAsignados);
-    console.log('📋 Logros disponibles en el sistema:', logros.map(function(l) { return l.id + ' - ' + l.nombre; }));
 
     var modal = document.createElement('div');
     modal.id = 'logrosModal';
@@ -4041,16 +3102,12 @@ function abrirLogros() {
         '<button onclick="cerrarLogros()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;color:#999;cursor:pointer;">✕</button>' +
         '<h2 style="text-align:center;font-size:22px;color:#fff;">🏆 Mis Logros</h2>';
 
-    // ============================================================
-    // FILTRAR SOLO LOGROS ASIGNADOS
-    // ============================================================
     var logrosMostrados = 0;
     for (var i = 0; i < logros.length; i++) {
         var l = logros[i];
         var reclamado = user.logros_reclamados && user.logros_reclamados.indexOf(l.id) !== -1;
         var asignado = logrosAsignados.indexOf(l.id) !== -1;
 
-        // SI NO ESTÁ ASIGNADO, NO LO MOSTRAMOS
         if (!asignado && !reclamado) {
             continue;
         }
@@ -4150,6 +3207,7 @@ function calcularProgresoLogro(tipo, fechaInicio, logroId) {
     }
     return total;
 }
+
 function reclamarLogro(logroId) {
     var logros = getLogrosSistema();
     var logro = null;
@@ -4158,19 +3216,16 @@ function reclamarLogro(logroId) {
     }
     if (!logro) { showAlert('⚠️ Logro no encontrado', 'danger'); return; }
     
-    // Verificar si ya fue reclamado
     if (user.logros_reclamados && user.logros_reclamados.indexOf(logro.id) !== -1) {
         showAlert('⚠️ Ya reclamado', 'warning');
         return;
     }
     
-    // Verificar si el logro está asignado
     if (!user.logros_asignados || user.logros_asignados.indexOf(logro.id) === -1) {
         showAlert('⚠️ Este logro no está asignado a tu cuenta', 'warning');
         return;
     }
     
-    // Verificar si ya tiene solicitud pendiente
     if (user.logros_pendientes_aprobar) {
         for (var p = 0; p < user.logros_pendientes_aprobar.length; p++) {
             if (user.logros_pendientes_aprobar[p].logroId === logroId && user.logros_pendientes_aprobar[p].estado === 'pendiente') {
@@ -4186,7 +3241,6 @@ function reclamarLogro(logroId) {
         return;
     }
 
-    // Solicitar comprobante
     var comprobante = prompt('📤 Sube tu comprobante para este logro (enlace o descripción):');
     if (!comprobante) return;
 
@@ -4208,6 +3262,7 @@ function reclamarLogro(logroId) {
     showAlert('✅ Comprobante enviado. Espera aprobación del administrador.', 'success');
     renderDashboard();
 }
+
 // ============================================================
 // COPY
 // ============================================================
@@ -4245,27 +3300,15 @@ function copyReferralLink() {
 // INICIALIZACIÓN
 // ============================================================
 checkSession();
-// ============================================================
-// INICIALIZACIÓN
-// ============================================================
-checkSession();
 
-// Cerrar alerta con tecla ESC
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         cerrarAlerta();
     }
 });
 
-
 // ============================================================
-// VIGILANTE DE ACTUALIZACIONES DEL BACKEND
-// ============================================================
-// ============================================================
-// VIGILANTE DE ACTUALIZACIONES DEL BACKEND (MEJORADO)
-// ============================================================
-// ============================================================
-// VIGILANTE DE ACTUALIZACIONES - VERSIÓN SILENCIOSA
+// VIGILANTE DE ACTUALIZACIONES
 // ============================================================
 function iniciarVigilante() {
     setInterval(function() {
@@ -4281,7 +3324,6 @@ function iniciarVigilante() {
             if (data.user) {
                 var huboCambios = false;
                 
-                // Comparar campos importantes con conversión a número
                 if (Number(data.user.balance || 0) !== Number(user.balance || 0)) huboCambios = true;
                 if (Number(data.user.puntos || 0) !== Number(user.puntos || 0)) huboCambios = true;
                 if (data.user.plan !== user.plan) huboCambios = true;
@@ -4299,13 +3341,10 @@ function iniciarVigilante() {
                     if (data.user.logros_asignados.length !== user.logros_asignados.length) huboCambios = true;
                 }
                 
-                // SI HAY CAMBIOS REALES, actualizar SILENCIOSAMENTE
                 if (huboCambios) {
-                    // Actualizar los datos del usuario
                     Object.assign(user, data.user);
                     sessionStorage.setItem('apex_user', JSON.stringify(user));
                     renderDashboard();
-                    // ✅ NOTIFICACIÓN ELIMINADA - Actualización silenciosa
                 }
             }
         })
@@ -4323,18 +3362,17 @@ function toggleDarkMode() {
     body.classList.toggle('dark-mode');
     var isDark = body.classList.contains('dark-mode');
     localStorage.setItem('apex_dark_mode', isDark ? 'true' : 'false');
-    var toggle = document.getElementById('darkModeToggle');
+    var toggle = document.querySelector('.dark-toggle');
     if (toggle) {
         toggle.textContent = isDark ? '☀️' : '🌙';
     }
 }
 
-// Cargar preferencia de modo oscuro al iniciar
 (function() {
     var isDark = localStorage.getItem('apex_dark_mode') === 'true';
     if (isDark) {
         document.body.classList.add('dark-mode');
-        var toggle = document.getElementById('darkModeToggle');
+        var toggle = document.querySelector('.dark-toggle');
         if (toggle) {
             toggle.textContent = '☀️';
         }
@@ -4342,38 +3380,86 @@ function toggleDarkMode() {
 })();
 
 // ============================================================
-// RENDER HISTORY - VERSIÓN DEFINITIVA Y CORRECTA
+// FUNCIONES ADICIONALES
 // ============================================================
+function sincronizarUsuarioConBackend(telefono) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+    var token = localStorage.getItem('apex_token');
+    if (!token || !user.id) return;
+    var datosActualizar = {
+        balance: Number(user.balance || 0),
+        puntos: Number(user.puntos || 0),
+        plan: user.plan || 'Sin plan',
+        plan_amount: Number(user.plan_amount || 0),
+        daily_earnings: Number(user.daily_earnings || 0),
+        ruleta_usos: Number(user.ruleta_usos || 0),
+        cofres_usos: Number(user.cofres_usos || 0),
+        dados_usos: Number(user.dados_usos || 0),
+        premio_ruleta: Number(user.premio_ruleta || 0),
+        premio_cofre: Number(user.premio_cofre || 0),
+        premio_dados: Number(user.premio_dados || 0),
+        cupones_asignados: user.cupones_asignados || [],
+        logros_asignados: user.logros_asignados || [],
+        tareas_asignadas: user.tareas_asignadas || [],
+        canjes_realizados: user.canjes_realizados || [],
+        logros_reclamados: user.logros_reclamados || [],
+        historial_detallado: user.historial_detallado || [],
+        direccion_retiro: user.direccion_retiro || null,
+        cuenta_habilitada: user.cuenta_habilitada !== false,
+        produccion_pausada: user.produccion_pausada || false,
+        nivel_autorizado: Number(user.nivel_autorizado || 0),
+        produccion_activa: user.produccion_activa || false,
+        produccion_inicio: user.produccion_inicio || null,
+        produccion_duracion: Number(user.produccion_duracion || 0),
+        tiempo_restante: Number(user.tiempo_restante || 0),
+        recompensa_pendiente: Number(user.recompensa_pendiente || 0),
+        puntosPendientes: Number(user.puntosPendientes || 0),
+        codigo_usado: user.codigo_usado || false,
+        reclamado_hoy: user.reclamado_hoy || false,
+        fecha_produccion: user.fecha_produccion || null,
+        codigos_usados_hoy: Number(user.codigos_usados_hoy || 0),
+        codigos_usados: user.codigos_usados || [],
+        ultimo_reinicio_codigos: user.ultimo_reinicio_codigos || null,
+        cofres_abiertos: user.cofres_abiertos || [],
+        logros_pendientes_aprobar: user.logros_pendientes_aprobar || [],
+        referidos: user.referidos || { izquierda: null, derecha: null, lista: [] },
+        historial: user.historial || [],
+        historial_codigos: user.historial_codigos || [],
+        descuentoRetiroActivo: user.descuentoRetiroActivo || null,
+        bonusReferidoActivo: user.bonusReferidoActivo || null
+    };
+    fetch(API_URL + '/api/admin/user/' + user.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify(datosActualizar)
+    }).catch(function() {});
+}
+
 // ============================================================
-// RENDER HISTORY - VERSIÓN DEFINITIVA Y ÚNICA
+// RENDER HISTORY - VERSIÓN FINAL
 // ============================================================
 function renderHistory(filter) {
     if (filter === undefined) filter = 'all';
     var list = document.getElementById('historyList');
     if (!list) return;
-
-    // Leer el array correcto (el que tiene el estado 'aprobado')
     var history = user.historial_detallado || user.historial || [];
-
     var filtered = [];
     if (filter === 'all') { filtered = history; }
     else {
         for (var h = 0; h < history.length; h++) {
             var tipo = history[h].tipo || history[h].type || '';
-            var origen = history[h].origen || '';
-            if (tipo === filter || origen === filter) {
+            if (tipo === filter || history[h].origen === filter) {
                 filtered.push(history[h]);
             }
         }
     }
-
     if (filtered.length === 0) {
         list.innerHTML = '<div style="text-align:center;color:#ccc;padding:20px 0;font-size:14px;">No hay registros disponibles</div>';
         return;
     }
-
     filtered.sort(function(a, b) { return new Date(b.fecha || b.date) - new Date(a.fecha || a.date); });
-
     var html = '';
     for (var f = 0; f < filtered.length; f++) {
         var h = filtered[f];
@@ -4382,8 +3468,6 @@ function renderHistory(filter) {
         var label = h.concepto || 'Transacción';
         var fecha = h.fecha || h.date;
         var estado = h.estado || h.status || 'completado';
-        
-        // Lógica de signos
         var esPositivo = false;
         var tipo = h.tipo || h.type || '';
 
@@ -4399,7 +3483,7 @@ function renderHistory(filter) {
 
         var sign = esPositivo ? '+' : '-';
         var amountClass = esPositivo ? 'positive' : 'negative';
-        var estadoColor = estado === 'aprobado' || estado === 'completado' ? '#4db6ac' : (estado === 'pendiente' ? '#f7971e' : '#ef5350');
+        var estadoColor = estado === 'aprobado' || estado === 'completado' ? '#4db6ac' : (estado === 'pendiente' ? '#f7971e' : '#e53935');
 
         var iconOrigen = '';
         if (tipo === 'produccion') iconOrigen = '⚡';
@@ -4422,7 +3506,48 @@ function renderHistory(filter) {
     list.innerHTML = html;
 }
 
-</script>
+// FUNCIONES ADICIONALES PARA COMPLETAR
+function guardarPremiosRuleta() {
+    var premios = [];
+    var inputs = document.querySelectorAll('.premio-ruleta-valor');
+    if (inputs.length === 0) { 
+        showAlert('⚠️ No hay premios para guardar', 'warning'); 
+        return; 
+    }
+    for (var i = 0; i < inputs.length; i++) { 
+        premios.push(parseFloat(inputs[i].value) || 0); 
+    }
+    localStorage.setItem(PREMIOS_RULETA_KEY, JSON.stringify({ premios: premios }));
+    showAlert('✅ Premios de máquina guardados', 'success');
+}
+
+function guardarPremiosCofres() {
+    var premios = [];
+    var inputs = document.querySelectorAll('.premio-cofre-valor');
+    if (inputs.length === 0) { 
+        showAlert('⚠️ No hay premios para guardar', 'warning'); 
+        return; 
+    }
+    for (var i = 0; i < inputs.length; i++) { 
+        premios.push(parseFloat(inputs[i].value) || 0); 
+    }
+    localStorage.setItem(PREMIOS_COFRES_KEY, JSON.stringify({ premios: premios }));
+    showAlert('✅ Premios de cofres guardados', 'success');
+}
+
+function guardarPremiosDados() {
+    var premios = [];
+    var inputs = document.querySelectorAll('.premio-dados-valor');
+    if (inputs.length === 0) { 
+        showAlert('⚠️ No hay premios para guardar', 'warning'); 
+        return; 
+    }
+    for (var i = 0; i < inputs.length; i++) { 
+        premios.push(parseFloat(inputs[i].value) || 0); 
+    }
+    localStorage.setItem(PREMIOS_DADOS_KEY, JSON.stringify({ premios: premios }));
+    showAlert('✅ Premios de dados guardados', 'success');
+}
 </script>
 </body>
 </html>
