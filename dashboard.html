@@ -2450,23 +2450,35 @@ function buyPlan(planName) {
         user.plan_amount = plan.amount;
         user.fecha_plan = new Date().toISOString();
 
-        var users = getUsers();
-        for (var i = 0; i < users.length; i++) {
-            var u = users[i];
-            if (u.referidos && u.referidos.lista) {
-                for (var j = 0; j < u.referidos.lista.length; j++) {
-                    if (u.referidos.lista[j].id === user.telefono) {
-                        u.referidos.lista[j].plan = planName;
-                        u.referidos.lista[j].tienePlan = true;
-                        u.referidos.lista[j].fechaPlan = new Date().toISOString();
-                        saveUsers(users);
-                        sincronizarUsuarioConBackend(u.telefono);
-                        sessionStorage.setItem('apex_users', JSON.stringify(users));
-                        break;
-                    }
-                }
+        // ✅ ACTUALIZAR EL REFERIDO EN TODOS LOS USUARIOS
+var users = getUsers();
+for (var i = 0; i < users.length; i++) {
+    var u = users[i];
+    if (u.referidos && u.referidos.lista) {
+        for (var j = 0; j < u.referidos.lista.length; j++) {
+            if (u.referidos.lista[j].id === user.telefono) {
+                // ✅ ACTUALIZAR TODOS LOS CAMPOS
+                u.referidos.lista[j].plan = planName;
+                u.referidos.lista[j].tienePlan = true;
+                u.referidos.lista[j].fechaPlan = new Date().toISOString();
+                u.referidos.lista[j].status = 'activo';
+                u.referidos.lista[j].plan_comprado = true;
+                
+                // ✅ GUARDAR EN LOCALSTORAGE
+                saveUsers(users);
+                
+                // ✅ SINCRONIZAR CON EL BACKEND
+                sincronizarUsuarioConBackend(u.telefono);
+                
+                // ✅ ACTUALIZAR SESSIONSTORAGE
+                sessionStorage.setItem('apex_users', JSON.stringify(users));
+                
+                console.log('✅ Referido actualizado:', u.nombre, '→', user.nombre, 'plan:', planName);
+                break;
             }
         }
+    }
+}
 
         if (!user.fechas_invito) {
             user.fechas_invito = { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null };
@@ -2565,18 +2577,23 @@ function renderTree() {
     var container = document.getElementById('treeContainer');
     if (!container) return;
 
+    // ✅ FORZAR RECARGA DE USUARIOS DESDE LOCALSTORAGE
     var users = getUsers();
     var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
     var listaReferidos = referidos.lista || [];
 
     function obtenerUsuario(telefono) {
         if (!telefono) return null;
+        
+        // ✅ 1. BUSCAR EN LOCALSTORAGE (DATOS MÁS ACTUALIZADOS)
         var users = getUsers();
         for (var i = 0; i < users.length; i++) {
             if (users[i].telefono === telefono) {
                 return users[i];
             }
         }
+        
+        // ✅ 2. BUSCAR EN LA LISTA DE REFERIDOS DEL USUARIO
         var referidos = user.referidos || { lista: [] };
         for (var i = 0; i < referidos.lista.length; i++) {
             if (referidos.lista[i].id === telefono) {
@@ -2585,6 +2602,8 @@ function renderTree() {
                     nombre: referidos.lista[i].nombre || telefono,
                     apellido: '',
                     plan: referidos.lista[i].plan || 'Sin plan',
+                    tienePlan: referidos.lista[i].tienePlan || false,
+                    fechaPlan: referidos.lista[i].fechaPlan || null,
                     referidos: { izquierda: null, derecha: null, lista: [] }
                 };
             }
@@ -2592,12 +2611,12 @@ function renderTree() {
         return null;
     }
 
-    // ============================================================
-    // CORRECCIÓN: FILTRAR REFERIDOS CON PLAN ACTIVO
-    // ============================================================
+    // ✅ 3. FILTRAR REFERIDOS CON PLAN ACTIVO (MEJORADO)
     var referidosConPlan = [];
     for (var i = 0; i < listaReferidos.length; i++) {
         var ref = listaReferidos[i];
+        
+        // ✅ OBTENER EL USUARIO COMPLETO
         var refUser = obtenerUsuario(ref.id);
         if (!refUser) {
             refUser = {
@@ -2605,13 +2624,31 @@ function renderTree() {
                 nombre: ref.nombre || ref.id,
                 apellido: '',
                 plan: ref.plan || 'Sin plan',
+                tienePlan: ref.tienePlan || false,
                 referidos: { izquierda: null, derecha: null, lista: [] }
             };
         }
         
-        // Verificar si tiene plan activo
+        // ✅ VERIFICAR SI TIENE PLAN ACTIVO (MÁS ROBUSTO)
+        var tienePlan = false;
         if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
+            tienePlan = true;
+        }
+        if (refUser.tienePlan === true) {
+            tienePlan = true;
+        }
+        if (ref.tienePlan === true) {
+            tienePlan = true;
+        }
+        if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined' && ref.plan !== '') {
+            tienePlan = true;
+        }
+        
+        if (tienePlan) {
             referidosConPlan.push(refUser);
+            console.log('✅ Referido con plan:', ref.id, '→', refUser.plan || ref.plan);
+        } else {
+            console.log('❌ Referido sin plan:', ref.id, 'plan:', refUser.plan || ref.plan);
         }
     }
 
@@ -2690,12 +2727,14 @@ function renderTree() {
 
     html += '<div style="text-align:center; margin-bottom:12px; font-weight:700; font-size:16px; color:#000;">🌳 Tu Árbol de Referidos</div>';
 
+    // NIVEL 1: TÚ
     html += '<div class="tree-level">';
     html += crearNodo(user, 'you');
     html += '</div>';
 
     html += '<div class="tree-connector">│</div>';
 
+    // NIVEL 2: 2 referidos directos con plan
     html += '<div class="tree-level">';
     var nivel2 = referidosConPlan.slice(0, 2);
     html += crearNodo(nivel2[0] || null, 'directo');
@@ -2704,6 +2743,7 @@ function renderTree() {
 
     html += '<div class="tree-connector">│</div>';
 
+    // NIVEL 3: 4 referidos de los referidos directos
     html += '<div class="tree-level">';
     var nivel3 = [];
     for (var i = 0; i < nivel2.length; i++) {
@@ -2727,6 +2767,7 @@ function renderTree() {
     }
     html += '</div>';
 
+    // LINK DE REFERIDO
     var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
     var referralLink = baseUrl + 'ref/' + (user.codigo_referido || 'APEX000');
     
@@ -2737,6 +2778,7 @@ function renderTree() {
     html += '<button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>';
     html += '</div></div>';
 
+    // ESTADÍSTICAS
     var totalReferidos = listaReferidos.length;
     var activos = referidosConPlan.length;
     
@@ -2751,6 +2793,7 @@ function renderTree() {
     html += '</div>';
     html += '</div>';
 
+    // LISTA DE TODOS LOS REFERIDOS
     if (listaReferidos.length > 0) {
         html += '<div style="margin-top:16px; width:100%;">';
         html += '<div style="font-size:14px; font-weight:600; color:#333; margin-bottom:10px;">📋 Tus Referidos</div>';
@@ -2768,10 +2811,20 @@ function renderTree() {
                 };
             }
             
-            var tienePlan = refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined';
+            var tienePlan = false;
+            if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
+                tienePlan = true;
+            }
+            if (ref.tienePlan === true) {
+                tienePlan = true;
+            }
+            if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined' && ref.plan !== '') {
+                tienePlan = true;
+            }
+            
             var colorFondo = tienePlan ? '#f0faf5' : '#f8f9fa';
             var borderColor = tienePlan ? '#4db6ac' : '#e0e0e0';
-            var estadoTexto = tienePlan ? '✅ ' + refUser.plan : '⏳ Pendiente de adquirir plan';
+            var estadoTexto = tienePlan ? '✅ ' + (refUser.plan || ref.plan || 'Plan activo') : '⏳ Pendiente de adquirir plan';
             var estadoColor = tienePlan ? '#2e7d32' : '#f7971e';
             var fechaRegistro = refUser.fecha_registro || ref.date || new Date().toISOString();
             var fechaFormateada = formatDate(fechaRegistro);
@@ -2790,6 +2843,7 @@ function renderTree() {
         html += '</div></div>';
     }
 
+    // INFORMACIÓN DE NIVELES
     var planActual = user.plan || 'Sin plan';
     var indiceActual = getIndicePlan(planActual);
     var siguienteIndice = indiceActual + 1;

@@ -297,7 +297,6 @@ app.post('/api/login', async (req, res) => {
 // ============================================================
 app.get('/api/verify', authenticate, async (req, res) => {
     try {
-        // Obtener el usuario COMPLETO de la base de datos
         const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
         
         if (result.rows.length === 0) {
@@ -307,39 +306,40 @@ app.get('/api/verify', authenticate, async (req, res) => {
         const userData = result.rows[0];
         
         res.json({ 
-    user: {
-        id: userData.id,
-        telefono: userData.telefono,
-        nombre: userData.nombre,
-        apellido: userData.apellido,
-        es_admin: userData.es_admin,
-        es_super_admin: userData.es_super_admin || false,
-        codigo_referido: userData.codigo_referido,
-        polygon_address: userData.polygon_address,
-        balance: Number(userData.balance || 0),
-        puntos: Number(userData.puntos || 0),
-        plan: userData.plan || 'Sin plan',
-        plan_amount: Number(userData.plan_amount || 0),
-        daily_earnings: Number(userData.daily_earnings || 0),
-        cuenta_habilitada: userData.cuenta_habilitada !== false,
-        produccion_pausada: userData.produccion_pausada || false,
-        password_retiro: userData.password_retiro_hash || '000000',
-        direccion_retiro: userData.direccion_retiro || null,
-	codigos_usados_hoy: Number(userData.codigos_usados_hoy || 0),
-        codigos_usados: userData.codigos_usados || [],
-        ultimo_reinicio_codigos: userData.ultimo_reinicio_codigos || null,
-        historial: userData.historial || [],
-        historial_detallado: userData.historial_detallado || [],
-        historial_codigos: userData.historial_codigos || [],
-        ruleta_usos: Number(userData.ruleta_usos || 0),
-        cofres_usos: Number(userData.cofres_usos || 0),
-        dados_usos: Number(userData.dados_usos || 0),
-        premio_ruleta: Number(userData.premio_ruleta || 0),
-        premio_cofre: Number(userData.premio_cofre || 0),
-        premio_dados: Number(userData.premio_dados || 0),
-        referidos: userData.referidos || { izquierda: null, derecha: null, lista: [] }  // ✅ AGREGAR ESTO
-    }
-});
+            user: {
+                id: userData.id,
+                telefono: userData.telefono,
+                nombre: userData.nombre,
+                apellido: userData.apellido,
+                es_admin: userData.es_admin,
+                es_super_admin: userData.es_super_admin || false,
+                codigo_referido: userData.codigo_referido,
+                polygon_address: userData.polygon_address,
+                balance: Number(userData.balance || 0),
+                puntos: Number(userData.puntos || 0),
+                plan: userData.plan || 'Sin plan',
+                plan_amount: Number(userData.plan_amount || 0),
+                daily_earnings: Number(userData.daily_earnings || 0),
+                cuenta_habilitada: userData.cuenta_habilitada !== false,
+                produccion_pausada: userData.produccion_pausada || false,
+                password_retiro: userData.password_retiro_hash || '000000',
+                direccion_retiro: userData.direccion_retiro || null,
+                // ✅ ESTOS SON LOS CAMPOS IMPORTANTES
+                codigos_usados_hoy: Number(userData.codigos_usados_hoy || 0),
+                codigos_usados: userData.codigos_usados || [],
+                ultimo_reinicio_codigos: userData.ultimo_reinicio_codigos || null,
+                historial: userData.historial || [],
+                historial_detallado: userData.historial_detallado || [],
+                historial_codigos: userData.historial_codigos || [],
+                ruleta_usos: Number(userData.ruleta_usos || 0),
+                cofres_usos: Number(userData.cofres_usos || 0),
+                dados_usos: Number(userData.dados_usos || 0),
+                premio_ruleta: Number(userData.premio_ruleta || 0),
+                premio_cofre: Number(userData.premio_cofre || 0),
+                premio_dados: Number(userData.premio_dados || 0),
+                referidos: userData.referidos || { izquierda: null, derecha: null, lista: [] }
+            }
+        });
     } catch (error) {
         console.error('Error en /api/verify:', error);
         res.status(500).json({ error: 'Error en el servidor' });
@@ -400,23 +400,22 @@ app.put('/api/user/update', async (req, res) => {
         let paramCount = 1;
         
         for (const [key, value] of Object.entries(updates)) {
-            // Solo actualizar campos que existen en la tabla
+            // ✅ AGREGAR 'codigos_usados_hoy' y 'ultimo_reinicio_codigos'
             const camposPermitidos = ['balance', 'puntos', 'plan', 'plan_amount', 'daily_earnings', 
-    'produccion_activa', 'produccion_inicio', 'produccion_duracion', 'tiempo_restante',
-    'recompensa_pendiente', 'puntosPendientes', 'codigo_usado', 'reclamado_hoy',
-    'fecha_produccion', 'codigos_usados_hoy', 'codigos_usados', 'ultimo_reinicio_codigos',
-    'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados',
-    'cofres_abiertos', 'cupones_asignados', 'logros_asignados', 'logros_pendientes_aprobar',
-    'tareas_asignadas', 'canjes_realizados', 'logros_reclamados', 'referidos',
-    'referidos_directos', 'fechas_invito', 'historial', 'historial_detallado',
-    'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
-    'direccion_retiro', 'password_retiro',
-    'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado', 'es_admin', 'es_super_admin'
-];
+                'produccion_activa', 'produccion_inicio', 'produccion_duracion', 'tiempo_restante',
+                'recompensa_pendiente', 'puntosPendientes', 'codigo_usado', 'reclamado_hoy',
+                'fecha_produccion', 'codigos_usados_hoy', 'codigos_usados', 'ultimo_reinicio_codigos',
+                'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados',
+                'cofres_abiertos', 'cupones_asignados', 'logros_asignados', 'logros_pendientes_aprobar',
+                'tareas_asignadas', 'canjes_realizados', 'logros_reclamados', 'referidos',
+                'referidos_directos', 'fechas_invito', 'historial', 'historial_detallado',
+                'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
+                'direccion_retiro', 'password_retiro',
+                'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado', 'es_admin', 'es_super_admin'
+            ];
             
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
-                // Si es JSON, convertirlo a string
                 if (typeof value === 'object' && value !== null) {
                     values.push(JSON.stringify(value));
                 } else {
@@ -440,34 +439,38 @@ app.put('/api/user/update', async (req, res) => {
         }
         
         // ✅ Enviar TODOS los campos del usuario
-const userData = result.rows[0];
-res.json({ 
-    message: 'Usuario actualizado exitosamente', 
-    user: {
-        id: userData.id,
-        telefono: userData.telefono,
-        nombre: userData.nombre,
-        apellido: userData.apellido,
-        es_admin: userData.es_admin,
-        es_super_admin: userData.es_super_admin || false,
-        codigo_referido: userData.codigo_referido,
-        polygon_address: userData.polygon_address,
-        balance: Number(userData.balance || 0),
-        puntos: Number(userData.puntos || 0),
-        plan: userData.plan || 'Sin plan',
-        plan_amount: Number(userData.plan_amount || 0),
-        daily_earnings: Number(userData.daily_earnings || 0),
-        cuenta_habilitada: userData.cuenta_habilitada,
-        produccion_pausada: userData.produccion_pausada || false
-    }
-});
+        const userData = result.rows[0];
+        res.json({ 
+            message: 'Usuario actualizado exitosamente', 
+            user: {
+                id: userData.id,
+                telefono: userData.telefono,
+                nombre: userData.nombre,
+                apellido: userData.apellido,
+                es_admin: userData.es_admin,
+                es_super_admin: userData.es_super_admin || false,
+                codigo_referido: userData.codigo_referido,
+                polygon_address: userData.polygon_address,
+                balance: Number(userData.balance || 0),
+                puntos: Number(userData.puntos || 0),
+                plan: userData.plan || 'Sin plan',
+                plan_amount: Number(userData.plan_amount || 0),
+                daily_earnings: Number(userData.daily_earnings || 0),
+                cuenta_habilitada: userData.cuenta_habilitada,
+                produccion_pausada: userData.produccion_pausada || false,
+                // ✅ AGREGAR ESTOS CAMPOS
+                codigos_usados_hoy: Number(userData.codigos_usados_hoy || 0),
+                ultimo_reinicio_codigos: userData.ultimo_reinicio_codigos || null,
+                codigos_usados: userData.codigos_usados || [],
+                referidos: userData.referidos || { izquierda: null, derecha: null, lista: [] }
+            }
+        });
         
     } catch (error) {
         console.error('Error al actualizar usuario:', error);
         res.status(500).json({ error: 'Error en el servidor' });
     }
 });
-
 // ============================================================
 // RUTAS DE ADMINISTRACIÓN
 // ============================================================
@@ -694,11 +697,20 @@ app.put('/api/admin/user/:id', async (req, res) => {
         const values = [];
         let paramCount = 1;
         
+        // ✅ AGREGAR 'codigos_usados_hoy' y 'ultimo_reinicio_codigos'
         for (const [key, value] of Object.entries(updates)) {
-            const camposPermitidos = ['balance', 'puntos', 'plan', 'cuenta_habilitada', 'produccion_pausada', 'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados', 'nivel_autorizado'];
+            const camposPermitidos = ['balance', 'puntos', 'plan', 'cuenta_habilitada', 'produccion_pausada', 
+                'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados', 
+                'nivel_autorizado', 'codigos_usados_hoy', 'ultimo_reinicio_codigos',
+                'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
+                'es_admin', 'es_super_admin'];
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
-                values.push(value);
+                if (typeof value === 'object' && value !== null) {
+                    values.push(JSON.stringify(value));
+                } else {
+                    values.push(value);
+                }
                 paramCount++;
             }
         }
