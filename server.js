@@ -132,6 +132,7 @@ app.post('/api/register', async (req, res) => {
       
       if (referidoResult.rows.length > 0) {
         const referido = referidoResult.rows[0];
+	var telefonoReferidor = referido.telefono; 
         let lado = '';
         
         // Obtener referidos actuales
@@ -174,22 +175,22 @@ app.post('/api/register', async (req, res) => {
     // CREAR USUARIO CON TODOS LOS DATOS
     // ============================================================
     const result = await pool.query(
-      `INSERT INTO users 
-       (telefono, nombre, apellido, password_hash, password_retiro_hash, 
-        es_admin, codigo_referido, polygon_address, balance, puntos, 
-        plan, plan_amount, daily_earnings, cuenta_habilitada, 
-        produccion_pausada, produccion_activa, direccion_retiro, 
-        direccion_retiro_bloqueada, referidos, fechas_invito, verificado,
-        historial, historial_detallado, historial_codigos, codigos_usados,
-        codigos_usados_hoy, ultimo_reinicio_codigos, ruleta_usos, cofres_usos,
-        dados_usos, premio_ruleta, premio_cofre, premio_dados, cofres_abiertos,
-        cupones_asignados, logros_asignados, logros_pendientes_aprobar,
-        tareas_asignadas, canjes_realizados, logros_reclamados,
-        referidos_directos, descuentoRetiroActivo, check_in_realizado,
-        fecha_registro) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44) 
-       RETURNING *`,
-      [
+    `INSERT INTO users 
+     (telefono, nombre, apellido, password_hash, password_retiro_hash, 
+      es_admin, codigo_referido, polygon_address, balance, puntos, 
+      plan, plan_amount, daily_earnings, cuenta_habilitada, 
+      produccion_pausada, produccion_activa, direccion_retiro, 
+      direccion_retiro_bloqueada, referidos, fechas_invito, verificado,
+      historial, historial_detallado, historial_codigos, codigos_usados,
+      codigos_usados_hoy, ultimo_reinicio_codigos, ruleta_usos, cofres_usos,
+      dados_usos, premio_ruleta, premio_cofre, premio_dados, cofres_abiertos,
+      cupones_asignados, logros_asignados, logros_pendientes_aprobar,
+      tareas_asignadas, canjes_realizados, logros_reclamados,
+      referidos_directos, descuentoRetiroActivo, check_in_realizado,
+      fecha_registro, referido_por)   // ✅ AGREGAR ESTO
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)  // ✅ AGREGAR $45
+     RETURNING *`,
+    [
         telefono, nombre, apellido, hashedPassword, hashedWithdrawPassword,
         esAdmin, referralCodeGenerated, walletAddress, 0, 0,
         'Sin plan', 0, 0, true,
@@ -203,9 +204,10 @@ app.post('/api/register', async (req, res) => {
         JSON.stringify([]), JSON.stringify([]), JSON.stringify([]),
         JSON.stringify({ izquierda: null, derecha: null }),
         JSON.stringify(null), null,
-        new Date().toISOString()
-      ]
-    );
+        new Date().toISOString(),
+        telefonoReferidor   // ✅ AGREGAR ESTO (el teléfono del referidor)
+    ]
+);
 
     // Generar token JWT
     const token = jwt.sign(
