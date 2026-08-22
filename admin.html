@@ -3601,41 +3601,52 @@ function verDetallesUsuario(telefono) {
         referidosPendientesHtml += '<div style="font-weight:600;font-size:13px;margin-bottom:6px;">🌳 Referidos Pendientes de Activar</div>';
 
         var allUsers = getUsers();
-        var pendientes = [];
-        for (var i = 0; i < allUsers.length; i++) {
-            var u = allUsers[i];
-            if (u.telefono === user.telefono) continue;
-            if (u.telefono === 'admin') continue;
-            
-            var esReferido = false;
-            if (u.referido_por && u.referido_por === user.telefono) {
-                esReferido = true;
-            }
-            
-            if (user.referidos && user.referidos.lista) {
-                for (var r = 0; r < user.referidos.lista.length; r++) {
-                    if (user.referidos.lista[r].id === u.telefono) {
-                        esReferido = true;
-                        break;
-                    }
-                }
-            }
-            
-            if (esReferido) {
-                var yaActivado = false;
-                if (user.referidos && user.referidos.lista) {
-                    for (var a = 0; a < user.referidos.lista.length; a++) {
-                        if (user.referidos.lista[a].id === u.telefono && user.referidos.lista[a].activo === true) {
-                            yaActivado = true;
-                            break;
-                        }
-                    }
-                }
-                if (!yaActivado) {
-                    pendientes.push(u);
-                }
+var pendientes = [];
+
+// Primero, obtener la lista de TODOS los referidos activos (de cualquier usuario)
+var todosLosReferidosActivos = [];
+for (var i = 0; i < allUsers.length; i++) {
+    var u = allUsers[i];
+    if (u.referidos && u.referidos.lista) {
+        for (var r = 0; r < u.referidos.lista.length; r++) {
+            if (u.referidos.lista[r].activo === true) {
+                todosLosReferidosActivos.push(u.referidos.lista[r].id);
             }
         }
+    }
+}
+
+for (var i = 0; i < allUsers.length; i++) {
+    var u = allUsers[i];
+    if (u.telefono === user.telefono) continue;
+    if (u.telefono === 'admin') continue;
+    
+    // Verificar si este usuario fue referido por el usuario actual
+    var esReferido = false;
+    if (u.referido_por && u.referido_por === user.telefono) {
+        esReferido = true;
+    }
+    
+    // También verificar en la lista de referidos del usuario (por si acaso)
+    if (!esReferido && user.referidos && user.referidos.lista) {
+        for (var r = 0; r < user.referidos.lista.length; r++) {
+            if (user.referidos.lista[r].id === u.telefono) {
+                esReferido = true;
+                break;
+            }
+        }
+    }
+    
+    if (esReferido) {
+        // ✅ VERIFICAR SI ESTÁ ACTIVADO EN EL ÁRBOL DE ALGUIEN
+        var estaActivadoGlobal = todosLosReferidosActivos.indexOf(u.telefono) !== -1;
+        
+        // Si no está activado en ningún lado, mostrar como pendiente
+        if (!estaActivadoGlobal) {
+            pendientes.push(u);
+        }
+    }
+}
 
         if (pendientes.length === 0) {
             referidosPendientesHtml += '<div style="color:#999;font-size:12px;padding:8px 0;">No hay referidos pendientes de activar.</div>';
