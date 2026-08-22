@@ -3593,6 +3593,211 @@ function verDetallesUsuario(telefono) {
     var arbolHtml = renderArbolMini(user);
     document.getElementById('detArbol').innerHTML = arbolHtml;
 
+
+// ============================================================
+// SECCIÓN: LISTA COMPLETA DE REFERIDOS (CON ACTIVAR/DESACTIVAR)
+// ============================================================
+var listaReferidosHtml = '<div style="margin-top:14px;border-top:1px solid #e0e0e0;padding-top:10px;">';
+listaReferidosHtml += '<div style="font-weight:600;font-size:13px;margin-bottom:6px;">📋 Todos los Referidos</div>';
+
+var allUsers = getUsers();
+var referidosLista = [];
+
+// Buscar todos los usuarios que se registraron con el código de este usuario
+for (var i = 0; i < allUsers.length; i++) {
+    var u = allUsers[i];
+    if (u.telefono === user.telefono) continue;
+    if (u.telefono === 'admin') continue;
+    
+    var esReferido = false;
+    if (u.referido_por && u.referido_por === user.telefono) {
+        esReferido = true;
+    }
+    
+    if (user.referidos && user.referidos.lista) {
+        for (var r = 0; r < user.referidos.lista.length; r++) {
+            if (user.referidos.lista[r].id === u.telefono) {
+                esReferido = true;
+                break;
+            }
+        }
+    }
+    
+    if (esReferido) {
+        // Verificar si está activado en el árbol
+        var estaActivado = false;
+        if (user.referidos && user.referidos.lista) {
+            for (var a = 0; a < user.referidos.lista.length; a++) {
+                if (user.referidos.lista[a].id === u.telefono && user.referidos.lista[a].activo === true) {
+                    estaActivado = true;
+                    break;
+                }
+            }
+        }
+        
+        var tienePlan = (u.plan && u.plan !== 'Sin plan');
+        var planText = tienePlan ? '✅ ' + u.plan : '⏳ Sin plan';
+        var estadoText = estaActivado ? '🌳 En árbol' : '📥 Pendiente';
+        var estadoColor = estaActivado ? '#4db6ac' : '#f7971e';
+        
+        referidosLista.push({
+            user: u,
+            estaActivado: estaActivado,
+            tienePlan: tienePlan,
+            planText: planText,
+            estadoText: estadoText,
+            estadoColor: estadoColor
+        });
+    }
+}
+
+if (referidosLista.length === 0) {
+    listaReferidosHtml += '<div style="color:#999;font-size:12px;padding:8px 0;">No hay referidos registrados.</div>';
+} else {
+    for (var i = 0; i < referidosLista.length; i++) {
+        var ref = referidosLista[i];
+        var u = ref.user;
+        
+        listaReferidosHtml += '<div style="background:#f8f9fa;border:2px solid ' + (ref.estaActivado ? '#4db6ac' : '#e0e0e0') + ';border-radius:10px;padding:12px;margin-bottom:8px;">';
+        listaReferidosHtml += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;align-items:center;">';
+        listaReferidosHtml += '<div><strong>' + u.nombre + ' ' + (u.apellido || '') + '</strong> 📱 ' + u.telefono + '<br><span style="font-size:11px;color:#666;">' + ref.planText + ' · ' + (ref.estaActivado ? '🌳 Activo' : '📥 Pendiente') + '</span></div>';
+        listaReferidosHtml += '</div>';
+        
+        listaReferidosHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;">';
+        
+        // Si NO está activado, mostrar opciones para activar
+        if (!ref.estaActivado) {
+            listaReferidosHtml += '<label style="font-size:11px;font-weight:600;color:#666;">Posición:</label>';
+            listaReferidosHtml += '<select id="ladoSelectLista_' + u.telefono + '" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;">';
+            listaReferidosHtml += '<option value="izquierda">⬅️ Izquierda</option>';
+            listaReferidosHtml += '<option value="derecha">➡️ Derecha</option>';
+            listaReferidosHtml += '</select>';
+            
+            listaReferidosHtml += '<label style="font-size:11px;font-weight:600;color:#666;margin-left:8px;">Color:</label>';
+            listaReferidosHtml += '<select id="colorSelectLista_' + u.telefono + '" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;">';
+            listaReferidosHtml += '<option value="verde">🟢 Verde (Completado)</option>';
+            listaReferidosHtml += '<option value="naranja" selected>🟠 Naranja (Pendiente)</option>';
+            listaReferidosHtml += '<option value="azul">🔵 Azul (Destacado)</option>';
+            listaReferidosHtml += '</select>';
+            
+            listaReferidosHtml += '<button class="btn btn-success btn-sm" onclick="activarReferidoDirecto(\'' + user.telefono + '\', \'' + u.telefono + '\', document.getElementById(\'ladoSelectLista_' + u.telefono + '\').value, document.getElementById(\'colorSelectLista_' + u.telefono + '\').value)" style="padding:6px 16px;">🌳 Activar</button>';
+        } else {
+            // Si está activado, mostrar botón para desactivar
+            listaReferidosHtml += '<button class="btn btn-danger btn-sm" onclick="desactivarReferido(\'' + user.telefono + '\', \'' + u.telefono + '\')" style="padding:6px 16px;">❌ Desactivar</button>';
+        }
+        
+        // Botón para eliminar referido
+        listaReferidosHtml += '<button class="btn btn-danger btn-sm" onclick="eliminarReferidoPermanente(\'' + user.telefono + '\', \'' + u.telefono + '\')" style="padding:6px 16px;">🗑️ Eliminar</button>';
+        
+        listaReferidosHtml += '</div>';
+        listaReferidosHtml += '</div>';
+    }
+}
+
+listaReferidosHtml += '</div>';
+
+// Agregar la sección al modal
+var contentDiv2 = document.getElementById('detallesContent');
+if (contentDiv2) {
+    contentDiv2.insertAdjacentHTML('beforeend', listaReferidosHtml);
+}
+
+
+// ============================================================
+// DESACTIVAR REFERIDO (QUITAR DEL ÁRBOL)
+// ============================================================
+function desactivarReferido(telefonoReferidor, telefonoReferido) {
+    if (!confirm('❌ ¿Quitar este referido del árbol?')) return;
+    
+    var users = getUsers();
+    var referidor = users.find(function(u) { return u.telefono === telefonoReferidor; });
+    
+    if (!referidor) {
+        showAlert('⚠️ Referidor no encontrado', 'danger');
+        return;
+    }
+    
+    if (referidor.referidos && referidor.referidos.lista) {
+        for (var i = 0; i < referidor.referidos.lista.length; i++) {
+            if (referidor.referidos.lista[i].id === telefonoReferido) {
+                referidor.referidos.lista[i].activo = false;
+                
+                // Si era izquierda o derecha, limpiar
+                if (referidor.referidos.izquierda === telefonoReferido) {
+                    referidor.referidos.izquierda = null;
+                }
+                if (referidor.referidos.derecha === telefonoReferido) {
+                    referidor.referidos.derecha = null;
+                }
+                
+                saveUsers(users);
+                sincronizarUsuarioConBackend(telefonoReferidor);
+                
+                showAlert('✅ Referido desactivado del árbol', 'success');
+                cerrarDetalles();
+                setTimeout(function() {
+                    verDetallesUsuario(telefonoReferidor);
+                }, 500);
+                return;
+            }
+        }
+    }
+    
+    showAlert('⚠️ Referido no encontrado', 'danger');
+}
+
+// ============================================================
+// ELIMINAR REFERIDO PERMANENTEMENTE
+// ============================================================
+function eliminarReferidoPermanente(telefonoReferidor, telefonoReferido) {
+    if (!confirm('⚠️ ¿Eliminar este referido PERMANENTEMENTE de la lista?')) return;
+    if (!confirm('⚠️ Esta acción NO se puede deshacer. ¿Estás seguro?')) return;
+    
+    var users = getUsers();
+    var referidor = users.find(function(u) { return u.telefono === telefonoReferidor; });
+    
+    if (!referidor) {
+        showAlert('⚠️ Referidor no encontrado', 'danger');
+        return;
+    }
+    
+    if (referidor.referidos && referidor.referidos.lista) {
+        // Eliminar de la lista
+        referidor.referidos.lista = referidor.referidos.lista.filter(function(ref) {
+            return ref.id !== telefonoReferido;
+        });
+        
+        // Limpiar izquierda/derecha si era directo
+        if (referidor.referidos.izquierda === telefonoReferido) {
+            referidor.referidos.izquierda = null;
+        }
+        if (referidor.referidos.derecha === telefonoReferido) {
+            referidor.referidos.derecha = null;
+        }
+        
+        // Limpiar referido_por del usuario eliminado
+        var referido = users.find(function(u) { return u.telefono === telefonoReferido; });
+        if (referido) {
+            referido.referido_por = null;
+        }
+        
+        saveUsers(users);
+        sincronizarUsuarioConBackend(telefonoReferidor);
+        if (referido) {
+            sincronizarUsuarioConBackend(telefonoReferido);
+        }
+        
+        showAlert('✅ Referido eliminado permanentemente', 'success');
+        cerrarDetalles();
+        setTimeout(function() {
+            verDetallesUsuario(telefonoReferidor);
+        }, 500);
+        return;
+    }
+    
+    showAlert('⚠️ Referido no encontrado', 'danger');
+}
+
     // ============================================================
     // SECCIÓN: REFERIDOS PENDIENTES DE ACTIVAR (CORREGIDO)
     // ============================================================
