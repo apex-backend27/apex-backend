@@ -110,7 +110,7 @@ app.post('/api/register', async (req, res) => {
     const hashedWithdrawPassword = await bcrypt.hash(passRetiro, 10);
 
     // ============================================================
-// PROCESAR CÓDIGO DE INVITACIÓN (con árbol binario completo)
+// PROCESAR CÓDIGO DE INVITACIÓN (VERSIÓN ORIGINAL - FUNCIONA)
 // ============================================================
 let referidoData = {
   izquierda: null,
@@ -134,143 +134,43 @@ if (codigoInv && codigoInv !== 'Eamb1714') {
   if (referidoResult.rows.length > 0) {
     const referido = referidoResult.rows[0];
     telefonoReferidor = referido.telefono;
-    
-    // ============================================================
-    // 1. OBTENER O CREAR LA ESTRUCTURA DE REFERIDOS DEL REFERIDOR
-    // ============================================================
-    let referidosActuales = referido.referidos || { 
-      izquierda: null, 
-      derecha: null, 
-      lista: [] 
-    };
-    
-    if (!referidosActuales.lista) {
-      referidosActuales.lista = [];
-    }
-    
-    // ============================================================
-    // 2. BUSCAR EL PRIMER ESPACIO DISPONIBLE EN EL ÁRBOL
-    // ============================================================
-    // Función para buscar un usuario con espacio disponible
-    function encontrarEspacioDisponible(usuarioId, callback) {
-      // Obtener todos los usuarios
-      return pool.query('SELECT * FROM users WHERE id = $1', [usuarioId])
-        .then(result => {
-          if (result.rows.length === 0) return null;
-          
-          const usuario = result.rows[0];
-          const refs = usuario.referidos || { izquierda: null, derecha: null, lista: [] };
-          
-          // Verificar si el usuario tiene espacio directo
-          if (!refs.izquierda || !refs.derecha) {
-            return usuario; // Encontramos espacio
-          }
-          
-          // Si no tiene espacio, buscar en sus referidos
-          return pool.query('SELECT * FROM users WHERE telefono = ANY($1)', [
-            [refs.izquierda, refs.derecha].filter(Boolean)
-          ])
-          .then(result => {
-            const referidosUsers = result.rows;
-            
-            for (let i = 0; i < referidosUsers.length; i++) {
-              const refUser = referidosUsers[i];
-              const refRefs = refUser.referidos || { izquierda: null, derecha: null, lista: [] };
-              
-              if (!refRefs.izquierda || !refRefs.derecha) {
-                return refUser; // Encontrado en los referidos
-              }
-            }
-            
-            return null; // No hay espacio
-          });
-        });
-    }
-    
-    // Buscar espacio disponible (con recursión manual)
-    let usuarioConEspacio = await encontrarEspacioDisponible(referido.id);
-    
-    if (!usuarioConEspacio) {
-      // Si no hay espacio, usar al mismo referidor (se agrega como "extra")
-      usuarioConEspacio = referido;
-    }
-    
-    // Obtener el teléfono del usuario que tiene espacio
-    const telefonoConEspacio = usuarioConEspacio.telefono;
-    let referidosDelUsuarioConEspacio = usuarioConEspacio.referidos || { 
-      izquierda: null, 
-      derecha: null, 
-      lista: [] 
-    };
-    
-    if (!referidosDelUsuarioConEspacio.lista) {
-      referidosDelUsuarioConEspacio.lista = [];
-    }
-    
-    // ============================================================
-    // 3. ASIGNAR EL NUEVO REFERIDO
-    // ============================================================
     let lado = '';
     
-    if (!referidosDelUsuarioConEspacio.izquierda) {
-      referidosDelUsuarioConEspacio.izquierda = telefono;
+    // Obtener referidos actuales
+    let referidosActuales = referido.referidos || { izquierda: null, derecha: null, lista: [] };
+    
+    // Asignar lado
+    if (!referidosActuales.izquierda) {
+      referidosActuales.izquierda = telefono;
+      fechasInvito.primero = new Date().toISOString();
       lado = 'izquierda';
-    } else if (!referidosDelUsuarioConEspacio.derecha) {
-      referidosDelUsuarioConEspacio.derecha = telefono;
+    } else if (!referidosActuales.derecha) {
+      referidosActuales.derecha = telefono;
+      fechasInvito.segundo = new Date().toISOString();
       lado = 'derecha';
     } else {
-      // En caso de que no haya espacio (fallback)
-      lado = 'extra (sin lado)';
-      // Agregar a la lista sin asignar lado
+      // TERCERO: se agrega a la lista pero sin lado (como referido indirecto)
+      lado = 'indirecto';
     }
-    
-    // Agregar a la lista de referidos
-    referidosDelUsuarioConEspacio.lista.push({
+
+    // Agregar a la lista de referidos SIEMPRE (incluso el tercero)
+    if (!referidosActuales.lista) referidosActuales.lista = [];
+    referidosActuales.lista.push({
       id: telefono,
       nombre: nombre + ' ' + apellido,
       date: new Date().toISOString(),
       lado: lado,
       commission: 0,
-      nivel: 1
+      activo: false  // POR DEFECTO NO ACTIVO (Admin lo activa)
     });
-    
-    // Actualizar referidos del usuario que tiene espacio
+
+    // Guardar referidos actualizados
     await pool.query(
       'UPDATE users SET referidos = $1 WHERE id = $2',
-      [JSON.stringify(referidosDelUsuarioConEspacio), usuarioConEspacio.id]
+      [JSON.stringify(referidosActuales), referido.id]
     );
-    
-    // ============================================================
-    // 4. ACTUALIZAR EL ÁRBOL DEL REFERIDOR ORIGINAL (para el frontend)
-    // ============================================================
-    // Reconstruir el árbol completo del referidor original
-    // Para que el frontend muestre todos los referidos
-    
-    // Obtener todos los referidos del referidor original
-    const referidosDelReferidor = referido.referidos || { izquierda: null, derecha: null, lista: [] };
-    referidosDelReferidor.lista.push({
-      id: telefono,
-      nombre: nombre + ' ' + apellido,
-      date: new Date().toISOString(),
-      lado: lado,
-      commission: 0,
-      nivel: 1
-    });
-    
-    // Si el usuario con espacio no es el referidor original, también lo agregamos
-    if (usuarioConEspacio.id !== referido.id) {
-      // El referido se colocó bajo otro usuario, pero aparece en la lista del referidor original
-      // como referido indirecto (nivel 2 o más)
-      // Ya lo agregamos arriba como parte de la lista del referidor
-    }
-    
-    // Actualizar el referidor original
-    await pool.query(
-      'UPDATE users SET referidos = $1 WHERE id = $2',
-      [JSON.stringify(referidosDelReferidor), referido.id]
-    );
-    
-    referidoData = referidosDelReferidor;
+
+    referidoData = referidosActuales;
   }
 }
 
