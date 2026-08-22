@@ -1272,8 +1272,7 @@
         <div class="card">
             <div class="label" style="margin-bottom:12px;">🌳 Tu Árbol de Referidos</div>
             <div id="treeContainer" class="tree-container"></div>
-            <div class="referral-count">👥 Referidos directos: <strong id="referralCount">0</strong></div>
-            <div class="nivel-info" id="nivelInfo"></div>
+            <div class="referral-count">👥 Referidos Totales: <strong id="referralCount">0</strong></div>
         </div>
     </div>
 
@@ -2577,262 +2576,93 @@ function renderTree() {
     var container = document.getElementById('treeContainer');
     if (!container) return;
 
-    // ✅ FORZAR RECARGA DE USUARIOS DESDE LOCALSTORAGE
     var users = getUsers();
     var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
     var listaReferidos = referidos.lista || [];
 
     function obtenerUsuario(telefono) {
         if (!telefono) return null;
-        
-        // ✅ 1. BUSCAR EN LOCALSTORAGE (DATOS MÁS ACTUALIZADOS)
         var users = getUsers();
         for (var i = 0; i < users.length; i++) {
             if (users[i].telefono === telefono) {
                 return users[i];
             }
         }
-        
-        // ✅ 2. BUSCAR EN LA LISTA DE REFERIDOS DEL USUARIO
-        var referidos = user.referidos || { lista: [] };
-        for (var i = 0; i < referidos.lista.length; i++) {
-            if (referidos.lista[i].id === telefono) {
-                return {
-                    telefono: referidos.lista[i].id,
-                    nombre: referidos.lista[i].nombre || telefono,
-                    apellido: '',
-                    plan: referidos.lista[i].plan || 'Sin plan',
-                    tienePlan: referidos.lista[i].tienePlan || false,
-                    fechaPlan: referidos.lista[i].fechaPlan || null,
-                    referidos: { izquierda: null, derecha: null, lista: [] }
-                };
-            }
-        }
         return null;
-    }
-
-    // ✅ 3. FILTRAR REFERIDOS CON PLAN ACTIVO (MEJORADO)
-    var referidosConPlan = [];
-    for (var i = 0; i < listaReferidos.length; i++) {
-        var ref = listaReferidos[i];
-        
-        // ✅ OBTENER EL USUARIO COMPLETO
-        var refUser = obtenerUsuario(ref.id);
-        if (!refUser) {
-            refUser = {
-                telefono: ref.id,
-                nombre: ref.nombre || ref.id,
-                apellido: '',
-                plan: ref.plan || 'Sin plan',
-                tienePlan: ref.tienePlan || false,
-                referidos: { izquierda: null, derecha: null, lista: [] }
-            };
-        }
-        
-        // ✅ VERIFICAR SI TIENE PLAN ACTIVO (MÁS ROBUSTO)
-        var tienePlan = false;
-        if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
-            tienePlan = true;
-        }
-        if (refUser.tienePlan === true) {
-            tienePlan = true;
-        }
-        if (ref.tienePlan === true) {
-            tienePlan = true;
-        }
-        if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined' && ref.plan !== '') {
-            tienePlan = true;
-        }
-        
-        if (tienePlan) {
-            referidosConPlan.push(refUser);
-            console.log('✅ Referido con plan:', ref.id, '→', refUser.plan || ref.plan);
-        } else {
-            console.log('❌ Referido sin plan:', ref.id, 'plan:', refUser.plan || ref.plan);
-        }
-    }
-
-    function getEstado(userObj) {
-        if (!userObj) return 'empty';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            if (userObj.referidos && userObj.referidos.izquierda && userObj.referidos.derecha) {
-                return 'completed';
-            }
-            return 'pending';
-        }
-        return 'empty';
-    }
-
-    function getInicial(userObj) {
-        if (!userObj) return '?';
-        return userObj.nombre ? userObj.nombre[0] : '?';
-    }
-
-    function getNombre(userObj) {
-        if (!userObj) return '';
-        return userObj.nombre || '';
-    }
-
-    function getLabel(userObj) {
-        if (!userObj) return 'Vacío';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return '✅ ' + userObj.plan;
-        }
-        return ' ';
-    }
-
-    function getColor(userObj) {
-        if (!userObj) return '#f5f5f5';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return '#4db6ac';
-        }
-        return '#f5f5f5';
-    }
-
-    function getBorder(userObj) {
-        if (!userObj) return '#ddd';
-        if (userObj.plan && userObj.plan !== 'Sin plan') {
-            return '#4db6ac';
-        }
-        return '#ddd';
-    }
-
-    function crearNodo(userObj, tipo) {
-        var estado = getEstado(userObj);
-        var clase = 'circle';
-        if (tipo === 'you') {
-            clase += ' you';
-        } else if (estado === 'completed') {
-            clase += ' completed';
-        } else if (estado === 'pending') {
-            clase += ' pending';
-        } else {
-            clase += ' empty';
-        }
-
-        var nombre = getNombre(userObj);
-        var label = getLabel(userObj);
-        var inicial = getInicial(userObj);
-        var color = getColor(userObj);
-        var border = getBorder(userObj);
-
-        return '<div class="tree-node">' +
-            '<div class="' + clase + '" style="background:' + color + ';border-color:' + border + ';">' + inicial + '</div>' +
-            '<div class="label">' + (nombre || 'Vacío') + '</div>' +
-            '<div class="label" style="font-size:6px;color:#999;">' + label + '</div>' +
-        '</div>';
     }
 
     var html = '';
 
-    html += '<div style="text-align:center; margin-bottom:12px; font-weight:700; font-size:16px; color:#000;">🌳 Tu Árbol de Referidos</div>';
-
-    // NIVEL 1: TÚ
-    html += '<div class="tree-level">';
-    html += crearNodo(user, 'you');
-    html += '</div>';
-
-    html += '<div class="tree-connector">│</div>';
-
-    // NIVEL 2: 2 referidos directos con plan
-    html += '<div class="tree-level">';
-    var nivel2 = referidosConPlan.slice(0, 2);
-    html += crearNodo(nivel2[0] || null, 'directo');
-    html += crearNodo(nivel2[1] || null, 'directo');
-    html += '</div>';
-
-    html += '<div class="tree-connector">│</div>';
-
-    // NIVEL 3: 4 referidos de los referidos directos
-    html += '<div class="tree-level">';
-    var nivel3 = [];
-    for (var i = 0; i < nivel2.length; i++) {
-        var refUser = nivel2[i];
-        if (refUser && refUser.referidos && refUser.referidos.lista) {
-            var subReferidos = refUser.referidos.lista;
-            for (var j = 0; j < subReferidos.length; j++) {
-                var subRef = subReferidos[j];
-                var subRefUser = obtenerUsuario(subRef.id);
-                if (subRefUser && subRefUser.plan && subRefUser.plan !== 'Sin plan' && subRefUser.plan !== 'null' && subRefUser.plan !== 'undefined') {
-                    nivel3.push(subRefUser);
-                }
-            }
-        }
-    }
-    while (nivel3.length < 4) {
-        nivel3.push(null);
-    }
-    for (var i = 0; i < 4; i++) {
-        html += crearNodo(nivel3[i] || null, 'indirecto');
-    }
-    html += '</div>';
-
-    // LINK DE REFERIDO
+    // ============================================================
+    // 1. LINK DE REFERIDO
+    // ============================================================
     var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
     var referralLink = baseUrl + 'ref/' + (user.codigo_referido || 'APEX000');
     
-    html += '<div style="margin-top:16px; background:#f8f9fa; border-radius:12px; padding:12px 16px; border:1px solid #e0e0e0; width:100%;">';
-    html += '<div style="font-size:12px; color:#666; font-weight:600; margin-bottom:4px;">🔗 Tu Link de Referido</div>';
+    html += '<div style="margin-bottom:16px; background:#f8f9fa; border-radius:12px; padding:14px 16px; border:1px solid #e0e0e0;">';
+    html += '<div style="font-size:13px; color:#666; font-weight:600; margin-bottom:6px;">🔗 Tu Link de Referido</div>';
     html += '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">';
     html += '<span style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;">' + referralLink + '</span>';
     html += '<button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>';
     html += '</div></div>';
 
-    // ESTADÍSTICAS
+    // ============================================================
+    // 2. ESTADÍSTICAS: SOLO TOTAL DE REFERIDOS
+    // ============================================================
     var totalReferidos = listaReferidos.length;
-    var activos = referidosConPlan.length;
     
-    html += '<div style="display:flex; gap:16px; margin-top:12px; width:100%;">';
-    html += '<div style="flex:1; background:#e8f5e9; border-radius:10px; padding:10px; text-align:center; border:1px solid #4db6ac;">';
-    html += '<div style="font-size:22px; font-weight:700; color:#2e7d32;">' + activos + '</div>';
-    html += '<div style="font-size:11px; color:#666;">📊 Referidos Activos</div>';
-    html += '</div>';
-    html += '<div style="flex:1; background:#f5f5f5; border-radius:10px; padding:10px; text-align:center; border:1px solid #e0e0e0;">';
-    html += '<div style="font-size:22px; font-weight:700; color:#333;">' + totalReferidos + '</div>';
-    html += '<div style="font-size:11px; color:#666;">📊 Referidos Totales</div>';
+    html += '<div style="display:flex; gap:16px; margin-bottom:12px;">';
+    html += '<div style="flex:1; background:#f5f5f5; border-radius:10px; padding:12px; text-align:center; border:1px solid #e0e0e0;">';
+    html += '<div style="font-size:28px; font-weight:700; color:#000;">' + totalReferidos + '</div>';
+    html += '<div style="font-size:12px; color:#666;">📊 Referidos Totales</div>';
     html += '</div>';
     html += '</div>';
 
-    // LISTA DE TODOS LOS REFERIDOS
+    // ============================================================
+    // 3. LISTA DE TODOS LOS REFERIDOS (CON ESTADO)
+    // ============================================================
     if (listaReferidos.length > 0) {
-        html += '<div style="margin-top:16px; width:100%;">';
+        html += '<div style="margin-top:12px;">';
         html += '<div style="font-size:14px; font-weight:600; color:#333; margin-bottom:10px;">📋 Tus Referidos</div>';
-        html += '<div style="display:flex; flex-direction:column; gap:6px; width:100%;">';
+        html += '<div style="display:flex; flex-direction:column; gap:6px;">';
         
         for (var i = 0; i < listaReferidos.length; i++) {
             var ref = listaReferidos[i];
             var refUser = obtenerUsuario(ref.id);
-            if (!refUser) {
-                refUser = {
-                    telefono: ref.id,
-                    nombre: ref.nombre || ref.id,
-                    plan: 'Sin plan',
-                    fecha_registro: ref.date || new Date().toISOString()
-                };
-            }
             
+            // ✅ VERIFICAR SI TIENE PLAN
             var tienePlan = false;
-            if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
+            var planNombre = 'Sin plan';
+            
+            // Buscar en la lista de referidos
+            if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined' && ref.plan !== '') {
                 tienePlan = true;
+                planNombre = ref.plan;
             }
             if (ref.tienePlan === true) {
                 tienePlan = true;
-            }
-            if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined' && ref.plan !== '') {
-                tienePlan = true;
+                planNombre = ref.plan || 'Trader';
             }
             
-            var colorFondo = tienePlan ? '#f0faf5' : '#f8f9fa';
+            // Buscar en users
+            if (refUser) {
+                if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
+                    tienePlan = true;
+                    planNombre = refUser.plan;
+                }
+            }
+            
+            var colorFondo = tienePlan ? '#e8f5e9' : '#f8f9fa';
             var borderColor = tienePlan ? '#4db6ac' : '#e0e0e0';
-            var estadoTexto = tienePlan ? '✅ ' + (refUser.plan || ref.plan || 'Plan activo') : '⏳ Pendiente de adquirir plan';
+            var estadoTexto = tienePlan ? '✅ ' + planNombre : '⏳ Sin plan';
             var estadoColor = tienePlan ? '#2e7d32' : '#f7971e';
-            var fechaRegistro = refUser.fecha_registro || ref.date || new Date().toISOString();
+            var fechaRegistro = ref.date || new Date().toISOString();
             var fechaFormateada = formatDate(fechaRegistro);
             
-            html += '<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; background:' + colorFondo + '; border:1px solid ' + borderColor + '; border-radius:8px; padding:10px 14px; gap:6px; width:100%;">';
+            html += '<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; background:' + colorFondo + '; border:1px solid ' + borderColor + '; border-radius:8px; padding:10px 14px; gap:6px;">';
             html += '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">';
             html += '<span style="font-weight:600; color:#333; font-size:13px;">#' + (i + 1) + '</span>';
-            html += '<span style="font-weight:600; color:#333;">' + (refUser.nombre || ref.id) + '</span>';
+            html += '<span style="font-weight:600; color:#333;">' + (ref.nombre || ref.id) + '</span>';
             html += '<span style="font-size:11px; color:#999;">📱 ' + ref.id + '</span>';
             html += '<span style="font-size:10px; color:#999;">📅 ' + fechaFormateada + '</span>';
             html += '</div>';
@@ -2841,34 +2671,9 @@ function renderTree() {
         }
         
         html += '</div></div>';
-    }
-
-    // INFORMACIÓN DE NIVELES
-    var planActual = user.plan || 'Sin plan';
-    var indiceActual = getIndicePlan(planActual);
-    var siguienteIndice = indiceActual + 1;
-    var siguientePlan = getPlanByIndex(siguienteIndice);
-    var nivelAutorizado = getNivelAutorizado();
-    var planesSuperados = [];
-    for (var i = 0; i < indiceActual; i++) {
-        planesSuperados.push(getPlanByIndex(i));
-    }
-    
-    var htmlNivel = '';
-    if (siguientePlan === 'Sin plan') {
-        htmlNivel = '🏆 Has alcanzado el máximo nivel. ¡Felicidades!';
-    } else if (nivelAutorizado >= siguienteIndice) {
-        htmlNivel = '🔓 <span style="color:#4db6ac; font-weight:600;">' + siguientePlan + ' desbloqueado</span> - Puedes comprarlo en la pestaña Planes';
     } else {
-        htmlNivel = '🔒 <span style="color:#ef5350; font-weight:600;">' + siguientePlan + ' bloqueado</span> - Completa las tareas asignadas y espera autorización del administrador';
+        html += '<div style="text-align:center; color:#999; padding:20px;">No has referido a nadie todavía.<br>Comparte tu link para invitar amigos.</div>';
     }
-    if (planesSuperados.length > 0) {
-        htmlNivel += '<br><span style="color:#0d47a1; font-size:11px;">✅ Niveles superados: ' + planesSuperados.join(' → ') + '</span>';
-    }
-    
-    html += '<div style="margin-top:16px; background:#f8f9fa; border-radius:10px; padding:12px 16px; text-align:center; font-size:12px; color:#666; border:1px solid #e0e0e0; width:100%;">';
-    html += htmlNivel;
-    html += '</div>';
 
     container.innerHTML = html;
     document.getElementById('referralCount').textContent = totalReferidos;
