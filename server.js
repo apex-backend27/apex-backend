@@ -123,6 +123,8 @@ app.post('/api/register', async (req, res) => {
       fechaRegistro: new Date().toISOString(),
       fechaPrimerPlan: null
     };
+	// ✅ DECLARAR LA VARIABLE ANTES DEL IF
+var telefonoReferidor = null;
 
     if (codigoInv && codigoInv !== 'Eamb1714') {
       const referidoResult = await pool.query(
@@ -132,9 +134,9 @@ app.post('/api/register', async (req, res) => {
       
       if (referidoResult.rows.length > 0) {
         const referido = referidoResult.rows[0];
-	var telefonoReferidor = referido.telefono; 
-        let lado = '';
-        
+	telefonoReferidor = referido.telefono;
+	let lado = '';
+	        
         // Obtener referidos actuales
         let referidosActuales = referido.referidos || { izquierda: null, derecha: null, lista: [] };
         
@@ -187,8 +189,8 @@ app.post('/api/register', async (req, res) => {
       cupones_asignados, logros_asignados, logros_pendientes_aprobar,
       tareas_asignadas, canjes_realizados, logros_reclamados,
       referidos_directos, descuentoRetiroActivo, check_in_realizado,
-      fecha_registro, referido_por)   // ✅ AGREGAR ESTO
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)  // ✅ AGREGAR $45
+      fecha_registro, referido_por)  
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45) 
      RETURNING *`,
     [
         telefono, nombre, apellido, hashedPassword, hashedWithdrawPassword,
@@ -205,7 +207,7 @@ app.post('/api/register', async (req, res) => {
         JSON.stringify({ izquierda: null, derecha: null }),
         JSON.stringify(null), null,
         new Date().toISOString(),
-        telefonoReferidor   // ✅ AGREGAR ESTO (el teléfono del referidor)
+        telefonoReferidor   
     ]
 );
 
@@ -231,7 +233,7 @@ app.post('/api/register', async (req, res) => {
         balance: 0,
         puntos: 0,
         plan: 'Sin plan',
-        referidos: referidoData  // ✅ AGREGAR ESTO
+        referidos: referidoData  
     }
 });
 
@@ -284,7 +286,7 @@ app.post('/api/login', async (req, res) => {
         balance: user.balance,
         puntos: user.puntos || 0,
         plan: user.plan || 'Sin plan',
-        referidos: user.referidos || { izquierda: null, derecha: null, lista: [] }  // ✅ AGREGAR ESTO
+        referidos: user.referidos || { izquierda: null, derecha: null, lista: [] }  
     }
 });
     
@@ -460,7 +462,7 @@ app.put('/api/user/update', async (req, res) => {
                 daily_earnings: Number(userData.daily_earnings || 0),
                 cuenta_habilitada: userData.cuenta_habilitada,
                 produccion_pausada: userData.produccion_pausada || false,
-                // ✅ AGREGAR ESTOS CAMPOS
+                
                 codigos_usados_hoy: Number(userData.codigos_usados_hoy || 0),
                 ultimo_reinicio_codigos: userData.ultimo_reinicio_codigos || null,
                 codigos_usados: userData.codigos_usados || [],
