@@ -1270,7 +1270,7 @@
 
     <div id="tab-referidos" class="tab-content">
         <div class="card">
-            <div class="label" style="margin-bottom:12px;">🌳 Tu Árbol de Referidos</div>
+            <div class="label" style="margin-bottom:12px;"> Tus Referidos</div>
             <div id="treeContainer" class="tree-container"></div>
             <div class="referral-count">👥 Referidos Totales: <strong id="referralCount">0</strong></div>
         </div>
@@ -2666,7 +2666,12 @@ function renderTree() {
             html += '<span style="font-size:11px; color:#999;">📱 ' + ref.id + '</span>';
             html += '<span style="font-size:10px; color:#999;">📅 ' + fechaFormateada + '</span>';
             html += '</div>';
-            html += '<span style="font-size:12px; font-weight:500; color:' + estadoColor + ';">' + estadoTexto + '</span>';
+            // ✅ SOLO MOSTRAR EL NOMBRE DEL PLAN O "Sin plan" (pero sin icono)
+// ✅ SOLO MOSTRAR EL PLAN SI TIENE, SINO NADA
+if (tienePlan) {
+    html += '<span style="font-size:11px; color:#4db6ac; font-weight:500;">' + planNombre + '</span>';
+}
+// Si no tiene plan, NO mostrar nada
             html += '</div>';
         }
         
