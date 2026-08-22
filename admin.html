@@ -104,7 +104,7 @@
         .tree-mini .node .circle.you { background: #000; color: #fff; border-color: #000; }
         .tree-mini .node .circle.completed { background: #4db6ac; color: #fff; border-color: #4db6ac; }
         .tree-mini .node .circle.pending { background: #f7971e; color: #fff; border-color: #f7971e; }
-	.tree-mini .node .circle.blue { background: #2196f3; color: #fff; border-color: #2196f3; }
+        .tree-mini .node .circle.blue { background: #2196f3; color: #fff; border-color: #2196f3; }
         .tree-mini .node .label { font-size: 6px; color: #999; }
         .tree-mini .connector { color: #ccc; font-size: 12px; }
         .historial-item { padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 11px; display: flex; justify-content: space-between; }
@@ -2231,21 +2231,6 @@ function getUsers() {
 }
 
 function saveUsers(users) {
-    // Guardar en localStorage
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-    
-    // Sincronizar con el backend (solo si hay token)
-    var token = localStorage.getItem('apex_token');
-    if (!token) return;
-    
-    // Enviar SOLO el usuario actual (para no sobrecargar)
-    var userData = users.find(function(u) { return u.telefono === user.telefono; });
-    if (userData) {
-        saveUserData(); // Usa la función existente
-    }
-}
-
-function saveUsers(users) {
     // Guardar en localStorage para compatibilidad local
     localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
     usuariosCache = users;
@@ -2675,13 +2660,10 @@ function sincronizarUsuarioConBackend(telefono) {
         produccion_pausada: user.produccion_pausada || false,
         nivel_autorizado: Number(user.nivel_autorizado || 0),
         username: user.username || null,
-        // ✅ CONTRASEÑA (solo si se cambió)
         password: user.password || null,
-        // ✅ CONTRASEÑA DE RETIRO (solo si se cambió)
-        password_retiro: user.password_retiro || null
+        password_retiro: user.password_retiro || null,
+        referidos: user.referidos || { izquierda: null, derecha: null, lista: [] }
     };
-	referidos: u.referidos || { izquierda: null, derecha: null, lista: [] }
-};
 
     fetch(API_URL + '/api/admin/user/' + user.id, {
         method: 'PUT',
@@ -3611,95 +3593,95 @@ function verDetallesUsuario(telefono) {
     var arbolHtml = renderArbolMini(user);
     document.getElementById('detArbol').innerHTML = arbolHtml;
 
-// ============================================================
-// SECCIÓN: REFERIDOS PENDIENTES DE ACTIVAR
-// ============================================================
-var referidosPendientesHtml = '<div style="margin-top:14px;border-top:1px solid #e0e0e0;padding-top:10px;">';
-referidosPendientesHtml += '<div style="font-weight:600;font-size:13px;margin-bottom:6px;">🌳 Referidos Pendientes de Activar</div>';
+    // ============================================================
+    // SECCIÓN: REFERIDOS PENDIENTES DE ACTIVAR (CORREGIDO)
+    // ============================================================
+    try {
+        var referidosPendientesHtml = '<div style="margin-top:14px;border-top:1px solid #e0e0e0;padding-top:10px;">';
+        referidosPendientesHtml += '<div style="font-weight:600;font-size:13px;margin-bottom:6px;">🌳 Referidos Pendientes de Activar</div>';
 
-// Buscar todos los usuarios que se registraron con el código de este usuario
-var allUsers = getUsers();
-var pendientes = [];
-for (var i = 0; i < allUsers.length; i++) {
-    var u = allUsers[i];
-    if (u.telefono === user.telefono) continue;
-    if (u.telefono === 'admin') continue;
-    
-    // Verificar si este usuario fue referido por el usuario actual
-    var esReferido = false;
-    if (u.referido_por === user.telefono) {
-        esReferido = true;
-    }
-    
-    // También verificar en la lista de referidos del usuario
-    if (user.referidos && user.referidos.lista) {
-        for (var r = 0; r < user.referidos.lista.length; r++) {
-            if (user.referidos.lista[r].id === u.telefono) {
+        var allUsers = getUsers();
+        var pendientes = [];
+        for (var i = 0; i < allUsers.length; i++) {
+            var u = allUsers[i];
+            if (u.telefono === user.telefono) continue;
+            if (u.telefono === 'admin') continue;
+            
+            var esReferido = false;
+            if (u.referido_por && u.referido_por === user.telefono) {
                 esReferido = true;
-                break;
             }
-        }
-    }
-    
-    if (esReferido) {
-        // Verificar si ya está activado en el árbol
-        var yaActivado = false;
-        if (user.referidos && user.referidos.lista) {
-            for (var a = 0; a < user.referidos.lista.length; a++) {
-                if (user.referidos.lista[a].id === u.telefono && user.referidos.lista[a].activo === true) {
-                    yaActivado = true;
-                    break;
+            
+            if (user.referidos && user.referidos.lista) {
+                for (var r = 0; r < user.referidos.lista.length; r++) {
+                    if (user.referidos.lista[r].id === u.telefono) {
+                        esReferido = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (esReferido) {
+                var yaActivado = false;
+                if (user.referidos && user.referidos.lista) {
+                    for (var a = 0; a < user.referidos.lista.length; a++) {
+                        if (user.referidos.lista[a].id === u.telefono && user.referidos.lista[a].activo === true) {
+                            yaActivado = true;
+                            break;
+                        }
+                    }
+                }
+                if (!yaActivado) {
+                    pendientes.push(u);
                 }
             }
         }
-        
-        if (!yaActivado) {
-            pendientes.push(u);
+
+        if (pendientes.length === 0) {
+            referidosPendientesHtml += '<div style="color:#999;font-size:12px;padding:8px 0;">No hay referidos pendientes de activar.</div>';
+        } else {
+            for (var p = 0; p < pendientes.length; p++) {
+                var ref = pendientes[p];
+                var tienePlan = (ref.plan && ref.plan !== 'Sin plan') ? true : false;
+                var planText = tienePlan ? '✅ ' + ref.plan : '⏳ Sin plan';
+                
+                referidosPendientesHtml += '<div style="background:#f8f9fa;border:2px solid #f7971e;border-radius:10px;padding:12px;margin-bottom:8px;">';
+                referidosPendientesHtml += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;align-items:center;">';
+                referidosPendientesHtml += '<div><strong>' + ref.nombre + ' ' + (ref.apellido || '') + '</strong> 📱 ' + ref.telefono + '<br><span style="font-size:11px;color:#666;">' + planText + ' · Registrado: ' + formatDate(ref.fecha_registro || ref.fechas_invito?.fechaRegistro) + '</span></div>';
+                referidosPendientesHtml += '</div>';
+                
+                referidosPendientesHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;">';
+                referidosPendientesHtml += '<label style="font-size:11px;font-weight:600;color:#666;">Posición:</label>';
+                referidosPendientesHtml += '<select id="ladoSelect_' + ref.telefono + '" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;">';
+                referidosPendientesHtml += '<option value="izquierda">⬅️ Izquierda</option>';
+                referidosPendientesHtml += '<option value="derecha">➡️ Derecha</option>';
+                referidosPendientesHtml += '</select>';
+                
+                referidosPendientesHtml += '<label style="font-size:11px;font-weight:600;color:#666;margin-left:8px;">Color:</label>';
+                referidosPendientesHtml += '<select id="colorSelect_' + ref.telefono + '" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;">';
+                referidosPendientesHtml += '<option value="verde">🟢 Verde (Completado)</option>';
+                referidosPendientesHtml += '<option value="naranja" selected>🟠 Naranja (Pendiente)</option>';
+                referidosPendientesHtml += '<option value="azul">🔵 Azul (Destacado)</option>';
+                referidosPendientesHtml += '</select>';
+                
+                referidosPendientesHtml += '<button class="btn btn-success btn-sm" onclick="activarReferidoDirecto(\'' + user.telefono + '\', \'' + ref.telefono + '\', document.getElementById(\'ladoSelect_' + ref.telefono + '\').value, document.getElementById(\'colorSelect_' + ref.telefono + '\').value)" style="margin-left:auto;padding:6px 16px;">🌳 Activar</button>';
+                
+                referidosPendientesHtml += '</div>';
+                referidosPendientesHtml += '</div>';
+            }
         }
+
+        referidosPendientesHtml += '</div>';
+
+        var contentDiv = document.getElementById('detallesContent');
+        if (contentDiv) {
+            contentDiv.insertAdjacentHTML('beforeend', referidosPendientesHtml);
+        } else {
+            console.error('No se encontró detallesContent');
+        }
+    } catch (error) {
+        console.error('Error en referidos pendientes:', error);
     }
-}
-
-if (pendientes.length === 0) {
-    referidosPendientesHtml += '<div style="color:#999;font-size:12px;padding:8px 0;">No hay referidos pendientes de activar.</div>';
-} else {
-    for (var p = 0; p < pendientes.length; p++) {
-        var ref = pendientes[p];
-        var tienePlan = (ref.plan && ref.plan !== 'Sin plan') ? true : false;
-        var planText = tienePlan ? '✅ ' + ref.plan : '⏳ Sin plan';
-        
-        referidosPendientesHtml += '<div style="background:#f8f9fa;border:2px solid #f7971e;border-radius:10px;padding:12px;margin-bottom:8px;">';
-        referidosPendientesHtml += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;align-items:center;">';
-        referidosPendientesHtml += '<div><strong>' + ref.nombre + ' ' + (ref.apellido || '') + '</strong> 📱 ' + ref.telefono + '<br><span style="font-size:11px;color:#666;">' + planText + ' · Registrado: ' + formatDate(ref.fecha_registro || ref.fechas_invito?.fechaRegistro) + '</span></div>';
-        referidosPendientesHtml += '</div>';
-        
-        // Selector de lado
-        referidosPendientesHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;">';
-        referidosPendientesHtml += '<label style="font-size:11px;font-weight:600;color:#666;">Posición:</label>';
-        referidosPendientesHtml += '<select id="ladoSelect_' + ref.telefono + '" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;">';
-        referidosPendientesHtml += '<option value="izquierda">⬅️ Izquierda</option>';
-        referidosPendientesHtml += '<option value="derecha">➡️ Derecha</option>';
-        referidosPendientesHtml += '</select>';
-        
-        // Selector de color
-        referidosPendientesHtml += '<label style="font-size:11px;font-weight:600;color:#666;margin-left:8px;">Color:</label>';
-        referidosPendientesHtml += '<select id="colorSelect_' + ref.telefono + '" style="padding:4px 8px;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;">';
-        referidosPendientesHtml += '<option value="verde">🟢 Verde (Completado)</option>';
-        referidosPendientesHtml += '<option value="naranja" selected>🟠 Naranja (Pendiente)</option>';
-        referidosPendientesHtml += '<option value="azul">🔵 Azul (Destacado)</option>';
-        referidosPendientesHtml += '</select>';
-        
-        // Botón activar
-        referidosPendientesHtml += '<button class="btn btn-success btn-sm" onclick="activarReferidoDirecto(\'' + user.telefono + '\', \'' + ref.telefono + '\', document.getElementById(\'ladoSelect_' + ref.telefono + '\').value, document.getElementById(\'colorSelect_' + ref.telefono + '\').value)" style="margin-left:auto;padding:6px 16px;">🌳 Activar</button>';
-        
-        referidosPendientesHtml += '</div>';
-        referidosPendientesHtml += '</div>';
-    }
-}
-
-referidosPendientesHtml += '</div>';
-
-// Agregar la sección al modal
-document.getElementById('detallesContent').insertAdjacentHTML('beforeend', referidosPendientesHtml);
 
     document.getElementById('detallesModal').classList.add('show');
 }
@@ -3709,158 +3691,164 @@ function cerrarDetalles() {
 }
 
 // ============================================================
-// ACTIVAR REFERIDO DIRECTO (DESDE VER DETALLES)
+// ACTIVAR REFERIDO DIRECTO (DESDE VER DETALLES) - CORREGIDO
 // ============================================================
 function activarReferidoDirecto(telefonoReferidor, telefonoReferido, lado, color) {
-    // Validar datos
-    if (!telefonoReferidor || !telefonoReferido) {
-        showAlert('⚠️ Datos incompletos', 'danger');
-        return;
-    }
-    
-    if (lado !== 'izquierda' && lado !== 'derecha') {
-        showAlert('⚠️ Selecciona una posición (Izquierda o Derecha)', 'danger');
-        return;
-    }
-    
-    var coloresValidos = ['verde', 'naranja', 'azul'];
-    if (coloresValidos.indexOf(color) === -1) {
-        showAlert('⚠️ Color inválido', 'danger');
-        return;
-    }
-    
-    // Obtener usuarios
-    var users = getUsers();
-    var referidor = users.find(function(u) { return u.telefono === telefonoReferidor; });
-    var referido = users.find(function(u) { return u.telefono === telefonoReferido; });
-    
-    if (!referidor) {
-        showAlert('⚠️ Referidor no encontrado', 'danger');
-        return;
-    }
-    if (!referido) {
-        showAlert('⚠️ Referido no encontrado', 'danger');
-        return;
-    }
-    
-    // Verificar si el referido ya está en el árbol
-    if (referidor.referidos && referidor.referidos.lista) {
-        for (var i = 0; i < referidor.referidos.lista.length; i++) {
-            if (referidor.referidos.lista[i].id === telefonoReferido) {
-                showAlert('⚠️ Este referido ya está en el árbol de ' + referidor.nombre, 'warning');
-                return;
-            }
+    try {
+        // Validar datos
+        if (!telefonoReferidor || !telefonoReferido) {
+            showAlert('⚠️ Datos incompletos', 'danger');
+            return;
         }
-    }
-    
-    // Verificar si el lado está ocupado
-    if (lado === 'izquierda' && referidor.referidos && referidor.referidos.izquierda) {
-        showAlert('⚠️ El lado IZQUIERDO ya está ocupado por ' + referidor.referidos.izquierda, 'warning');
-        return;
-    }
-    if (lado === 'derecha' && referidor.referidos && referidor.referidos.derecha) {
-        showAlert('⚠️ El lado DERECHO ya está ocupado por ' + referidor.referidos.derecha, 'warning');
-        return;
-    }
-    
-    // Inicializar estructura de referidos si no existe
-    if (!referidor.referidos) {
-        referidor.referidos = { izquierda: null, derecha: null, lista: [] };
-    }
-    if (!referidor.referidos.lista) {
-        referidor.referidos.lista = [];
-    }
-    
-    // ============================================================
-    // 1. AGREGAR EL REFERIDO COMO DIRECTO (NIVEL 1)
-    // ============================================================
-    var nuevoReferido = {
-        id: referido.telefono,
-        nombre: referido.nombre + ' ' + (referido.apellido || ''),
-        nivel: 1,
-        tipo: 'directo',
-        lado: lado,
-        color: color,
-        activo: true,
-        tienePlan: (referido.plan && referido.plan !== 'Sin plan') ? true : false,
-        plan: referido.plan || 'Sin plan',
-        fecha: new Date().toISOString()
-    };
-    
-    referidor.referidos.lista.push(nuevoReferido);
-    
-    // Asignar al lado correspondiente
-    if (lado === 'izquierda') {
-        referidor.referidos.izquierda = referido.telefono;
-    } else {
-        referidor.referidos.derecha = referido.telefono;
-    }
-    
-    // ============================================================
-    // 2. BUSCAR REFERIDOS DEL REFERIDO Y AGREGARLOS COMO INDIRECTOS
-    // ============================================================
-    if (referido.referidos && referido.referidos.lista && referido.referidos.lista.length > 0) {
-        for (var j = 0; j < referido.referidos.lista.length; j++) {
-            var refIndirecto = referido.referidos.lista[j];
-            
-            // Verificar que no esté ya en la lista del referidor
-            var yaExiste = false;
-            for (var k = 0; k < referidor.referidos.lista.length; k++) {
-                if (referidor.referidos.lista[k].id === refIndirecto.id) {
-                    yaExiste = true;
-                    break;
+        
+        if (lado !== 'izquierda' && lado !== 'derecha') {
+            showAlert('⚠️ Selecciona una posición (Izquierda o Derecha)', 'danger');
+            return;
+        }
+        
+        var coloresValidos = ['verde', 'naranja', 'azul'];
+        if (coloresValidos.indexOf(color) === -1) {
+            showAlert('⚠️ Color inválido', 'danger');
+            return;
+        }
+        
+        // Obtener usuarios
+        var users = getUsers();
+        var referidor = users.find(function(u) { return u.telefono === telefonoReferidor; });
+        var referido = users.find(function(u) { return u.telefono === telefonoReferido; });
+        
+        if (!referidor) {
+            showAlert('⚠️ Referidor no encontrado', 'danger');
+            return;
+        }
+        if (!referido) {
+            showAlert('⚠️ Referido no encontrado', 'danger');
+            return;
+        }
+        
+        // Verificar si el referido ya está en el árbol
+        if (referidor.referidos && referidor.referidos.lista) {
+            for (var i = 0; i < referidor.referidos.lista.length; i++) {
+                if (referidor.referidos.lista[i].id === telefonoReferido) {
+                    showAlert('⚠️ Este referido ya está en el árbol de ' + referidor.nombre, 'warning');
+                    return;
                 }
             }
-            
-            if (!yaExiste) {
-                referidor.referidos.lista.push({
-                    id: refIndirecto.id,
-                    nombre: refIndirecto.nombre || refIndirecto.id,
-                    nivel: (refIndirecto.nivel || 1) + 1, // Aumenta el nivel
-                    tipo: 'indirecto',
-                    lado: refIndirecto.lado || 'indirecto',
-                    color: refIndirecto.color || 'naranja',
-                    activo: refIndirecto.activo || false,
-                    tienePlan: refIndirecto.tienePlan || false,
-                    plan: refIndirecto.plan || 'Sin plan',
-                    padre: referido.telefono, // Guarda quién es su padre directo
-                    fecha: refIndirecto.fecha || new Date().toISOString()
-                });
+        }
+        
+        // Verificar si el lado está ocupado
+        if (lado === 'izquierda' && referidor.referidos && referidor.referidos.izquierda) {
+            showAlert('⚠️ El lado IZQUIERDO ya está ocupado por ' + referidor.referidos.izquierda, 'warning');
+            return;
+        }
+        if (lado === 'derecha' && referidor.referidos && referidor.referidos.derecha) {
+            showAlert('⚠️ El lado DERECHO ya está ocupado por ' + referidor.referidos.derecha, 'warning');
+            return;
+        }
+        
+        // Inicializar estructura de referidos si no existe
+        if (!referidor.referidos) {
+            referidor.referidos = { izquierda: null, derecha: null, lista: [] };
+        }
+        if (!referidor.referidos.lista) {
+            referidor.referidos.lista = [];
+        }
+        
+        // ============================================================
+        // 1. AGREGAR EL REFERIDO COMO DIRECTO (NIVEL 1)
+        // ============================================================
+        var nuevoReferido = {
+            id: referido.telefono,
+            nombre: referido.nombre + ' ' + (referido.apellido || ''),
+            nivel: 1,
+            tipo: 'directo',
+            lado: lado,
+            color: color,
+            activo: true,
+            tienePlan: (referido.plan && referido.plan !== 'Sin plan') ? true : false,
+            plan: referido.plan || 'Sin plan',
+            fecha: new Date().toISOString()
+        };
+        
+        referidor.referidos.lista.push(nuevoReferido);
+        
+        // Asignar al lado correspondiente
+        if (lado === 'izquierda') {
+            referidor.referidos.izquierda = referido.telefono;
+        } else {
+            referidor.referidos.derecha = referido.telefono;
+        }
+        
+        // ============================================================
+        // 2. BUSCAR REFERIDOS DEL REFERIDO Y AGREGARLOS COMO INDIRECTOS
+        // ============================================================
+        if (referido.referidos && referido.referidos.lista && referido.referidos.lista.length > 0) {
+            for (var j = 0; j < referido.referidos.lista.length; j++) {
+                var refIndirecto = referido.referidos.lista[j];
+                
+                // Verificar que no esté ya en la lista del referidor
+                var yaExiste = false;
+                for (var k = 0; k < referidor.referidos.lista.length; k++) {
+                    if (referidor.referidos.lista[k].id === refIndirecto.id) {
+                        yaExiste = true;
+                        break;
+                    }
+                }
+                
+                if (!yaExiste) {
+                    referidor.referidos.lista.push({
+                        id: refIndirecto.id,
+                        nombre: refIndirecto.nombre || refIndirecto.id,
+                        nivel: (refIndirecto.nivel || 1) + 1,
+                        tipo: 'indirecto',
+                        lado: refIndirecto.lado || 'indirecto',
+                        color: refIndirecto.color || 'naranja',
+                        activo: refIndirecto.activo || false,
+                        tienePlan: refIndirecto.tienePlan || false,
+                        plan: refIndirecto.plan || 'Sin plan',
+                        padre: referido.telefono,
+                        fecha: refIndirecto.fecha || new Date().toISOString()
+                    });
+                }
             }
         }
+        
+        // ============================================================
+        // 3. GUARDAR EN LOCALSTORAGE Y SINCRONIZAR
+        // ============================================================
+        saveUsers(users);
+        sincronizarUsuarioConBackend(telefonoReferidor);
+        
+        // Actualizar sessionStorage
+        sessionStorage.setItem('apex_users', JSON.stringify(users));
+        
+        // ============================================================
+        // 4. GENERAR NOTIFICACIÓN
+        // ============================================================
+        generarNotificacion(
+            'referido',
+            '🌳 Referido activado en árbol',
+            referido.nombre + ' ' + (referido.apellido || '') + ' fue activado como ' + lado + ' de ' + referidor.nombre + ' (Color: ' + color + ')',
+            referidor.nombre + ' ' + referidor.apellido,
+            referidor.telefono,
+            'aprobado'
+        );
+        
+        // ============================================================
+        // 5. MOSTRAR MENSAJE Y RECARGAR
+        // ============================================================
+        showAlert('✅ ' + referido.nombre + ' activado como ' + lado + ' de ' + referidor.nombre + ' (Color: ' + color + '). ' + (referido.referidos && referido.referidos.lista ? referido.referidos.lista.length : 0) + ' referidos indirectos agregados.', 'success');
+        
+        // Cerrar y reabrir detalles para actualizar el árbol
+        cerrarDetalles();
+        setTimeout(function() {
+            verDetallesUsuario(telefonoReferidor);
+        }, 500);
+        
+    } catch (error) {
+        console.error('Error en activarReferidoDirecto:', error);
+        showAlert('❌ Error al activar referido: ' + error.message, 'danger');
     }
-    
-    // ============================================================
-    // 3. GUARDAR EN LOCALSTORAGE Y SINCRONIZAR
-    // ============================================================
-    saveUsers(users);
-    sincronizarUsuarioConBackend(telefonoReferidor);
-    
-    // Actualizar sessionStorage
-    sessionStorage.setItem('apex_users', JSON.stringify(users));
-    
-    // ============================================================
-    // 4. GENERAR NOTIFICACIÓN
-    // ============================================================
-    generarNotificacion(
-        'referido',
-        '🌳 Referido activado en árbol',
-        referido.nombre + ' ' + (referido.apellido || '') + ' fue activado como ' + lado + ' de ' + referidor.nombre + ' (Color: ' + color + ')',
-        referidor.nombre + ' ' + referidor.apellido,
-        referidor.telefono,
-        'aprobado'
-    );
-    
-    // ============================================================
-    // 5. MOSTRAR MENSAJE Y RECARGAR
-    // ============================================================
-    showAlert('✅ ' + referido.nombre + ' activado como ' + lado + ' de ' + referidor.nombre + ' (Color: ' + color + '). ' + (referido.referidos && referido.referidos.lista ? referido.referidos.lista.length : 0) + ' referidos indirectos agregados.', 'success');
-    
-    // Cerrar y reabrir detalles para actualizar el árbol
-    cerrarDetalles();
-    setTimeout(function() {
-        verDetallesUsuario(telefonoReferidor);
-    }, 500);
 }
 
 function renderArbolMini(user) {
