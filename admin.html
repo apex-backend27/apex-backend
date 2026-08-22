@@ -3595,7 +3595,7 @@ function verDetallesUsuario(telefono) {
 
 
 // ============================================================
-// SECCIÓN: LISTA COMPLETA DE REFERIDOS (CON ACTIVAR/DESACTIVAR)
+// SECCIÓN: LISTA COMPLETA DE REFERIDOS (CORREGIDA)
 // ============================================================
 var listaReferidosHtml = '<div style="margin-top:14px;border-top:1px solid #e0e0e0;padding-top:10px;">';
 listaReferidosHtml += '<div style="font-weight:600;font-size:13px;margin-bottom:6px;">📋 Todos los Referidos</div>';
@@ -3610,11 +3610,14 @@ for (var i = 0; i < allUsers.length; i++) {
     if (u.telefono === 'admin') continue;
     
     var esReferido = false;
+    
+    // ✅ Verificar por referido_por (cuando se registraron con el código)
     if (u.referido_por && u.referido_por === user.telefono) {
         esReferido = true;
     }
     
-    if (user.referidos && user.referidos.lista) {
+    // ✅ También verificar en la lista de referidos del usuario
+    if (!esReferido && user.referidos && user.referidos.lista) {
         for (var r = 0; r < user.referidos.lista.length; r++) {
             if (user.referidos.lista[r].id === u.telefono) {
                 esReferido = true;
@@ -3626,19 +3629,27 @@ for (var i = 0; i < allUsers.length; i++) {
     if (esReferido) {
         // Verificar si está activado en el árbol
         var estaActivado = false;
+        var posicion = 'pendiente';
         if (user.referidos && user.referidos.lista) {
             for (var a = 0; a < user.referidos.lista.length; a++) {
-                if (user.referidos.lista[a].id === u.telefono && user.referidos.lista[a].activo === true) {
-                    estaActivado = true;
+                if (user.referidos.lista[a].id === u.telefono) {
+                    if (user.referidos.lista[a].activo === true) {
+                        estaActivado = true;
+                        posicion = user.referidos.lista[a].lado || 'desconocido';
+                    }
                     break;
                 }
             }
         }
         
-        var tienePlan = (u.plan && u.plan !== 'Sin plan');
+        // ✅ VERIFICAR SI TIENE PLAN (USANDO EL PLAN DEL USUARIO)
+        var tienePlan = (u.plan && u.plan !== 'Sin plan' && u.plan !== 'null' && u.plan !== 'undefined');
         var planText = tienePlan ? '✅ ' + u.plan : '⏳ Sin plan';
-        var estadoText = estaActivado ? '🌳 En árbol' : '📥 Pendiente';
+        var estadoText = estaActivado ? '🌳 En árbol (' + posicion + ')' : '📥 Pendiente de activar';
         var estadoColor = estaActivado ? '#4db6ac' : '#f7971e';
+        
+        // ✅ SI TIENE PLAN Y NO ESTÁ ACTIVADO, DESTACARLO
+        var destacado = (tienePlan && !estaActivado) ? 'border:2px solid #f7971e; background:#fff8e1;' : 'border:1px solid #e0e0e0; background:#f8f9fa;';
         
         referidosLista.push({
             user: u,
@@ -3646,10 +3657,22 @@ for (var i = 0; i < allUsers.length; i++) {
             tienePlan: tienePlan,
             planText: planText,
             estadoText: estadoText,
-            estadoColor: estadoColor
+            estadoColor: estadoColor,
+            posicion: posicion,
+            destacado: destacado
         });
     }
 }
+
+// ✅ ORDENAR: Primero los que tienen plan y no están activados, luego los activados, luego los sin plan
+referidosLista.sort(function(a, b) {
+    // Prioridad: tiene plan y no activado > activado > sin plan
+    if (a.tienePlan && !a.estaActivado) return -1;
+    if (b.tienePlan && !b.estaActivado) return 1;
+    if (a.estaActivado && !b.estaActivado) return -1;
+    if (!a.estaActivado && b.estaActivado) return 1;
+    return 0;
+});
 
 if (referidosLista.length === 0) {
     listaReferidosHtml += '<div style="color:#999;font-size:12px;padding:8px 0;">No hay referidos registrados.</div>';
@@ -3658,9 +3681,22 @@ if (referidosLista.length === 0) {
         var ref = referidosLista[i];
         var u = ref.user;
         
-        listaReferidosHtml += '<div style="background:#f8f9fa;border:2px solid ' + (ref.estaActivado ? '#4db6ac' : '#e0e0e0') + ';border-radius:10px;padding:12px;margin-bottom:8px;">';
+        // Color de fondo según estado
+        var bgColor = ref.estaActivado ? '#e8f5e9' : (ref.tienePlan ? '#fff8e1' : '#f8f9fa');
+        var borderColor = ref.estaActivado ? '#4db6ac' : (ref.tienePlan ? '#f7971e' : '#e0e0e0');
+        
+        listaReferidosHtml += '<div style="border:2px solid ' + borderColor + ';border-radius:10px;padding:12px;margin-bottom:8px;background:' + bgColor + ';">';
         listaReferidosHtml += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;align-items:center;">';
-        listaReferidosHtml += '<div><strong>' + u.nombre + ' ' + (u.apellido || '') + '</strong> 📱 ' + u.telefono + '<br><span style="font-size:11px;color:#666;">' + ref.planText + ' · ' + (ref.estaActivado ? '🌳 Activo' : '📥 Pendiente') + '</span></div>';
+        listaReferidosHtml += '<div><strong>' + u.nombre + ' ' + (u.apellido || '') + '</strong> 📱 ' + u.telefono + '<br>';
+        listaReferidosHtml += '<span style="font-size:11px;color:#666;">' + ref.planText + ' · </span>';
+        listaReferidosHtml += '<span style="font-size:11px;color:' + ref.estadoColor + ';font-weight:600;">' + ref.estadoText + '</span>';
+        
+        // ✅ SI TIENE PLAN, MOSTRAR INDICADOR
+        if (ref.tienePlan && !ref.estaActivado) {
+            listaReferidosHtml += ' <span style="font-size:10px;background:#f7971e;color:#fff;padding:2px 8px;border-radius:10px;">⚠️ PENDIENTE DE ACTIVAR</span>';
+        }
+        
+        listaReferidosHtml += '</div>';
         listaReferidosHtml += '</div>';
         
         listaReferidosHtml += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;">';
@@ -3683,7 +3719,7 @@ if (referidosLista.length === 0) {
             listaReferidosHtml += '<button class="btn btn-success btn-sm" onclick="activarReferidoDirecto(\'' + user.telefono + '\', \'' + u.telefono + '\', document.getElementById(\'ladoSelectLista_' + u.telefono + '\').value, document.getElementById(\'colorSelectLista_' + u.telefono + '\').value)" style="padding:6px 16px;">🌳 Activar</button>';
         } else {
             // Si está activado, mostrar botón para desactivar
-            listaReferidosHtml += '<button class="btn btn-danger btn-sm" onclick="desactivarReferido(\'' + user.telefono + '\', \'' + u.telefono + '\')" style="padding:6px 16px;">❌ Desactivar</button>';
+            listaReferidosHtml += '<button class="btn btn-warning btn-sm" onclick="desactivarReferido(\'' + user.telefono + '\', \'' + u.telefono + '\')" style="padding:6px 16px;">⬅️ Quitar del árbol</button>';
         }
         
         // Botón para eliminar referido
@@ -3697,11 +3733,10 @@ if (referidosLista.length === 0) {
 listaReferidosHtml += '</div>';
 
 // Agregar la sección al modal
-var contentDiv2 = document.getElementById('detallesContent');
-if (contentDiv2) {
-    contentDiv2.insertAdjacentHTML('beforeend', listaReferidosHtml);
+var contentDiv3 = document.getElementById('detallesContent');
+if (contentDiv3) {
+    contentDiv3.insertAdjacentHTML('beforeend', listaReferidosHtml);
 }
-
 
 // ============================================================
 // DESACTIVAR REFERIDO (QUITAR DEL ÁRBOL)
