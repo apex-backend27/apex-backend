@@ -3693,76 +3693,22 @@ function cerrarDetalles() {
 function renderArbolMini(user) {
     var users = getUsers();
     var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
-    var izq = referidos.izquierda;
-    var der = referidos.derecha;
+    var listaReferidos = referidos.lista || [];
 
-    var izqUser = null, derUser = null;
-    if (izq) {
+    function obtenerUsuario(telefono) {
+        if (!telefono) return null;
         for (var i = 0; i < users.length; i++) {
-            if (users[i].telefono === izq) { izqUser = users[i]; break; }
-        }
-    }
-    if (der) {
-        for (var i = 0; i < users.length; i++) {
-            if (users[i].telefono === der) { derUser = users[i]; break; }
-        }
-    }
-
-    var izqIzq = null, izqDer = null, derIzq = null, derDer = null;
-    if (izqUser && izqUser.referidos) {
-        if (izqUser.referidos.izquierda) {
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === izqUser.referidos.izquierda) { izqIzq = users[i]; break; }
+            if (users[i] && users[i].telefono === telefono) {
+                return users[i];
             }
         }
-        if (izqUser.referidos.derecha) {
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === izqUser.referidos.derecha) { izqDer = users[i]; break; }
-            }
-        }
-    }
-    if (derUser && derUser.referidos) {
-        if (derUser.referidos.izquierda) {
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === derUser.referidos.izquierda) { derIzq = users[i]; break; }
-            }
-        }
-        if (derUser.referidos.derecha) {
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === derUser.referidos.derecha) { derDer = users[i]; break; }
-            }
-        }
-    }
-
-    // ✅ FUNCIÓN PARA OBTENER COLOR DE UN REFERIDO
-    function getColorFromList(telefono) {
-        if (!telefono) return 'empty';
-        if (referidos && referidos.lista) {
-            for (var i = 0; i < referidos.lista.length; i++) {
-                if (referidos.lista[i].id === telefono) {
-                    var color = referidos.lista[i].color || 'naranja';
-                    if (color === 'verde') return 'completed';
-                    if (color === 'naranja') return 'pending';
-                    if (color === 'azul') return 'blue';
-                    return 'pending';
-                }
-            }
-        }
-        return 'empty';
+        return null;
     }
 
     function getEstado(u) {
         if (!u) return 'empty';
-        if (u.plan && u.plan !== 'Sin plan') return 'completed';
-        // Verificar en la lista de referidos
-        if (u && referidos && referidos.lista) {
-            for (var i = 0; i < referidos.lista.length; i++) {
-                if (referidos.lista[i].id === u.telefono) {
-                    if (referidos.lista[i].color === 'verde') return 'completed';
-                    if (referidos.lista[i].color === 'azul') return 'blue';
-                    return 'pending';
-                }
-            }
+        if (u.plan && u.plan !== 'Sin plan' && u.plan !== 'null' && u.plan !== 'undefined') {
+            return 'completed';
         }
         return 'pending';
     }
@@ -3772,36 +3718,154 @@ function renderArbolMini(user) {
         return u.nombre ? u.nombre[0] : '?';
     }
 
+    function getNombre(u) {
+        if (!u) return '';
+        return u.nombre || '';
+    }
+
+    function getPlan(u) {
+        if (!u) return '';
+        if (u.plan && u.plan !== 'Sin plan' && u.plan !== 'null' && u.plan !== 'undefined') {
+            return u.plan;
+        }
+        return '';
+    }
+
     function crearNodo(u, tipo) {
         var estado = getEstado(u);
         var clase = 'circle';
-        if (tipo === 'you') clase += ' you';
-        else if (estado === 'completed') clase += ' completed';
-        else if (estado === 'blue') clase += ' blue';
-        else if (estado === 'pending') clase += ' pending';
-        else clase += ' empty';
-        
-        // Color personalizado para azul
-        var estiloExtra = '';
-        if (estado === 'blue') {
-            estiloExtra = ' style="background:#2196f3;color:#fff;border-color:#2196f3;"';
+        if (tipo === 'you') {
+            clase += ' you';
+        } else if (estado === 'completed') {
+            clase += ' completed';
+        } else if (estado === 'pending') {
+            clase += ' pending';
+        } else {
+            clase += ' empty';
         }
-        
-        return '<div class="node"><div class="' + clase + '"' + estiloExtra + '>' + getInicial(u) + '</div><div class="label">' + (u ? u.nombre || '?' : 'Vacío') + '</div></div>';
+
+        var nombre = getNombre(u);
+        var inicial = getInicial(u);
+        var plan = getPlan(u);
+        var color = '#f5f5f5';
+        var border = '#ddd';
+
+        if (u) {
+            if (u.plan && u.plan !== 'Sin plan' && u.plan !== 'null' && u.plan !== 'undefined') {
+                color = '#4db6ac';
+                border = '#2e7d32';
+            } else {
+                color = '#f5f5f5';
+                border = '#ddd';
+            }
+        }
+
+        var labelHtml = '<div class="label">' + (nombre || 'Vacío') + '</div>';
+        if (plan) {
+            labelHtml += '<div class="label plan-label">' + plan + '</div>';
+        }
+
+        return '<div class="node">' +
+            '<div class="' + clase + '" style="background:' + color + ';border-color:' + border + ';">' + inicial + '</div>' +
+            labelHtml +
+        '</div>';
     }
 
+    // ============================================================
+    // 1. FILTRAR REFERIDOS CON PLAN ACTIVO (SIN DEPENDER DE "activo")
+    // ✅ AHORA MUESTRA A TODOS LOS QUE TENGAN PLAN
+    // ============================================================
+    var directosConPlan = [];
+    for (var i = 0; i < listaReferidos.length; i++) {
+        var ref = listaReferidos[i];
+        if (!ref || !ref.id) continue;
+        var refUser = obtenerUsuario(ref.id);
+        if (refUser) {
+            if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined') {
+                directosConPlan.push(refUser);
+            }
+        }
+    }
+
+    // ============================================================
+    // 2. CONSTRUIR EL ÁRBOL
+    // ============================================================
     var html = '';
     html += '<div class="tree-mini">';
+
+    // NIVEL 1: TÚ
     html += '<div class="level">' + crearNodo(user, 'you') + '</div>';
     html += '<div class="connector">│</div>';
-    html += '<div class="level">' + crearNodo(izqUser, 'directo') + crearNodo(derUser, 'directo') + '</div>';
+
+    // NIVEL 2: DIRECTOS CON PLAN (TODOS)
+    if (directosConPlan.length === 0) {
+        html += '<div class="level">' + crearNodo(null, 'directo') + crearNodo(null, 'directo') + '</div>';
+    } else {
+        html += '<div class="level" style="flex-wrap:wrap;gap:12px;">';
+        for (var i = 0; i < directosConPlan.length; i++) {
+            html += crearNodo(directosConPlan[i], 'directo');
+        }
+        while (directosConPlan.length < 2) {
+            html += crearNodo(null, 'directo');
+        }
+        html += '</div>';
+    }
+
     html += '<div class="connector">│</div>';
-    html += '<div class="level">' + 
-        crearNodo(izqIzq, 'indirecto') + 
-        crearNodo(izqDer, 'indirecto') + 
-        crearNodo(derIzq, 'indirecto') + 
-        crearNodo(derDer, 'indirecto') + 
-    '</div>';
+
+    // NIVEL 3: INDIRECTOS (hijos de los directos que tengan plan)
+    var indirectosConPlan = [];
+    for (var i = 0; i < directosConPlan.length; i++) {
+        var directo = directosConPlan[i];
+        if (directo.referidos && directo.referidos.lista) {
+            for (var j = 0; j < directo.referidos.lista.length; j++) {
+                var subRef = directo.referidos.lista[j];
+                if (!subRef || !subRef.id) continue;
+                var subUser = obtenerUsuario(subRef.id);
+                if (subUser) {
+                    if (subUser.plan && subUser.plan !== 'Sin plan' && subUser.plan !== 'null' && subUser.plan !== 'undefined') {
+                        indirectosConPlan.push(subUser);
+                    }
+                }
+            }
+        }
+    }
+
+    if (indirectosConPlan.length === 0) {
+        html += '<div class="level">' + 
+            crearNodo(null, 'indirecto') + 
+            crearNodo(null, 'indirecto') + 
+            crearNodo(null, 'indirecto') + 
+            crearNodo(null, 'indirecto') + 
+        '</div>';
+    } else {
+        html += '<div class="level" style="flex-wrap:wrap;gap:12px;">';
+        for (var i = 0; i < indirectosConPlan.length; i++) {
+            html += crearNodo(indirectosConPlan[i], 'indirecto');
+        }
+        while (indirectosConPlan.length < 4) {
+            html += crearNodo(null, 'indirecto');
+        }
+        html += '</div>';
+    }
+
+    // ============================================================
+    // 3. ESTADÍSTICAS
+    // ============================================================
+    var totalReferidos = listaReferidos.length;
+    var activos = directosConPlan.length + indirectosConPlan.length;
+
+    html += '<div class="tree-stats">';
+    html += '<div class="stat-item green">';
+    html += '<span class="number">' + activos + '</span>';
+    html += '<span class="label">✅ Con plan</span>';
+    html += '</div>';
+    html += '<div class="stat-item">';
+    html += '<span class="number">' + totalReferidos + '</span>';
+    html += '<span class="label">📊 Total</span>';
+    html += '</div>';
+    html += '</div>';
+
     html += '</div>';
 
     return html;
