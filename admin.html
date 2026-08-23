@@ -3600,8 +3600,8 @@ function verDetallesUsuario(telefono) {
         document.getElementById('detArbol').innerHTML = '<div style="color:#999;font-size:12px;padding:8px 0;">Error al cargar el árbol de referidos.</div>';
     }
 
-    // ============================================================
-    // SECCIÓN: LISTA DE REFERIDOS (SIMPLE, SIN BOTONES)
+               // ============================================================
+    // SECCIÓN: LISTA DE REFERIDOS (SOLO user.referidos.lista)
     // ============================================================
     try {
         var listaReferidosHtml = '<div style="margin-top:14px;border-top:1px solid #e0e0e0;padding-top:10px;">';
@@ -3609,6 +3609,7 @@ function verDetallesUsuario(telefono) {
 
         var referidosLista = [];
 
+        // ✅ SOLO USAR user.referidos.lista (IGNORAR referido_por)
         if (user.referidos && user.referidos.lista && user.referidos.lista.length > 0) {
             var allUsers = getUsers();
             
@@ -3624,19 +3625,27 @@ function verDetallesUsuario(telefono) {
                     }
                 }
                 
-                if (refUser) {
-                    var tienePlan = (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined');
-                    var planText = tienePlan ? refUser.plan : 'Sin plan';
-                    var fechaRegistro = refUser.fecha_registro || ref.date || new Date().toISOString();
-                    var fechaFormateada = formatDate(fechaRegistro);
-                    
-                    referidosLista.push({
-                        user: refUser,
-                        tienePlan: tienePlan,
-                        planText: planText,
-                        fecha: fechaFormateada
-                    });
+                if (!refUser) {
+                    refUser = {
+                        telefono: ref.id,
+                        nombre: ref.nombre || ref.id,
+                        apellido: '',
+                        plan: ref.plan || 'Sin plan',
+                        fecha_registro: ref.date || new Date().toISOString()
+                    };
                 }
+                
+                var tienePlan = (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined');
+                var planText = tienePlan ? refUser.plan : 'Sin plan';
+                var fechaRegistro = refUser.fecha_registro || ref.date || new Date().toISOString();
+                var fechaFormateada = formatDate(fechaRegistro);
+                
+                referidosLista.push({
+                    user: refUser,
+                    tienePlan: tienePlan,
+                    planText: planText,
+                    fecha: fechaFormateada
+                });
             }
         }
 
@@ -3654,14 +3663,14 @@ function verDetallesUsuario(telefono) {
                 var claseItem = ref.tienePlan ? 'referido-item con-plan' : 'referido-item sin-plan';
                 var clasePlan = ref.tienePlan ? 'plan con-plan' : 'plan sin-plan';
                 
-                listaReferidosHtml += '<div class="' + claseItem + '">';
-                listaReferidosHtml += '<div class="info">';
-                listaReferidosHtml += '<span class="numero">#' + (i + 1) + '</span>';
-                listaReferidosHtml += '<span class="nombre">' + (u.nombre || '') + ' ' + (u.apellido || '') + '</span>';
-                listaReferidosHtml += '<span class="telefono">📱 ' + u.telefono + '</span>';
-                listaReferidosHtml += '<span class="fecha">📅 ' + ref.fecha + '</span>';
+                listaReferidosHtml += '<div class="' + claseItem + '" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:8px 12px; margin-bottom:4px; border-radius:8px; background:' + (ref.tienePlan ? '#f0faf5' : '#f8f9fa') + '; border:1px solid ' + (ref.tienePlan ? '#4db6ac' : '#e0e0e0') + ';">';
+                listaReferidosHtml += '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">';
+                listaReferidosHtml += '<span style="font-weight:700; color:#333; font-size:13px;">#' + (i + 1) + '</span>';
+                listaReferidosHtml += '<span style="font-weight:600; color:#333;">' + (u.nombre || '') + ' ' + (u.apellido || '') + '</span>';
+                listaReferidosHtml += '<span style="font-size:11px; color:#999;">📱 ' + u.telefono + '</span>';
+                listaReferidosHtml += '<span style="font-size:10px; color:#999;">📅 ' + ref.fecha + '</span>';
                 listaReferidosHtml += '</div>';
-                listaReferidosHtml += '<span class="' + clasePlan + '">' + ref.planText + '</span>';
+                listaReferidosHtml += '<span style="font-size:11px; color:' + (ref.tienePlan ? '#2e7d32' : '#999') + '; font-weight:500;">' + ref.planText + '</span>';
                 listaReferidosHtml += '</div>';
             }
         }
@@ -3670,13 +3679,28 @@ function verDetallesUsuario(telefono) {
 
         var contentDiv = document.getElementById('detallesContent');
         if (contentDiv) {
-            contentDiv.insertAdjacentHTML('beforeend', listaReferidosHtml);
+            // ✅ ELIMINAR LA SECCIÓN ANTERIOR SI EXISTE
+            var seccionExistente = contentDiv.querySelector('.referidos-section');
+            if (seccionExistente) {
+                seccionExistente.remove();
+            }
+            // ✅ AGREGAR LA NUEVA SECCIÓN CON UNA CLASE PARA IDENTIFICARLA
+            var nuevoElemento = document.createElement('div');
+            nuevoElemento.className = 'referidos-section';
+            nuevoElemento.innerHTML = listaReferidosHtml;
+            contentDiv.appendChild(nuevoElemento);
         }
     } catch (error) {
         console.error('Error al cargar referidos:', error);
         var contentDiv = document.getElementById('detallesContent');
         if (contentDiv) {
-            contentDiv.insertAdjacentHTML('beforeend', '<div style="color:#999;font-size:12px;padding:8px 0;">Error al cargar referidos.</div>');
+            var seccionExistente = contentDiv.querySelector('.referidos-section');
+            if (!seccionExistente) {
+                var nuevoElemento = document.createElement('div');
+                nuevoElemento.className = 'referidos-section';
+                nuevoElemento.innerHTML = '<div style="color:#999;font-size:12px;padding:8px 0;">Error al cargar referidos.</div>';
+                contentDiv.appendChild(nuevoElemento);
+            }
         }
     }
 
@@ -3691,185 +3715,273 @@ function cerrarDetalles() {
 
 
 function renderArbolMini(user) {
-    var users = getUsers();
-    var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
-    var listaReferidos = referidos.lista || [];
+    try {
+        if (!user) {
+            return '<div style="color:#999;font-size:12px;padding:8px 0;">Usuario no encontrado.</div>';
+        }
+        
+        var users = getUsers();
+        if (!users || !Array.isArray(users)) {
+            users = [];
+        }
+        
+        var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
+        var listaReferidos = referidos.lista || [];
 
-    function obtenerUsuario(telefono) {
-        if (!telefono) return null;
-        for (var i = 0; i < users.length; i++) {
-            if (users[i] && users[i].telefono === telefono) {
-                return users[i];
+        function obtenerUsuario(telefono) {
+            if (!telefono) return null;
+            for (var i = 0; i < users.length; i++) {
+                if (users[i] && users[i].telefono === telefono) {
+                    return users[i];
+                }
+            }
+            return null;
+        }
+
+        function obtenerHijosConPlan(usuario) {
+            var hijos = [];
+            if (!usuario || !usuario.referidos || !usuario.referidos.lista) {
+                return hijos;
+            }
+            for (var i = 0; i < usuario.referidos.lista.length; i++) {
+                var ref = usuario.referidos.lista[i];
+                if (!ref || !ref.id) continue;
+                var refUser = obtenerUsuario(ref.id);
+                if (refUser) {
+                    if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined') {
+                        hijos.push(refUser);
+                    }
+                }
+            }
+            return hijos;
+        }
+
+        // ============================================================
+        // FUNCIÓN RECURSIVA PARA CONSTRUIR EL ÁRBOL CON SANGRÍA
+        // ============================================================
+        function construirArbolConSangria(usuario, nivel, esUltimo, prefijo) {
+            if (nivel > 5) return '';
+            
+            var hijos = obtenerHijosConPlan(usuario);
+            if (hijos.length === 0) return '';
+            
+            var html = '';
+            
+            for (var i = 0; i < hijos.length; i++) {
+                var hijo = hijos[i];
+                var esUltimoHijo = (i === hijos.length - 1);
+                
+                // Determinar el indicador visual
+                var indicador = '├── ';
+                if (esUltimoHijo) {
+                    indicador = '└── ';
+                }
+                
+                // Determinar el prefijo de sangría
+                var sangria = '';
+                if (nivel > 0) {
+                    sangria = '│   ';
+                }
+                
+                // Color y estado del nodo
+                var color = '#4db6ac';
+                var border = '#2e7d32';
+                var inicial = hijo.nombre ? hijo.nombre[0] : '?';
+                var nombre = hijo.nombre || 'Usuario';
+                var plan = hijo.plan || '';
+                
+                // Construir el HTML del nodo con sangría
+                html += '<div style="display:flex; align-items:center; gap:6px; padding:3px 0; font-size:13px; font-family:monospace; padding-left:' + (nivel * 20) + 'px;">';
+                html += '<span style="color:#999; font-size:13px;">' + indicador + '</span>';
+                html += '<span style="display:inline-block; width:24px; height:24px; border-radius:50%; background:' + color + '; border:2px solid ' + border + '; text-align:center; line-height:20px; font-size:10px; font-weight:700; color:#fff;">' + inicial + '</span>';
+                html += '<span style="font-family:Arial, sans-serif; font-weight:500;">' + nombre + '</span>';
+                if (plan) {
+                    html += '<span style="font-size:9px; color:#4db6ac; background:#e8f5e9; padding:1px 8px; border-radius:10px; font-family:Arial, sans-serif;">' + plan + '</span>';
+                }
+                html += '</div>';
+                
+                // Recursivamente procesar los hijos de este hijo
+                if (nivel < 5) {
+                    var nietos = obtenerHijosConPlan(hijo);
+                    if (nietos.length > 0) {
+                        html += construirArbolConSangria(hijo, nivel + 1, esUltimoHijo, prefijo + (esUltimoHijo ? '    ' : '│   '));
+                    }
+                }
+            }
+            
+            return html;
+        }
+
+        // ============================================================
+        // 1. OBTENER REFERIDOS DIRECTOS CON PLAN
+        // ============================================================
+        var directosConPlan = [];
+        for (var i = 0; i < listaReferidos.length; i++) {
+            var ref = listaReferidos[i];
+            if (!ref || !ref.id) continue;
+            var refUser = obtenerUsuario(ref.id);
+            if (refUser) {
+                if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined') {
+                    directosConPlan.push(refUser);
+                }
             }
         }
-        return null;
-    }
 
-    function getEstado(u) {
-        if (!u) return 'empty';
-        if (u.plan && u.plan !== 'Sin plan' && u.plan !== 'null' && u.plan !== 'undefined') {
-            return 'completed';
-        }
-        return 'pending';
-    }
+        // ============================================================
+        // 2. CONSTRUIR EL ÁRBOL CON SANGRÍA
+        // ============================================================
+        var html = '';
+        html += '<div style="background:#f8f9fa; border-radius:12px; padding:16px; border:2px solid #e0e0e0; max-height:500px; overflow-y:auto;">';
+        html += '<div style="font-weight:700; font-size:14px; margin-bottom:10px; color:#333; text-align:center;">🌳 Árbol de Referidos</div>';
+        html += '<div style="font-family:monospace; font-size:13px; line-height:1.8;">';
 
-    function getInicial(u) {
-        if (!u) return '?';
-        return u.nombre ? u.nombre[0] : '?';
-    }
-
-    function getNombre(u) {
-        if (!u) return '';
-        return u.nombre || '';
-    }
-
-    function getPlan(u) {
-        if (!u) return '';
-        if (u.plan && u.plan !== 'Sin plan' && u.plan !== 'null' && u.plan !== 'undefined') {
-            return u.plan;
-        }
-        return '';
-    }
-
-    function crearNodo(u, tipo) {
-        var estado = getEstado(u);
-        var clase = 'circle';
-        if (tipo === 'you') {
-            clase += ' you';
-        } else if (estado === 'completed') {
-            clase += ' completed';
-        } else if (estado === 'pending') {
-            clase += ' pending';
-        } else {
-            clase += ' empty';
-        }
-
-        var nombre = getNombre(u);
-        var inicial = getInicial(u);
-        var plan = getPlan(u);
-        var color = '#f5f5f5';
-        var border = '#ddd';
-
-        if (u) {
-            if (u.plan && u.plan !== 'Sin plan' && u.plan !== 'null' && u.plan !== 'undefined') {
-                color = '#4db6ac';
-                border = '#2e7d32';
-            } else {
-                color = '#f5f5f5';
-                border = '#ddd';
-            }
-        }
-
-        var labelHtml = '<div class="label">' + (nombre || 'Vacío') + '</div>';
+        // Nodo raíz (el usuario)
+        var inicial = user.nombre ? user.nombre[0] : '?';
+        var nombre = user.nombre || 'Usuario';
+        var plan = user.plan || '';
+        
+        html += '<div style="display:flex; align-items:center; gap:8px; padding:4px 0; font-weight:700; font-size:14px;">';
+        html += '<span style="display:inline-block; width:28px; height:28px; border-radius:50%; background:#000; border:2px solid #000; text-align:center; line-height:24px; font-size:12px; font-weight:700; color:#fff;">' + inicial + '</span>';
+        html += '<span style="font-family:Arial, sans-serif;">' + nombre + '</span>';
         if (plan) {
-            labelHtml += '<div class="label plan-label">' + plan + '</div>';
-        }
-
-        return '<div class="node">' +
-            '<div class="' + clase + '" style="background:' + color + ';border-color:' + border + ';">' + inicial + '</div>' +
-            labelHtml +
-        '</div>';
-    }
-
-    // ============================================================
-    // 1. FILTRAR REFERIDOS CON PLAN ACTIVO (SIN DEPENDER DE "activo")
-    // ✅ AHORA MUESTRA A TODOS LOS QUE TENGAN PLAN
-    // ============================================================
-    var directosConPlan = [];
-    for (var i = 0; i < listaReferidos.length; i++) {
-        var ref = listaReferidos[i];
-        if (!ref || !ref.id) continue;
-        var refUser = obtenerUsuario(ref.id);
-        if (refUser) {
-            if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined') {
-                directosConPlan.push(refUser);
-            }
-        }
-    }
-
-    // ============================================================
-    // 2. CONSTRUIR EL ÁRBOL
-    // ============================================================
-    var html = '';
-    html += '<div class="tree-mini">';
-
-    // NIVEL 1: TÚ
-    html += '<div class="level">' + crearNodo(user, 'you') + '</div>';
-    html += '<div class="connector">│</div>';
-
-    // NIVEL 2: DIRECTOS CON PLAN (TODOS)
-    if (directosConPlan.length === 0) {
-        html += '<div class="level">' + crearNodo(null, 'directo') + crearNodo(null, 'directo') + '</div>';
-    } else {
-        html += '<div class="level" style="flex-wrap:wrap;gap:12px;">';
-        for (var i = 0; i < directosConPlan.length; i++) {
-            html += crearNodo(directosConPlan[i], 'directo');
-        }
-        while (directosConPlan.length < 2) {
-            html += crearNodo(null, 'directo');
+            html += '<span style="font-size:10px; color:#4db6ac; background:#e8f5e9; padding:1px 10px; border-radius:10px; font-family:Arial, sans-serif;">' + plan + '</span>';
         }
         html += '</div>';
-    }
 
-    html += '<div class="connector">│</div>';
-
-    // NIVEL 3: INDIRECTOS (hijos de los directos que tengan plan)
-    var indirectosConPlan = [];
-    for (var i = 0; i < directosConPlan.length; i++) {
-        var directo = directosConPlan[i];
-        if (directo.referidos && directo.referidos.lista) {
-            for (var j = 0; j < directo.referidos.lista.length; j++) {
-                var subRef = directo.referidos.lista[j];
-                if (!subRef || !subRef.id) continue;
-                var subUser = obtenerUsuario(subRef.id);
-                if (subUser) {
-                    if (subUser.plan && subUser.plan !== 'Sin plan' && subUser.plan !== 'null' && subUser.plan !== 'undefined') {
-                        indirectosConPlan.push(subUser);
+        // Mostrar los directos con su árbol
+        if (directosConPlan.length === 0) {
+            html += '<div style="color:#999; font-size:12px; padding:8px 0; font-family:Arial, sans-serif;">No hay referidos con plan activo.</div>';
+        } else {
+            for (var i = 0; i < directosConPlan.length; i++) {
+                var hijo = directosConPlan[i];
+                var esUltimoDirecto = (i === directosConPlan.length - 1);
+                
+                var indicador = '├── ';
+                if (esUltimoDirecto) {
+                    indicador = '└── ';
+                }
+                
+                var color = '#4db6ac';
+                var border = '#2e7d32';
+                var inicialHijo = hijo.nombre ? hijo.nombre[0] : '?';
+                var nombreHijo = hijo.nombre || 'Usuario';
+                var planHijo = hijo.plan || '';
+                
+                html += '<div style="display:flex; align-items:center; gap:6px; padding:3px 0; font-size:13px; font-family:monospace;">';
+                html += '<span style="color:#999; font-size:13px;">' + indicador + '</span>';
+                html += '<span style="display:inline-block; width:24px; height:24px; border-radius:50%; background:' + color + '; border:2px solid ' + border + '; text-align:center; line-height:20px; font-size:10px; font-weight:700; color:#fff;">' + inicialHijo + '</span>';
+                html += '<span style="font-family:Arial, sans-serif; font-weight:500;">' + nombreHijo + '</span>';
+                if (planHijo) {
+                    html += '<span style="font-size:9px; color:#4db6ac; background:#e8f5e9; padding:1px 8px; border-radius:10px; font-family:Arial, sans-serif;">' + planHijo + '</span>';
+                }
+                html += '</div>';
+                
+                // Procesar los hijos de este directo (nivel 3+)
+                var hijosDelDirecto = obtenerHijosConPlan(hijo);
+                if (hijosDelDirecto.length > 0) {
+                    var prefijo = esUltimoDirecto ? '    ' : '│   ';
+                    for (var j = 0; j < hijosDelDirecto.length; j++) {
+                        var nieto = hijosDelDirecto[j];
+                        var esUltimoNieto = (j === hijosDelDirecto.length - 1);
+                        
+                        var indicadorNieto = '├── ';
+                        if (esUltimoNieto) {
+                            indicadorNieto = '└── ';
+                        }
+                        
+                        var colorNieto = '#4db6ac';
+                        var borderNieto = '#2e7d32';
+                        var inicialNieto = nieto.nombre ? nieto.nombre[0] : '?';
+                        var nombreNieto = nieto.nombre || 'Usuario';
+                        var planNieto = nieto.plan || '';
+                        
+                        html += '<div style="display:flex; align-items:center; gap:6px; padding:3px 0; font-size:13px; font-family:monospace; padding-left:20px;">';
+                        html += '<span style="color:#999; font-size:13px;">' + indicadorNieto + '</span>';
+                        html += '<span style="display:inline-block; width:24px; height:24px; border-radius:50%; background:' + colorNieto + '; border:2px solid ' + borderNieto + '; text-align:center; line-height:20px; font-size:10px; font-weight:700; color:#fff;">' + inicialNieto + '</span>';
+                        html += '<span style="font-family:Arial, sans-serif; font-weight:500;">' + nombreNieto + '</span>';
+                        if (planNieto) {
+                            html += '<span style="font-size:9px; color:#4db6ac; background:#e8f5e9; padding:1px 8px; border-radius:10px; font-family:Arial, sans-serif;">' + planNieto + '</span>';
+                        }
+                        html += '</div>';
+                        
+                        // Nivel 4: bisnietos
+                        var bisnietos = obtenerHijosConPlan(nieto);
+                        if (bisnietos.length > 0) {
+                            for (var k = 0; k < bisnietos.length; k++) {
+                                var bisnieto = bisnietos[k];
+                                var esUltimoBisnieto = (k === bisnietos.length - 1);
+                                
+                                var indicadorBisnieto = '├── ';
+                                if (esUltimoBisnieto) {
+                                    indicadorBisnieto = '└── ';
+                                }
+                                
+                                var colorBisnieto = '#4db6ac';
+                                var borderBisnieto = '#2e7d32';
+                                var inicialBisnieto = bisnieto.nombre ? bisnieto.nombre[0] : '?';
+                                var nombreBisnieto = bisnieto.nombre || 'Usuario';
+                                var planBisnieto = bisnieto.plan || '';
+                                
+                                html += '<div style="display:flex; align-items:center; gap:6px; padding:3px 0; font-size:13px; font-family:monospace; padding-left:40px;">';
+                                html += '<span style="color:#999; font-size:13px;">' + indicadorBisnieto + '</span>';
+                                html += '<span style="display:inline-block; width:24px; height:24px; border-radius:50%; background:' + colorBisnieto + '; border:2px solid ' + borderBisnieto + '; text-align:center; line-height:20px; font-size:10px; font-weight:700; color:#fff;">' + inicialBisnieto + '</span>';
+                                html += '<span style="font-family:Arial, sans-serif; font-weight:500;">' + nombreBisnieto + '</span>';
+                                if (planBisnieto) {
+                                    html += '<span style="font-size:9px; color:#4db6ac; background:#e8f5e9; padding:1px 8px; border-radius:10px; font-family:Arial, sans-serif;">' + planBisnieto + '</span>';
+                                }
+                                html += '</div>';
+                            }
+                        }
                     }
                 }
             }
         }
-    }
 
-    if (indirectosConPlan.length === 0) {
-        html += '<div class="level">' + 
-            crearNodo(null, 'indirecto') + 
-            crearNodo(null, 'indirecto') + 
-            crearNodo(null, 'indirecto') + 
-            crearNodo(null, 'indirecto') + 
-        '</div>';
-    } else {
-        html += '<div class="level" style="flex-wrap:wrap;gap:12px;">';
-        for (var i = 0; i < indirectosConPlan.length; i++) {
-            html += crearNodo(indirectosConPlan[i], 'indirecto');
-        }
-        while (indirectosConPlan.length < 4) {
-            html += crearNodo(null, 'indirecto');
-        }
         html += '</div>';
+
+        // ============================================================
+        // 3. ESTADÍSTICAS
+        // ============================================================
+        var totalReferidos = listaReferidos.length;
+        var activos = 0;
+        
+        function contarTodos(usuarios) {
+            if (!usuarios) return 0;
+            var count = 0;
+            for (var i = 0; i < usuarios.length; i++) {
+                if (usuarios[i] !== null) {
+                    count++;
+                    var hijos = obtenerHijosConPlan(usuarios[i]);
+                    if (hijos.length > 0) {
+                        count += contarTodos(hijos);
+                    }
+                }
+            }
+            return count;
+        }
+        activos = contarTodos(directosConPlan);
+
+        html += '<div style="display:flex; gap:16px; margin-top:12px; padding-top:12px; border-top:2px solid #e0e0e0; justify-content:center;">';
+        html += '<div style="text-align:center; padding:4px 16px; background:#e8f5e9; border-radius:8px;">';
+        html += '<span style="font-size:18px; font-weight:700; color:#2e7d32;">' + activos + '</span>';
+        html += '<span style="font-size:9px; color:#666; display:block;">✅ Con plan</span>';
+        html += '</div>';
+        html += '<div style="text-align:center; padding:4px 16px; background:#f5f5f5; border-radius:8px;">';
+        html += '<span style="font-size:18px; font-weight:700; color:#333;">' + totalReferidos + '</span>';
+        html += '<span style="font-size:9px; color:#666; display:block;">📊 Total</span>';
+        html += '</div>';
+        html += '</div>';
+
+        html += '</div>';
+
+        return html;
+
+    } catch (error) {
+        console.error('Error en renderArbolMini:', error);
+        return '<div style="color:#999;font-size:12px;padding:8px 0;">Error al cargar el árbol.</div>';
     }
-
-    // ============================================================
-    // 3. ESTADÍSTICAS
-    // ============================================================
-    var totalReferidos = listaReferidos.length;
-    var activos = directosConPlan.length + indirectosConPlan.length;
-
-    html += '<div class="tree-stats">';
-    html += '<div class="stat-item green">';
-    html += '<span class="number">' + activos + '</span>';
-    html += '<span class="label">✅ Con plan</span>';
-    html += '</div>';
-    html += '<div class="stat-item">';
-    html += '<span class="number">' + totalReferidos + '</span>';
-    html += '<span class="label">📊 Total</span>';
-    html += '</div>';
-    html += '</div>';
-
-    html += '</div>';
-
-    return html;
 }
+
 
 // ============================================================
 // PREMIOS
