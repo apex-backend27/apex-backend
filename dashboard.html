@@ -759,22 +759,30 @@ function logout() {
 }
 
 // ============================================================
-// CHECK SESSION
+// CHECK SESSION - CON DEPURACIÓN
 // ============================================================
 function checkSession() {
     var token = localStorage.getItem('apex_token');
+    console.log('🔍 Token encontrado:', token ? '✅ Sí' : '❌ No');
+    
     if (!token) {
+        console.log('❌ No hay token, redirigiendo a login');
         window.location.href = 'index.html';
         return;
     }
 
+    console.log('📡 Verificando token con el backend...');
+    
     fetch(API_URL + '/api/verify', {
         method: 'GET',
         headers: { 'Authorization': 'Bearer ' + token }
     })
     .then(response => response.json())
     .then(data => {
+        console.log('📦 Respuesta del backend:', data);
+        
         if (data.error) {
+            console.log('❌ Error en verificación:', data.error);
             localStorage.removeItem('apex_token');
             localStorage.removeItem('apex_user');
             window.location.href = 'index.html';
@@ -782,6 +790,7 @@ function checkSession() {
         }
 
         if (data.user) {
+            console.log('✅ Usuario autenticado:', data.user.nombre);
             user = {
                 telefono: data.user.telefono,
                 nombre: data.user.nombre,
@@ -827,17 +836,26 @@ function checkSession() {
             verificarNuevoDia();
             renderDashboard();
             iniciarVigilante();
+            console.log('✅ Dashboard renderizado correctamente');
         } else {
+            console.log('❌ No hay usuario en la respuesta');
             localStorage.removeItem('apex_token');
             localStorage.removeItem('apex_user');
             window.location.href = 'index.html';
         }
     })
     .catch(error => {
-        console.error('Error al verificar sesión:', error);
-        localStorage.removeItem('apex_token');
-        localStorage.removeItem('apex_user');
-        window.location.href = 'index.html';
+        console.error('❌ Error de red al verificar:', error);
+        // Si falla la conexión, intentar usar sesión local
+        var userLocal = JSON.parse(sessionStorage.getItem('apex_user') || 'null');
+        if (userLocal) {
+            console.log('🔄 Usando sesión local como respaldo');
+            user = userLocal;
+            renderDashboard();
+            iniciarVigilante();
+        } else {
+            window.location.href = 'index.html';
+        }
     });
 }
 
