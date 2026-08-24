@@ -3,403 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>APEX - Login</title>
+    <title>APEX - Inicio de Sesión</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .container { width: 100%; max-width: 400px; background: #ffffff; border-radius: 16px; padding: 32px 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: relative; }
-        .brand { text-align: center; margin-bottom: 28px; }
-        .brand h1 { font-size: 32px; font-weight: 800; color: #000000; }
-        .brand .slogan { font-size: 10px; color: #999; letter-spacing: 4px; text-transform: uppercase; margin-top: 2px; }
-        .tabs { display: flex; gap: 6px; background: #f0f0f0; border-radius: 12px; padding: 4px; margin-bottom: 24px; }
-        .tabs button { flex: 1; padding: 10px; border: none; border-radius: 10px; background: transparent; color: #888; font-size: 14px; font-weight: 600; cursor: pointer; }
-        .tabs button.active { background: #000000; color: #ffffff; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 12px; color: #666; font-weight: 600; margin-bottom: 4px; }
-        .form-group input { width: 100%; padding: 12px 14px; background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 10px; color: #000000; font-size: 15px; outline: none; }
-        .form-group input:focus { border-color: #000000; background: #ffffff; }
-        .form-group input::placeholder { color: #bbb; }
-        .remember-me { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-        .remember-me input[type="checkbox"] { width: 18px; height: 18px; accent-color: #000000; }
-        .remember-me label { font-size: 13px; color: #666; cursor: pointer; }
-        .btn-primary { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #000000; color: #ffffff; font-size: 16px; font-weight: 700; cursor: pointer; }
-        .btn-primary:active { transform: scale(0.97); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .alert { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; display: none; font-size: 13px; text-align: center; }
-        .alert.show { display: block; }
-        .alert-success { background: #e8f5e9; border: 1px solid #c8e6c9; color: #2e7d32; }
-        .alert-danger { background: #fbe9e7; border: 1px solid #ffccbc; color: #c62828; }
-        .alert-warning { background: #fff8e1; border: 1px solid #ffe0b2; color: #e65100; }
-        .alert-info { background: #e3f2fd; border: 1px solid #bbdefb; color: #0d47a1; }
-        .info-text { text-align: center; font-size: 11px; color: #bbb; margin-top: 14px; }
-        .invite-code { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; }
-        .invite-code label { display: block; font-size: 12px; color: #666; font-weight: 600; margin-bottom: 4px; }
-        .invite-code input { width: 100%; padding: 12px 14px; background: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; color: #000000; font-size: 15px; outline: none; font-family: monospace; text-transform: uppercase; letter-spacing: 2px; }
-        .invite-code input:focus { border-color: #000000; }
-        .invite-code input::placeholder { color: #ccc; text-transform: none; letter-spacing: 0; }
-        .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #ffffff; border-top: 2px solid transparent; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .dark-mode-toggle-index {
-            background: none;
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .login-container {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 40px 32px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
+        }
+        .login-container h1 {
+            font-size: 32px;
+            font-weight: 800;
+            color: #000;
+            text-align: center;
+        }
+        .login-container .slogan {
+            text-align: center;
+            font-size: 9px;
+            color: #999;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-top: -4px;
+            margin-bottom: 24px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            color: #000;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .form-group input:focus {
+            border-color: #000;
+            background: #fff;
+        }
+        .login-btn {
+            width: 100%;
+            padding: 16px;
+            background: #000;
+            color: #fff;
             border: none;
-            font-size: 20px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
             cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 8px;
             transition: background 0.2s;
-            position: absolute;
+        }
+        .login-btn:hover { background: #333; }
+        .login-btn:active { transform: scale(0.97); }
+        .error-msg {
+            color: #ef5350;
+            font-size: 13px;
+            text-align: center;
+            margin-top: 12px;
+            display: none;
+        }
+        .error-msg.show { display: block; }
+        .register-link {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 13px;
+            color: #999;
+        }
+        .register-link a {
+            color: #000;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .register-link a:hover { text-decoration: underline; }
+        .dark-mode-toggle {
+            position: fixed;
             top: 16px;
             right: 16px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
         }
-        .dark-mode-toggle-index:hover { background: #f0f0f0; }
-        body.dark-mode .dark-mode-toggle-index:hover { background: #333; }
-
-        /* Modo oscuro */
-        body.dark-mode { background: #121212; color: #e0e0e0; }
-        body.dark-mode .container { background: #1e1e1e; border-color: #333; }
-        body.dark-mode .brand h1 { color: #e0e0e0; }
-        body.dark-mode .brand .slogan { color: #666; }
-        body.dark-mode .tabs { background: #2a2a2a; }
-        body.dark-mode .tabs button { color: #888; }
-        body.dark-mode .tabs button.active { background: #000000; color: #ffffff; }
-        body.dark-mode .form-group label { color: #999; }
-        body.dark-mode .form-group input { background: #2a2a2a; border-color: #444; color: #e0e0e0; }
-        body.dark-mode .form-group input:focus { border-color: #666; background: #333; }
-        body.dark-mode .form-group input::placeholder { color: #666; }
-        body.dark-mode .remember-me label { color: #999; }
-        body.dark-mode .btn-primary { background: #333; color: #ffffff; }
-        body.dark-mode .btn-primary:hover { background: #444; }
-        body.dark-mode .alert-success { background: #1a3a2a; border-color: #2e7d32; color: #4db6ac; }
-        body.dark-mode .alert-danger { background: #3a1a1a; border-color: #c62828; color: #ef5350; }
-        body.dark-mode .alert-warning { background: #3a2a1a; border-color: #e65100; color: #f7971e; }
-        body.dark-mode .alert-info { background: #1a2a3a; border-color: #0d47a1; color: #64b5f6; }
-        body.dark-mode .info-text { color: #666; }
-        body.dark-mode .invite-code { background: #2a2a2a; border-color: #444; }
-        body.dark-mode .invite-code label { color: #999; }
-        body.dark-mode .invite-code input { background: #1e1e1e; border-color: #444; color: #e0e0e0; }
-        body.dark-mode .invite-code input:focus { border-color: #666; background: #2a2a2a; }
-        body.dark-mode .invite-code input::placeholder { color: #666; }
+        body.dark-mode {
+            background: #121212;
+        }
+        body.dark-mode .login-container {
+            background: #1e1e1e;
+            border-color: #333;
+        }
+        body.dark-mode .login-container h1 {
+            color: #e0e0e0;
+        }
+        body.dark-mode .form-group input {
+            background: #2a2a2a;
+            border-color: #444;
+            color: #e0e0e0;
+        }
+        body.dark-mode .form-group input:focus {
+            background: #333;
+            border-color: #666;
+        }
+        body.dark-mode .form-group label {
+            color: #999;
+        }
+        body.dark-mode .register-link {
+            color: #666;
+        }
+        body.dark-mode .register-link a {
+            color: #e0e0e0;
+        }
+        body.dark-mode .dark-mode-toggle {
+            background: #1e1e1e;
+            border-color: #333;
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <button class="dark-mode-toggle-index" onclick="toggleDarkModeIndex()" id="darkModeToggleIndex">🌙</button>
-    <div class="brand">
+    <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙</button>
+
+    <div class="login-container">
         <h1>APEX</h1>
         <div class="slogan">CRECE · GANA · TRIUNFA</div>
+        
+        <div class="form-group">
+            <label>📱 Teléfono o Usuario</label>
+            <input type="text" id="loginUser" placeholder="Ej: 987654321 o admin1714">
+        </div>
+        <div class="form-group">
+            <label>🔑 Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="Ingresa tu contraseña">
+        </div>
+        <button class="login-btn" onclick="login()">🚀 Iniciar Sesión</button>
+        <div class="error-msg" id="loginError">❌ Usuario o contraseña incorrectos</div>
+        <div class="register-link">
+            ¿No tienes cuenta? <a href="#" onclick="showRegister()">Regístrate aquí</a>
+        </div>
     </div>
 
-    <div id="alertMessage" class="alert"></div>
+    <script>
+        const API_URL = 'https://apex-backend-cj21.onrender.com';
 
-    <div class="tabs">
-        <button class="active" onclick="switchTab('login')">Iniciar</button>
-        <button onclick="switchTab('register')">Registrarse</button>
-    </div>
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            var isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('apex_dark_mode', isDark ? 'true' : 'false');
+            document.querySelector('.dark-mode-toggle').textContent = isDark ? '☀️' : '🌙';
+        }
 
-    <div id="tab-login" class="tab-content active">
-        <form id="loginForm" onsubmit="loginUser(event)">
-            <div class="form-group">
-                <label>Teléfono</label>
-                <input type="text" id="loginPhone" placeholder="987654321" required>
-            </div>
-            <div class="form-group">
-                <label>Contraseña</label>
-                <input type="password" id="loginPassword" placeholder="••••••••" required>
-            </div>
-            <div class="remember-me">
-                <input type="checkbox" id="rememberMe">
-                <label for="rememberMe">Recordarme</label>
-            </div>
-            <button type="submit" class="btn-primary" id="loginBtn">Iniciar Sesión</button>
-        </form>
-    </div>
-
-    <div id="tab-register" class="tab-content">
-        <form id="registerForm" onsubmit="registerUser(event)">
-            <div class="form-group">
-                <label>Teléfono</label>
-                <input type="text" id="registerPhone" placeholder="987654321" required>
-            </div>
-            <div class="form-group">
-                <label>Nombre</label>
-                <input type="text" id="registerName" placeholder="Juan" required>
-            </div>
-            <div class="form-group">
-                <label>Apellido</label>
-                <input type="text" id="registerLastName" placeholder="Pérez" required>
-            </div>
-            <div class="form-group">
-                <label>Contraseña</label>
-                <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" required minlength="6">
-            </div>
-            <div class="form-group">
-                <label>Contraseña de Retiro</label>
-                <input type="password" id="registerWithdrawPassword" placeholder="6 dígitos" required minlength="6" maxlength="6" pattern="[0-9]{6}">
-            </div>
-            <div class="invite-code">
-                <label>Código de Invitación (opcional)</label>
-                <input type="text" id="registerInviteCode" placeholder="Ej: APEXXXXXXX">
-            </div>
-            <button type="submit" class="btn-primary" id="registerBtn">Crear Cuenta</button>
-        </form>
-        <div class="info-text">Al registrarte aceptas los términos y condiciones</div>
-    </div>
-</div>
-
-<script>
+        (function() {
+            if (localStorage.getItem('apex_dark_mode') === 'true') {
+                document.body.classList.add('dark-mode');
+                document.querySelector('.dark-mode-toggle').textContent = '☀️';
+            }
+        })();
 
 // ============================================================
-// BLOQUEAR REDIRECCIÓN AUTOMÁTICA - FORZAR LOGIN
+// CREAR ADMIN SI NO EXISTE - EJECUTAR AL CARGAR
 // ============================================================
-(function() {
-    // Limpiar todo
-    localStorage.removeItem('apex_token');
-    localStorage.removeItem('apex_user');
-    sessionStorage.removeItem('apex_user');
-    localStorage.removeItem('apex_remember');
-    console.log('🧹 Sesión limpiada - Mostrando login');
-})();
-
-// ============================================================
-// CONTROL DE SESIÓN - FORZAR LOGIN
-// ============================================================
-(function() {
-    // Si hay token y usuario, pero NO queremos redirigir automáticamente
-    var token = localStorage.getItem('apex_token');
-    var user = localStorage.getItem('apex_user');
+function crearAdminSiNoExiste() {
+    var users = getUsers();
+    var adminExiste = users.some(function(u) { return u.telefono === '999999999'; });
     
-    if (token && user) {
-        console.log('👤 Sesión encontrada para:', JSON.parse(user).nombre);
-        console.log('ℹ️ Debes hacer clic en "Iniciar Sesión" para continuar');
-        // ✅ NO hacemos nada - el usuario debe hacer clic en el botón
+    if (!adminExiste) {
+        console.log('🔄 Creando usuario administrador...');
+        fetch(API_URL + '/api/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                nombre: 'Admin',
+                apellido: 'Principal',
+                telefono: '999999999',
+                password: 'admin123',
+                es_admin: true,
+                es_super_admin: true
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('❌ Error al crear admin:', data.error);
+            } else {
+                console.log('✅ Administrador creado correctamente');
+                // Guardar en localStorage
+                var users = getUsers();
+                users.push({
+                    telefono: '999999999',
+                    nombre: 'Admin',
+                    apellido: 'Principal',
+                    password: 'admin123',
+                    es_admin: true,
+                    es_super_admin: true,
+                    balance: 0,
+                    puntos: 0,
+                    plan: 'Sin plan'
+                });
+                saveUsers(users);
+            }
+        })
+        .catch(error => {
+            console.error('❌ Error de red:', error);
+        });
     }
-})();
-
-// ============================================================
-// CONFIGURACIÓN
-// ============================================================
-const API_URL = 'https://apex-backend-cj21.onrender.com';
-var STORAGE_KEY = 'apex_users';
-var REMEMBER_KEY = 'apex_remember';
-var ADMIN_CODE = 'Eamb1714';
-
-// ============================================================
-// UTILIDADES
-// ============================================================
-function showAlert(msg, type) {
-    if (type === undefined) type = 'danger';
-    var el = document.getElementById('alertMessage');
-    if (!el) return;
-    el.className = 'alert alert-' + type + ' show';
-    el.textContent = msg;
-    clearTimeout(window.alertTimeout);
-    window.alertTimeout = setTimeout(function() { el.className = 'alert'; }, 5000);
 }
 
-function switchTab(tab) {
-    var tabs = document.querySelectorAll('.tab-content');
-    for (var i = 0; i < tabs.length; i++) {
-        tabs[i].classList.remove('active');
+// Llamar a la función al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    crearAdminSiNoExiste();
+});
+
+function register() {
+    var nombre = document.getElementById('regNombre').value.trim();
+    var telefono = document.getElementById('regTelefono').value.trim();
+    var password = document.getElementById('regPassword').value.trim();
+    var codigoRef = localStorage.getItem('apex_ref_codigo') || null;
+
+    if (!nombre || !telefono || !password) {
+        showAlert('⚠️ Completa todos los campos', 'danger');
+        return;
     }
-    var buttons = document.querySelectorAll('.tabs button');
-    for (var i = 0; i < buttons.length; i++) {
-        buttons[i].classList.remove('active');
-    }
-    document.getElementById('tab-' + tab).classList.add('active');
-    if (tab === 'login') buttons[0].classList.add('active');
-    else buttons[1].classList.add('active');
-    document.getElementById('alertMessage').className = 'alert';
-}
-
-// ============================================================
-// REGISTRO - CON BACKEND
-// ============================================================
-function registerUser(event) {
-    event.preventDefault();
-
-    var telefono = document.getElementById('registerPhone').value.trim();
-    var nombre = document.getElementById('registerName').value.trim();
-    var apellido = document.getElementById('registerLastName').value.trim();
-    var password = document.getElementById('registerPassword').value;
-    var passRetiro = document.getElementById('registerWithdrawPassword').value;
-    var codigoInv = document.getElementById('registerInviteCode').value.trim();
-
-    if (!telefono || !nombre || !apellido || !password || !passRetiro) {
-        return showAlert('Todos los campos son obligatorios', 'danger');
-    }
-    if (password.length < 6) return showAlert('La contraseña debe tener mínimo 6 caracteres', 'danger');
-    if (!/^\d{6}$/.test(passRetiro)) return showAlert('La contraseña de retiro debe ser 6 dígitos', 'danger');
-
-    var btn = document.getElementById('registerBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading-spinner"></span> Registrando...';
 
     fetch(API_URL + '/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            telefono: telefono,
             nombre: nombre,
-            apellido: apellido,
+            telefono: telefono,
             password: password,
-            passRetiro: passRetiro,
-            codigoInv: codigoInv
+            codigo_referido: codigoRef
         })
     })
     .then(response => response.json())
     .then(data => {
         if (data.error) {
             showAlert('❌ ' + data.error, 'danger');
-            btn.disabled = false;
-            btn.innerHTML = 'Crear Cuenta';
             return;
         }
-
-        showAlert(data.message, 'success');
-        localStorage.setItem('apex_token', data.token);
-        localStorage.setItem('apex_user', JSON.stringify(data.user));
-
-        btn.disabled = false;
-        btn.innerHTML = 'Crear Cuenta';
-
+        showAlert('✅ Usuario registrado! Inicia sesión.', 'success');
         setTimeout(function() {
-            window.location.href = data.user.es_admin ? 'admin.html' : 'dashboard.html';
+            window.location.href = 'index.html';
         }, 1500);
     })
     .catch(error => {
-        showAlert('❌ Error al registrar: ' + error.message, 'danger');
-        btn.disabled = false;
-        btn.innerHTML = 'Crear Cuenta';
+        showAlert('❌ Error de conexión: ' + error.message, 'danger');
     });
 }
 
-// ============================================================
-// LOGIN - CON BACKEND
-// ============================================================
-function loginUser(event) {
-    event.preventDefault();
 
-    var telefono = document.getElementById('loginPhone').value.trim();
-    var password = document.getElementById('loginPassword').value;
-    var remember = document.getElementById('rememberMe').checked;
 
-    if (!telefono || !password) return showAlert('Completa todos los campos', 'danger');
+        function login() {
+            var userInput = document.getElementById('loginUser').value.trim();
+            var password = document.getElementById('loginPassword').value.trim();
+            var errorEl = document.getElementById('loginError');
 
-    var btn = document.getElementById('loginBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading-spinner"></span> Validando...';
-
-    fetch(API_URL + '/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            telefono: telefono,
-            password: password
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            showAlert('❌ ' + data.error, 'danger');
-            btn.disabled = false;
-            btn.innerHTML = 'Iniciar Sesión';
-            return;
-        }
-
-        localStorage.setItem('apex_token', data.token);
-        localStorage.setItem('apex_user', JSON.stringify(data.user));
-
-        if (remember) {
-            localStorage.setItem('apex_remember', JSON.stringify({
-                telefono: telefono,
-                timestamp: Date.now()
-            }));
-        } else {
-            localStorage.removeItem('apex_remember');
-        }
-
-        showAlert('✅ Bienvenido ' + data.user.nombre, 'success');
-        btn.disabled = false;
-        btn.innerHTML = 'Iniciar Sesión';
-
-        setTimeout(function() {
-            window.location.href = data.user.es_admin ? 'admin.html' : 'dashboard.html';
-        }, 1000);
-    })
-    .catch(error => {
-        showAlert('❌ Error al iniciar sesión: ' + error.message, 'danger');
-        btn.disabled = false;
-        btn.innerHTML = 'Iniciar Sesión';
-    });
-}
-
-// ============================================================
-// VERIFICACIÓN DE SESIÓN
-// ============================================================
-(function() {
-    var token = localStorage.getItem('apex_token');
-    if (token) {
-        fetch(API_URL + '/api/verify', {
-            method: 'GET',
-            headers: { 'Authorization': 'Bearer ' + token }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.user) {
-                localStorage.setItem('apex_user', JSON.stringify(data.user));
-                window.location.href = data.user.es_admin ? 'admin.html' : 'dashboard.html';
-            } else {
-                localStorage.removeItem('apex_token');
-                localStorage.removeItem('apex_user');
+            if (!userInput || !password) {
+                errorEl.textContent = '⚠️ Completa todos los campos';
+                errorEl.className = 'error-msg show';
+                return;
             }
-        })
-        .catch(() => {
-            localStorage.removeItem('apex_token');
-            localStorage.removeItem('apex_user');
-        });
-    } else {
-        var rememberData = localStorage.getItem('apex_remember');
-        if (rememberData) {
-            try {
-                var data = JSON.parse(rememberData);
-                if (data.timestamp && (Date.now() - data.timestamp) < 7 * 24 * 60 * 60 * 1000) {
-                    localStorage.removeItem('apex_remember');
-                } else {
-                    localStorage.removeItem('apex_remember');
+
+            fetch(API_URL + '/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user: userInput, password: password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    errorEl.textContent = '❌ ' + data.error;
+                    errorEl.className = 'error-msg show';
+                    return;
                 }
-            } catch (e) {
-                localStorage.removeItem('apex_remember');
-            }
-        }
-    }
-})();
 
-// ============================================================
-// MODO OSCURO
-// ============================================================
-function toggleDarkModeIndex() {
-    var body = document.body;
-    body.classList.toggle('dark-mode');
-    var isDark = body.classList.contains('dark-mode');
-    localStorage.setItem('apex_dark_mode', isDark ? 'true' : 'false');
-    var toggle = document.getElementById('darkModeToggleIndex');
-    if (toggle) {
-        toggle.textContent = isDark ? '☀️' : '🌙';
-    }
-}
-
-(function() {
-    var isDark = localStorage.getItem('apex_dark_mode') === 'true';
-    if (isDark) {
-        document.body.classList.add('dark-mode');
-        var toggle = document.getElementById('darkModeToggleIndex');
-        if (toggle) {
-            toggle.textContent = '☀️';
+                if (data.token && data.user) {
+                    localStorage.setItem('apex_token', data.token);
+                    localStorage.setItem('apex_user', JSON.stringify(data.user));
+                    
+                    if (data.user.es_admin) {
+                        window.location.href = 'admin.html';
+                    } else {
+                        window.location.href = 'dashboard.html';
+                    }
+                } else {
+                    errorEl.textContent = '❌ Error al iniciar sesión';
+                    errorEl.className = 'error-msg show';
+                }
+            })
+            .catch(error => {
+                errorEl.textContent = '❌ Error de conexión: ' + error.message;
+                errorEl.className = 'error-msg show';
+            });
         }
-    }
-})();
-</script>
+
+        document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') login();
+        });
+        document.getElementById('loginUser').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') login();
+        });
+
+        function showRegister() {
+            alert('📝 Para registrarte, contacta al administrador.\n\n' +
+                  '📱 Administrador: 999999999\n' +
+                  '🔑 Contraseña: admin123');
+        }
+    </script>
 </body>
 </html>
