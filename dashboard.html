@@ -73,7 +73,7 @@
         .actividad-card.bloqueada { opacity: 0.5; pointer-events: none; }
         .cofres-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
         .cofre-item { background: #1a1a2e; border: 2px solid #e0e0e0; border-radius: 14px; padding: 16px 8px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .cofre-item:hover:not(.abierto):not(.bloqueado) { border-color: #f7971e; transform: translateY(-2px); }
+        .cofre-item:hover:not(.abierto):not(.bloqueado) { border-color: #f7971e; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
         .cofre-item:active:not(.abierto):not(.bloqueado) { transform: scale(0.95); }
         .cofre-item .icono { font-size: 32px; }
         .cofre-item .numero { font-size: 11px; color: #fff; margin-top: 2px; }
@@ -87,6 +87,7 @@
         .profile-input-group { display: flex; gap: 10px; }
         .profile-input-group input { flex: 1; padding: 12px 14px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 12px; color: #000000; font-size: 14px; outline: none; }
         .profile-input-group input:focus { border-color: #000000; background: #ffffff; }
+        .profile-input-group input::placeholder { color: #ccc; }
         .profile-input-group .btn-action { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; }
         .profile-input-group .btn-action:active { transform: scale(0.95); }
         .btn-save { background: #000000; color: #ffffff; }
@@ -145,12 +146,9 @@
         .nivel-info { font-size: 11px; color: #999; text-align: center; padding: 8px; background: #f8f9fa; border-radius: 10px; margin-top: 8px; }
         .nivel-info .desbloqueado { color: #4db6ac; font-weight: 600; }
         .nivel-info .bloqueado { color: #ef5350; font-weight: 600; }
-        .dark-mode-toggle { background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s; }
-        .dark-mode-toggle:hover { background: #f0f0f0; }
-        body.dark-mode .dark-mode-toggle:hover { background: #333; }
-
+        
         /* ============================================================
-           TAREAS DIARIAS
+           TAREAS DIARIAS - NUEVO
            ============================================================ */
         .tareas-grid {
             display: flex;
@@ -195,36 +193,19 @@
             align-items: center;
             gap: 12px;
         }
-        .tarea-item .tarea-info .icono {
-            font-size: 28px;
-        }
-        .tarea-item .tarea-info .nombre {
-            font-weight: 600;
-            font-size: 14px;
-            color: #000;
-        }
-        .tarea-item .tarea-info .hora {
-            font-size: 11px;
-            color: #999;
-        }
+        .tarea-item .tarea-info .icono { font-size: 28px; }
+        .tarea-item .tarea-info .nombre { font-weight: 600; font-size: 14px; color: #000; }
+        .tarea-item .tarea-info .hora { font-size: 11px; color: #999; }
         .tarea-item .tarea-estado {
             font-size: 11px;
             font-weight: 600;
             padding: 4px 12px;
             border-radius: 20px;
         }
-        .tarea-item .tarea-estado.disponible {
-            background: #4db6ac;
-            color: #fff;
-        }
-        .tarea-item .tarea-estado.completada {
-            background: #4db6ac;
-            color: #fff;
-        }
-        .tarea-item .tarea-estado.bloqueada {
-            background: #e0e0e0;
-            color: #999;
-        }
+        .tarea-item .tarea-estado.disponible { background: #4db6ac; color: #fff; }
+        .tarea-item .tarea-estado.completada { background: #4db6ac; color: #fff; }
+        .tarea-item .tarea-estado.bloqueada { background: #e0e0e0; color: #999; }
+        
         .progreso-container {
             background: #f8f9fa;
             border-radius: 12px;
@@ -233,13 +214,8 @@
             border: 1px solid #e0e0e0;
             margin-bottom: 16px;
         }
-        .progreso-container .progreso-texto {
-            font-size: 14px;
-            color: #666;
-        }
-        .progreso-container .progreso-texto strong {
-            color: #000;
-        }
+        .progreso-container .progreso-texto { font-size: 14px; color: #666; }
+        .progreso-container .progreso-texto strong { color: #000; }
         .progreso-container .progreso-barra {
             width: 100%;
             height: 8px;
@@ -265,15 +241,8 @@
             border: 1px solid #f7971e;
             margin-top: 8px;
         }
-        .racha-container .racha-numero {
-            font-size: 24px;
-            font-weight: 700;
-            color: #f7971e;
-        }
-        .racha-container .racha-texto {
-            font-size: 13px;
-            color: #666;
-        }
+        .racha-container .racha-numero { font-size: 24px; font-weight: 700; color: #f7971e; }
+        .racha-container .racha-texto { font-size: 13px; color: #666; }
 
         /* ============================================================
            MODAL DE ALERTAS
@@ -379,6 +348,9 @@
         body.dark-mode .card-gold { background: #1a1a0a; border-color: #f7971e; }
         body.dark-mode .card-blue { background: #0a1a2a; border-color: #64b5f6; }
         body.dark-mode .card-green { background: #0a1a1a; border-color: #4db6ac; }
+        .dark-mode-toggle { background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s; }
+        .dark-mode-toggle:hover { background: #f0f0f0; }
+        body.dark-mode .dark-mode-toggle:hover { background: #333; }
 
         @media (max-width: 480px) {
             .ganancias-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -426,9 +398,7 @@
 
     <div id="alertMessage" class="alert"></div>
 
-    <!-- ============================================================
-    TAB INICIO
-    ============================================================ -->
+    <!-- TAB INICIO -->
     <div id="tab-inicio" class="tab-content active">
         <div class="card card-gold balance-card">
             <div class="label">💰 Saldo Actual</div>
@@ -437,7 +407,7 @@
             <div class="points">⭐ Puntos: <span id="pointsAmount">0</span></div>
         </div>
 
-        <!-- TAREAS DIARIAS -->
+        <!-- TAREAS DIARIAS - NUEVO -->
         <div class="card card-blue" id="tareasCard">
             <div class="label">📋 Tareas de Hoy</div>
             <div class="progreso-container">
@@ -469,20 +439,13 @@
         </div>
     </div>
 
-    <!-- ============================================================
-    TAB PLANES
-    ============================================================ -->
-    <div id="tab-planes" class="tab-content">
-        <div id="planesContainer"></div>
-    </div>
+    <!-- TAB PLANES -->
+    <div id="tab-planes" class="tab-content"><div id="planesContainer"></div></div>
 
-    <!-- ============================================================
-    TAB REFERIDOS
-    ============================================================ -->
+    <!-- TAB REFERIDOS -->
     <div id="tab-referidos" class="tab-content">
         <div class="card">
             <div class="label" style="margin-bottom:12px;">👥 Tus Referidos</div>
-            
             <div style="margin-bottom:16px; background:#f8f9fa; border-radius:12px; padding:14px 16px; border:1px solid #e0e0e0;">
                 <div style="font-size:13px; color:#666; font-weight:600; margin-bottom:6px;">🔗 Tu Link de Referido</div>
                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -490,7 +453,6 @@
                     <button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>
                 </div>
             </div>
-
             <div style="display:flex; gap:16px; margin-bottom:16px;">
                 <div style="flex:1; background:#f5f5f5; border-radius:10px; padding:12px; text-align:center; border:1px solid #e0e0e0;">
                     <div style="font-size:28px; font-weight:700; color:#000;" id="totalReferidos">0</div>
@@ -501,16 +463,11 @@
                     <div style="font-size:12px; color:#666;">✅ Con Plan</div>
                 </div>
             </div>
-
-            <div id="referidosListaContainer">
-                <div style="text-align:center; color:#999; padding:20px;">No has referido a nadie todavía.<br>Comparte tu link para invitar amigos.</div>
-            </div>
+            <div id="referidosListaContainer"><div style="text-align:center; color:#999; padding:20px;">No has referido a nadie todavía.<br>Comparte tu link para invitar amigos.</div></div>
         </div>
     </div>
 
-    <!-- ============================================================
-    TAB HISTORIAL
-    ============================================================ -->
+    <!-- TAB HISTORIAL -->
     <div id="tab-historial" class="tab-content">
         <div class="ganancias-stats">
             <div class="ganancia-stat"><div class="label">📊 Esta semana</div><div class="number gold" id="gananciaSemanal">$0.00</div></div>
@@ -527,16 +484,12 @@
         <div id="historyList"><div style="text-align:center;color:#ccc;padding:20px 0;font-size:14px;">No hay historial</div></div>
     </div>
 
-    <!-- ============================================================
-    TAB ACTIVIDADES
-    ============================================================ -->
+    <!-- TAB ACTIVIDADES -->
     <div id="tab-actividades" class="tab-content">
         <div class="actividad-grid" id="actividadesGrid"></div>
     </div>
 
-    <!-- ============================================================
-    TAB PERFIL
-    ============================================================ -->
+    <!-- TAB PERFIL -->
     <div id="tab-perfil" class="tab-content">
         <div class="profile-section">
             <span class="section-label">👤 DATOS PERSONALES</span>
@@ -565,9 +518,7 @@
     </div>
 </div>
 
-<!-- ============================================================
-NAVEGACIÓN INFERIOR
-============================================================ -->
+<!-- BOTTOM NAV -->
 <nav class="bottom-nav">
     <button class="nav-item active" data-tab="inicio" onclick="switchTab('inicio')"><span class="icon">🏠</span><span class="label">Inicio</span></button>
     <button class="nav-item" data-tab="planes" onclick="switchTab('planes')"><span class="icon">📊</span><span class="label">Planes</span></button>
@@ -759,30 +710,22 @@ function logout() {
 }
 
 // ============================================================
-// CHECK SESSION - CON DEPURACIÓN
+// CHECK SESSION
 // ============================================================
 function checkSession() {
     var token = localStorage.getItem('apex_token');
-    console.log('🔍 Token encontrado:', token ? '✅ Sí' : '❌ No');
-    
     if (!token) {
-        console.log('❌ No hay token, redirigiendo a login');
         window.location.href = 'index.html';
         return;
     }
 
-    console.log('📡 Verificando token con el backend...');
-    
     fetch(API_URL + '/api/verify', {
         method: 'GET',
         headers: { 'Authorization': 'Bearer ' + token }
     })
     .then(response => response.json())
     .then(data => {
-        console.log('📦 Respuesta del backend:', data);
-        
         if (data.error) {
-            console.log('❌ Error en verificación:', data.error);
             localStorage.removeItem('apex_token');
             localStorage.removeItem('apex_user');
             window.location.href = 'index.html';
@@ -790,7 +733,6 @@ function checkSession() {
         }
 
         if (data.user) {
-            console.log('✅ Usuario autenticado:', data.user.nombre);
             user = {
                 telefono: data.user.telefono,
                 nombre: data.user.nombre,
@@ -827,6 +769,7 @@ function checkSession() {
                 descuentoRetiroActivo: data.user.descuentoRetiroActivo || null,
                 bonusReferidoActivo: data.user.bonusReferidoActivo || null,
                 fecha_registro: data.user.fecha_registro || new Date().toISOString(),
+                // TAREAS DIARIAS - NUEVO
                 tareas_completadas_hoy: data.user.tareas_completadas_hoy || [],
                 ultima_fecha_tareas: data.user.ultima_fecha_tareas || null,
                 racha_dias: data.user.racha_dias || 0
@@ -836,26 +779,17 @@ function checkSession() {
             verificarNuevoDia();
             renderDashboard();
             iniciarVigilante();
-            console.log('✅ Dashboard renderizado correctamente');
         } else {
-            console.log('❌ No hay usuario en la respuesta');
             localStorage.removeItem('apex_token');
             localStorage.removeItem('apex_user');
             window.location.href = 'index.html';
         }
     })
     .catch(error => {
-        console.error('❌ Error de red al verificar:', error);
-        // Si falla la conexión, intentar usar sesión local
-        var userLocal = JSON.parse(sessionStorage.getItem('apex_user') || 'null');
-        if (userLocal) {
-            console.log('🔄 Usando sesión local como respaldo');
-            user = userLocal;
-            renderDashboard();
-            iniciarVigilante();
-        } else {
-            window.location.href = 'index.html';
-        }
+        console.error('Error al verificar sesión:', error);
+        localStorage.removeItem('apex_token');
+        localStorage.removeItem('apex_user');
+        window.location.href = 'index.html';
     });
 }
 
@@ -931,6 +865,7 @@ function saveUserData() {
             logros_reclamados: user.logros_reclamados || [],
             logros_pendientes_aprobar: user.logros_pendientes_aprobar || [],
             password_retiro: user.password_retiro || '000000',
+            // TAREAS DIARIAS - NUEVO
             tareas_completadas_hoy: user.tareas_completadas_hoy || [],
             ultima_fecha_tareas: user.ultima_fecha_tareas || null,
             racha_dias: user.racha_dias || 0
@@ -1031,7 +966,7 @@ function renderDashboard() {
     renderTree();
     renderHistory('all');
     calcularGanancias();
-    renderTareas();
+    renderTareas(); // <--- NUEVO
     renderActividades();
     verificarAdmin();
 }
@@ -1049,7 +984,7 @@ function verificarAdmin() {
 }
 
 // ============================================================
-// RENDER TAREAS
+// RENDER TAREAS - NUEVO
 // ============================================================
 function renderTareas() {
     var container = document.getElementById('tareasContainer');
@@ -1142,7 +1077,7 @@ function renderTareas() {
 }
 
 // ============================================================
-// COMPLETAR TAREA DIARIA
+// COMPLETAR TAREA DIARIA - NUEVO
 // ============================================================
 function completarTareaDiaria(index) {
     if (!user) return;
@@ -1612,22 +1547,43 @@ function renderActividades() {
     var usosCofres = user.cofres_usos || 0;
     var usosDados = user.dados_usos || 0;
 
+    var tareasPendientes = 0;
+    if (user.tareas_asignadas) {
+        for (var i = 0; i < user.tareas_asignadas.length; i++) {
+            if (user.tareas_asignadas[i].estado === 'pendiente' || user.tareas_asignadas[i].estado === 'completada') {
+                tareasPendientes++;
+            }
+        }
+    }
+
+    var logrosPendientes = 0;
+    if (user.logros_pendientes_aprobar) {
+        logrosPendientes = user.logros_pendientes_aprobar.length;
+    }
+
+    var cuponesDisponibles = 0;
+    if (user.cupones_asignados) {
+        for (var i = 0; i < user.cupones_asignados.length; i++) {
+            if (!user.cupones_asignados[i].usado) cuponesDisponibles++;
+        }
+    }
+
     var actividades = [
-        { id: 'ruleta', icono: '🎰', nombre: 'Máquina de Bolas', desc: 'Saca una bola y gana premio', badge: usosRuleta > 0 ? usosRuleta + ' usos' : 'Sin usos', disponible: usosRuleta > 0 },
-        { id: 'cofres', icono: '🎁', nombre: '9 Cofres', desc: 'Elige un cofre y descubre premio', badge: usosCofres > 0 ? usosCofres + ' usos' : 'Sin usos', disponible: usosCofres > 0 },
-        { id: 'dados', icono: '🎲', nombre: 'Dados', desc: 'Lanza el dado y gana premio', badge: usosDados > 0 ? usosDados + ' usos' : 'Sin usos', disponible: usosDados > 0 },
-        { id: 'cupones', icono: '🎫', nombre: 'Mis Cupones', desc: 'Activa cupones de descuento y bonos', badge: (user.cupones_asignados || []).filter(function(c) { return !c.usado; }).length + ' disponibles', disponible: true },
-        { id: 'tareas', icono: '📋', nombre: 'Mis Tareas', desc: 'Completa tareas asignadas', badge: (user.tareas_asignadas || []).length + ' tareas', disponible: true },
-        { id: 'logros', icono: '🏆', nombre: 'Mis Logros', desc: 'Completa logros y gana recompensas', badge: (user.logros_reclamados || []).length + ' obtenidos', disponible: true },
-        { id: 'puntos', icono: '⭐', nombre: 'Mis Puntos', desc: 'Canjea tus puntos por USDT', badge: (user.puntos || 0) + ' pts', disponible: true }
+        { id: 'ruleta', icono: '🎰', nombre: 'Máquina de Bolas', desc: 'Saca una bola y gana premio', badge: usosRuleta > 0 ? usosRuleta + ' usos' : 'Sin usos', disponible: usosRuleta > 0 && user.cuenta_habilitada !== false && !user.produccion_pausada },
+        { id: 'cofres', icono: '🎁', nombre: '9 Cofres', desc: 'Elige un cofre y descubre premio', badge: usosCofres > 0 ? usosCofres + ' usos' : 'Sin usos', disponible: usosCofres > 0 && user.cuenta_habilitada !== false && !user.produccion_pausada },
+        { id: 'dados', icono: '🎲', nombre: 'Dados', desc: 'Lanza el dado y gana premio', badge: usosDados > 0 ? usosDados + ' usos' : 'Sin usos', disponible: usosDados > 0 && user.cuenta_habilitada !== false && !user.produccion_pausada },
+        { id: 'cupones', icono: '🎫', nombre: 'Mis Cupones', desc: 'Activa cupones de descuento y bonos', badge: cuponesDisponibles > 0 ? cuponesDisponibles + ' disponibles' : 'Sin cupones', disponible: cuponesDisponibles > 0 && user.cuenta_habilitada !== false && !user.produccion_pausada },
+        { id: 'tareas', icono: '📋', nombre: 'Mis Tareas', desc: tareasPendientes > 0 ? 'Tienes ' + tareasPendientes + ' tareas pendientes' : 'Completa tareas', badge: tareasPendientes > 0 ? tareasPendientes + ' pendientes' : 'Sin tareas', disponible: user.cuenta_habilitada !== false && !user.produccion_pausada },
+        { id: 'logros', icono: '🏆', nombre: 'Mis Logros', desc: 'Completa logros y gana recompensas', badge: (user.logros_reclamados || []).length + ' obtenidos', disponible: user.cuenta_habilitada !== false && !user.produccion_pausada },
+        { id: 'puntos', icono: '⭐', nombre: 'Mis Puntos', desc: 'Canjea tus puntos por USDT', badge: (user.puntos || 0) + ' pts', disponible: user.cuenta_habilitada !== false && !user.produccion_pausada }
     ];
 
     var html = '';
     for (var a = 0; a < actividades.length; a++) {
         var act = actividades[a];
-        var onclick = "abrirActividad('" + act.id + "')";
-        var estadoText = '🎯 Disponible';
-        html += '<div class="actividad-card" onclick="' + onclick + '">' +
+        var onclick = act.disponible ? "abrirActividad('" + act.id + "')" : '';
+        var estadoText = act.disponible ? '🎯 Disponible' : (user.produccion_pausada ? '⏸️ Pausada' : '🔒 Bloqueado');
+        html += '<div class="actividad-card ' + (act.disponible ? '' : 'bloqueada') + '" onclick="' + onclick + '">' +
             '<span class="badge-prox">' + act.badge + '</span>' +
             '<span class="icono">' + act.icono + '</span>' +
             '<div class="nombre">' + act.nombre + '</div>' +
@@ -2231,7 +2187,6 @@ function abrirLogros() {
         logrosMostrados++;
         var progreso = 0;
         var total = 0;
-        // Calcular progreso según tipo
         if (l.tipo === 'referidos') {
             total = (user.referidos && user.referidos.lista) ? user.referidos.lista.length : 0;
         } else if (l.tipo === 'ganancias') {
