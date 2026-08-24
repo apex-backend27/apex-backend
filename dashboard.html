@@ -56,7 +56,99 @@
         .bottom-nav .nav-item.active .label { color: #000000; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        
+        .ganancias-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .ganancia-stat { background: #f8f9fa; border-radius: 12px; padding: 12px 14px; text-align: center; border: 1px solid #e0e0e0; }
+        .ganancia-stat .label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+        .ganancia-stat .number { font-size: 22px; font-weight: 700; color: #000000; margin-top: 2px; }
+        .ganancia-stat .number.gold { color: #f7971e; }
+        .ganancia-stat .number.green { color: #4db6ac; }
+        .actividad-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .actividad-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 16px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+        .actividad-card:active { transform: scale(0.97); }
+        .actividad-card .icono { font-size: 36px; display: block; margin-bottom: 6px; }
+        .actividad-card .nombre { font-size: 13px; font-weight: 600; color: #000; }
+        .actividad-card .desc { font-size: 10px; color: #999; margin-top: 2px; }
+        .actividad-card .estado { font-size: 9px; color: #4db6ac; font-weight: 600; margin-top: 4px; }
+        .actividad-card .badge-prox { position: absolute; top: 8px; right: 8px; background: #f5f5f5; color: #999; font-size: 7px; padding: 2px 8px; border-radius: 10px; font-weight: 600; text-transform: uppercase; }
+        .actividad-card.bloqueada { opacity: 0.5; pointer-events: none; }
+        .cofres-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+        .cofre-item { background: #1a1a2e; border: 2px solid #e0e0e0; border-radius: 14px; padding: 16px 8px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .cofre-item:hover:not(.abierto):not(.bloqueado) { border-color: #f7971e; transform: translateY(-2px); }
+        .cofre-item:active:not(.abierto):not(.bloqueado) { transform: scale(0.95); }
+        .cofre-item .icono { font-size: 32px; }
+        .cofre-item .numero { font-size: 11px; color: #fff; margin-top: 2px; }
+        .cofre-item.abierto { opacity: 0.7; cursor: default; border-color: #4db6ac; background: #0f2a1f; }
+        .cofre-item .cofre-resultado { font-size: 13px; font-weight: 700; color: #4db6ac; margin-top: 2px; }
+        .profile-field { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+        .profile-field .label { font-size: 12px; color: #999; font-weight: 600; }
+        .profile-field .value { font-size: 13px; color: #000000; text-align: right; }
+        .profile-section { margin-bottom: 20px; }
+        .profile-section .section-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; display: block; font-weight: 600; }
+        .profile-input-group { display: flex; gap: 10px; }
+        .profile-input-group input { flex: 1; padding: 12px 14px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 12px; color: #000000; font-size: 14px; outline: none; }
+        .profile-input-group input:focus { border-color: #000000; background: #ffffff; }
+        .profile-input-group .btn-action { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; }
+        .profile-input-group .btn-action:active { transform: scale(0.95); }
+        .btn-save { background: #000000; color: #ffffff; }
+        .btn-withdraw { background: #000000; color: #ffffff; width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+        .btn-withdraw:active { transform: scale(0.97); }
+        .btn-withdraw:disabled { opacity: 0.3; cursor: not-allowed; }
+        .withdraw-hint { font-size: 11px; color: #999; margin-top: 8px; text-align: center; }
+        .withdraw-info { font-size: 12px; color: #999; margin-bottom: 8px; }
+        .withdraw-info strong { color: #000000; }
+        .historial-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        .historial-item:last-child { border-bottom: none; }
+        .historial-item .left .desc { font-size: 13px; color: #000000; }
+        .historial-item .left .date { font-size: 10px; color: #999; }
+        .historial-item .right { text-align: right; }
+        .historial-item .right .amount { font-size: 13px; font-weight: 600; }
+        .historial-item .right .amount.positive { color: #4db6ac; }
+        .historial-item .right .amount.negative { color: #ef5350; }
+        .historial-item .right .status { font-size: 9px; color: #999; }
+        .historial-item .right .origen { font-size: 8px; color: #999; }
+        .filter-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+        .filter-tabs .filter-btn { padding: 6px 16px; border: 1px solid #e0e0e0; border-radius: 20px; background: transparent; color: #999; font-size: 11px; cursor: pointer; font-weight: 500; }
+        .filter-tabs .filter-btn.active { background: #000000; border-color: #000000; color: #ffffff; }
+        .plan-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .plan-card.active-plan { border-color: #f7971e; background: #fffbf0; }
+        .plan-card.locked { opacity: 0.6; border-color: #ccc; background: #f5f5f5; }
+        .plan-card.locked .buy-btn { background: #ccc; cursor: not-allowed; }
+        .plan-card .info { display: flex; align-items: center; gap: 14px; }
+        .plan-card .info .icon { font-size: 28px; }
+        .plan-card .info .name { font-size: 15px; font-weight: 600; color: #000000; }
+        .plan-card .info .name .badge { font-size: 9px; font-weight: 400; color: #999; margin-left: 4px; }
+        .plan-card .info .name .lock-icon { font-size: 12px; margin-left: 4px; }
+        .plan-card .info .details { font-size: 11px; color: #999; margin-top: 2px; }
+        .plan-card .info .details strong { color: #000000; }
+        .plan-card .info .upgrade-info { font-size: 10px; color: #f7971e; margin-top: 2px; }
+        .plan-card .info .locked-info { font-size: 10px; color: #ef5350; margin-top: 2px; }
+        .plan-card .action { text-align: right; }
+        .plan-card .action .price { font-size: 16px; font-weight: 700; color: #000000; }
+        .plan-card .action .sub { font-size: 9px; color: #999; }
+        .plan-card .action .buy-btn { margin-top: 4px; padding: 6px 18px; border: none; border-radius: 10px; background: #000000; color: #ffffff; font-weight: 700; font-size: 11px; cursor: pointer; width: 100%; }
+        .plan-card .action .buy-btn:active { transform: scale(0.95); }
+        .plan-card .action .buy-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .plan-card .action .active-tag { font-size: 10px; color: #4db6ac; font-weight: 600; }
+        .plan-card .action .locked-tag { font-size: 10px; color: #ef5350; font-weight: 600; }
+        .tree-container { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 0; overflow-x: auto; width: 100%; }
+        .tree-level { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+        .tree-node { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 40px; }
+        .tree-node .circle { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; border: 2px solid #ddd; background: #f5f5f5; color: #999; }
+        .tree-node .circle.you { background: #000000; color: #ffffff; border-color: #000000; }
+        .tree-node .circle.completed { background: #4db6ac; color: #fff; border-color: #4db6ac; }
+        .tree-node .circle.pending { background: #fff8e1; color: #e65100; border-color: #f7971e; }
+        .tree-node .circle.empty { background: #f5f5f5; color: #ccc; border-color: #ddd; }
+        .tree-node .label { font-size: 7px; color: #999; text-transform: uppercase; letter-spacing: 0.3px; text-align: center; max-width: 55px; word-break: break-all; }
+        .tree-connector { color: #ccc; font-size: 16px; }
+        .referral-count { text-align: center; font-size: 12px; color: #666; margin-top: 8px; }
+        .referral-count strong { color: #000; }
+        .nivel-info { font-size: 11px; color: #999; text-align: center; padding: 8px; background: #f8f9fa; border-radius: 10px; margin-top: 8px; }
+        .nivel-info .desbloqueado { color: #4db6ac; font-weight: 600; }
+        .nivel-info .bloqueado { color: #ef5350; font-weight: 600; }
+        .dark-mode-toggle { background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s; }
+        .dark-mode-toggle:hover { background: #f0f0f0; }
+        body.dark-mode .dark-mode-toggle:hover { background: #333; }
+
         /* ============================================================
            TAREAS DIARIAS
            ============================================================ */
@@ -70,12 +162,12 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 16px;
+            padding: 12px 16px;
             background: #f8f9fa;
             border-radius: 12px;
             border: 2px solid #e0e0e0;
             transition: all 0.3s;
-            cursor: pointer;
+            cursor: default;
         }
         .tarea-item.disponible {
             border-color: #4db6ac;
@@ -95,7 +187,7 @@
         .tarea-item.bloqueada {
             border-color: #e0e0e0;
             background: #f5f5f5;
-            opacity: 0.5;
+            opacity: 0.6;
             cursor: not-allowed;
         }
         .tarea-item .tarea-info {
@@ -115,12 +207,8 @@
             font-size: 11px;
             color: #999;
         }
-        .tarea-item .tarea-info .desc {
-            font-size: 11px;
-            color: #666;
-        }
         .tarea-item .tarea-estado {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             padding: 4px 12px;
             border-radius: 20px;
@@ -137,11 +225,6 @@
             background: #e0e0e0;
             color: #999;
         }
-        .tarea-item .tarea-estado.pendiente {
-            background: #f7971e;
-            color: #fff;
-        }
-        
         .progreso-container {
             background: #f8f9fa;
             border-radius: 12px;
@@ -191,127 +274,6 @@
             font-size: 13px;
             color: #666;
         }
-        
-        /* ============================================================
-           REFERIDOS SIMPLIFICADOS
-           ============================================================ */
-        .referido-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 14px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-            margin-bottom: 4px;
-        }
-        .referido-item .info {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .referido-item .info .nombre {
-            font-weight: 600;
-            color: #000;
-        }
-        .referido-item .info .telefono {
-            font-size: 11px;
-            color: #999;
-        }
-        .referido-item .plan {
-            font-size: 11px;
-            font-weight: 500;
-            padding: 2px 10px;
-            border-radius: 12px;
-        }
-        .referido-item .plan.activo {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-        .referido-item .plan.inactivo {
-            background: #f5f5f5;
-            color: #999;
-        }
-        
-        /* ============================================================
-           OTROS ESTILOS
-           ============================================================ */
-        .ganancias-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-        .ganancia-stat { background: #f8f9fa; border-radius: 12px; padding: 12px 14px; text-align: center; border: 1px solid #e0e0e0; }
-        .ganancia-stat .label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
-        .ganancia-stat .number { font-size: 22px; font-weight: 700; color: #000000; margin-top: 2px; }
-        .ganancia-stat .number.gold { color: #f7971e; }
-        .ganancia-stat .number.green { color: #4db6ac; }
-        .filter-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-        .filter-tabs .filter-btn { padding: 6px 16px; border: 1px solid #e0e0e0; border-radius: 20px; background: transparent; color: #999; font-size: 11px; cursor: pointer; font-weight: 500; }
-        .filter-tabs .filter-btn.active { background: #000000; border-color: #000000; color: #ffffff; }
-        .historial-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
-        .historial-item:last-child { border-bottom: none; }
-        .historial-item .left .desc { font-size: 13px; color: #000000; }
-        .historial-item .left .date { font-size: 10px; color: #999; }
-        .historial-item .right { text-align: right; }
-        .historial-item .right .amount { font-size: 13px; font-weight: 600; }
-        .historial-item .right .amount.positive { color: #4db6ac; }
-        .historial-item .right .amount.negative { color: #ef5350; }
-        .historial-item .right .status { font-size: 9px; color: #999; }
-        
-        /* ============================================================
-           ACTIVIDADES (Máquina, Cofres, Dados, etc.)
-           ============================================================ */
-        .actividad-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .actividad-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 16px; padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
-        .actividad-card:active { transform: scale(0.97); }
-        .actividad-card .icono { font-size: 36px; display: block; margin-bottom: 6px; }
-        .actividad-card .nombre { font-size: 13px; font-weight: 600; color: #000; }
-        .actividad-card .desc { font-size: 10px; color: #999; margin-top: 2px; }
-        .actividad-card .estado { font-size: 9px; color: #4db6ac; font-weight: 600; margin-top: 4px; }
-        .actividad-card .badge-prox { position: absolute; top: 8px; right: 8px; background: #f5f5f5; color: #999; font-size: 7px; padding: 2px 8px; border-radius: 10px; font-weight: 600; text-transform: uppercase; }
-        .actividad-card.bloqueada { opacity: 0.5; pointer-events: none; }
-        
-        .cofres-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
-        .cofre-item { background: #1a1a2e; border: 2px solid #e0e0e0; border-radius: 14px; padding: 16px 8px; text-align: center; cursor: pointer; transition: all 0.3s; position: relative; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .cofre-item:hover:not(.abierto):not(.bloqueado) { border-color: #f7971e; transform: translateY(-2px); }
-        .cofre-item:active:not(.abierto):not(.bloqueado) { transform: scale(0.95); }
-        .cofre-item .icono { font-size: 32px; }
-        .cofre-item .numero { font-size: 11px; color: #fff; margin-top: 2px; }
-        .cofre-item.abierto { opacity: 0.7; cursor: default; border-color: #4db6ac; background: #0f2a1f; }
-        .cofre-item .cofre-resultado { font-size: 13px; font-weight: 700; color: #4db6ac; margin-top: 2px; }
-        
-        .profile-field { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
-        .profile-field .label { font-size: 12px; color: #999; font-weight: 600; }
-        .profile-field .value { font-size: 13px; color: #000000; text-align: right; }
-        .profile-section { margin-bottom: 20px; }
-        .profile-section .section-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; display: block; font-weight: 600; }
-        .profile-input-group { display: flex; gap: 10px; }
-        .profile-input-group input { flex: 1; padding: 12px 14px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 12px; color: #000000; font-size: 14px; outline: none; }
-        .profile-input-group input:focus { border-color: #000000; background: #ffffff; }
-        .profile-input-group .btn-action { padding: 12px 20px; border: none; border-radius: 12px; font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; }
-        .profile-input-group .btn-action:active { transform: scale(0.95); }
-        .btn-save { background: #000000; color: #ffffff; }
-        .btn-withdraw { background: #000000; color: #ffffff; width: 100%; padding: 16px; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 8px; }
-        .btn-withdraw:active { transform: scale(0.97); }
-        .btn-withdraw:disabled { opacity: 0.3; cursor: not-allowed; }
-        .withdraw-hint { font-size: 11px; color: #999; margin-top: 8px; text-align: center; }
-        .withdraw-info { font-size: 12px; color: #999; margin-bottom: 8px; }
-        .withdraw-info strong { color: #000000; }
-        
-        .plan-card { background: #ffffff; border: 1px solid #e0e0e0; border-radius: 14px; padding: 16px 18px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .plan-card.active-plan { border-color: #f7971e; background: #fffbf0; }
-        .plan-card.locked { opacity: 0.6; border-color: #ccc; background: #f5f5f5; }
-        .plan-card.locked .buy-btn { background: #ccc; cursor: not-allowed; }
-        .plan-card .info { display: flex; align-items: center; gap: 14px; }
-        .plan-card .info .icon { font-size: 28px; }
-        .plan-card .info .name { font-size: 15px; font-weight: 600; color: #000000; }
-        .plan-card .info .name .badge { font-size: 9px; font-weight: 400; color: #999; margin-left: 4px; }
-        .plan-card .info .details { font-size: 11px; color: #999; margin-top: 2px; }
-        .plan-card .info .details strong { color: #000000; }
-        .plan-card .action { text-align: right; }
-        .plan-card .action .price { font-size: 16px; font-weight: 700; color: #000000; }
-        .plan-card .action .sub { font-size: 9px; color: #999; }
-        .plan-card .action .buy-btn { margin-top: 4px; padding: 6px 18px; border: none; border-radius: 10px; background: #000000; color: #ffffff; font-weight: 700; font-size: 11px; cursor: pointer; width: 100%; }
-        .plan-card .action .buy-btn:active { transform: scale(0.95); }
-        .plan-card .action .buy-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .plan-card .action .active-tag { font-size: 10px; color: #4db6ac; font-weight: 600; }
 
         /* ============================================================
            MODAL DE ALERTAS
@@ -375,165 +337,48 @@
             background: #121212;
             color: #e0e0e0;
         }
-        body.dark-mode .header,
-        body.dark-mode .card,
-        body.dark-mode .bottom-nav,
-        body.dark-mode .actividad-card {
+        body.dark-mode .header, body.dark-mode .card, body.dark-mode .bottom-nav, body.dark-mode .actividad-card {
             background: #1e1e1e;
             border-color: #333;
         }
-        body.dark-mode .brand h1,
-        body.dark-mode .balance-card .amount,
-        body.dark-mode .profile-field .value,
-        body.dark-mode .tarea-item .tarea-info .nombre,
-        body.dark-mode .progreso-container .progreso-texto strong {
+        body.dark-mode .brand h1, body.dark-mode .balance-card .amount, body.dark-mode .profile-field .value,
+        body.dark-mode .tarea-item .tarea-info .nombre, body.dark-mode .progreso-container .progreso-texto strong {
             color: #e0e0e0;
         }
-        body.dark-mode .user .info .name {
-            color: #e0e0e0;
-        }
-        body.dark-mode .tarea-item {
-            background: #1a1a1a;
-            border-color: #333;
-        }
-        body.dark-mode .tarea-item.disponible {
-            border-color: #4db6ac;
-            background: #1a2a1a;
-        }
-        body.dark-mode .tarea-item.completada {
-            border-color: #4db6ac;
-            background: #0f1f0f;
-        }
-        body.dark-mode .tarea-item.bloqueada {
-            border-color: #333;
-            background: #1a1a1a;
-        }
-        body.dark-mode .progreso-container {
-            background: #1a1a1a;
-            border-color: #333;
-        }
-        body.dark-mode .racha-container {
-            background: #2a1a0a;
-            border-color: #f7971e;
-        }
-        body.dark-mode .racha-container .racha-texto {
-            color: #999;
-        }
-        body.dark-mode .referido-item {
-            background: #1a1a1a;
-            border-color: #333;
-        }
-        body.dark-mode .referido-item .info .nombre {
-            color: #e0e0e0;
-        }
-        body.dark-mode .ganancia-stat {
-            background: #1a1a1a;
-            border-color: #333;
-        }
-        body.dark-mode .ganancia-stat .number {
-            color: #e0e0e0;
-        }
-        body.dark-mode .filter-tabs .filter-btn {
-            background: transparent;
-            border-color: #444;
-            color: #999;
-        }
-        body.dark-mode .filter-tabs .filter-btn.active {
-            background: #000;
-            border-color: #000;
-            color: #fff;
-        }
-        body.dark-mode .historial-item {
-            border-bottom-color: #333;
-        }
-        body.dark-mode .historial-item .left .desc {
-            color: #e0e0e0;
-        }
-        body.dark-mode .historial-item .left .date {
-            color: #666;
-        }
-        body.dark-mode .profile-field {
-            border-bottom-color: #333;
-        }
-        body.dark-mode .profile-input-group input {
-            background: #2a2a2a;
-            border-color: #444;
-            color: #e0e0e0;
-        }
-        body.dark-mode .profile-input-group input:focus {
-            background: #333;
-            border-color: #666;
-        }
-        body.dark-mode .plan-card {
-            background: #1e1e1e;
-            border-color: #333;
-        }
-        body.dark-mode .plan-card.active-plan {
-            background: #1a1a1a;
-            border-color: #f7971e;
-        }
-        body.dark-mode .plan-card .info .name {
-            color: #e0e0e0;
-        }
-        body.dark-mode .plan-card .action .price {
-            color: #e0e0e0;
-        }
-        body.dark-mode .cofre-item {
-            background: #1a1a2e;
-        }
-        body.dark-mode .cofre-item.abierto {
-            background: #0f2a1f;
-        }
-        body.dark-mode .address-box {
-            background: #2a2a2a;
-            border-color: #444;
-        }
-        body.dark-mode .address-box .addr {
-            color: #bbb;
-        }
-        body.dark-mode .bottom-nav .nav-item {
-            color: #666;
-        }
-        body.dark-mode .bottom-nav .nav-item.active {
-            color: #e0e0e0;
-        }
-        body.dark-mode .bottom-nav .nav-item.active .label {
-            color: #e0e0e0;
-        }
-        body.dark-mode .alert-modal {
-            background: #1e1e1e;
-            border-color: #444;
-        }
-        body.dark-mode .alert-modal .alert-message {
-            color: #bbb;
-        }
-        body.dark-mode .card-gold {
-            background: #1a1a0a;
-            border-color: #f7971e;
-        }
-        body.dark-mode .card-blue {
-            background: #0a1a2a;
-            border-color: #64b5f6;
-        }
-        body.dark-mode .card-green {
-            background: #0a1a1a;
-            border-color: #4db6ac;
-        }
-        .dark-mode-toggle {
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 8px;
-            transition: background 0.2s;
-        }
-        .dark-mode-toggle:hover {
-            background: #f0f0f0;
-        }
-        body.dark-mode .dark-mode-toggle:hover {
-            background: #333;
-        }
+        body.dark-mode .user .info .name { color: #e0e0e0; }
+        body.dark-mode .tarea-item { background: #1a1a1a; border-color: #333; }
+        body.dark-mode .tarea-item.disponible { border-color: #4db6ac; background: #1a2a1a; }
+        body.dark-mode .tarea-item.completada { border-color: #4db6ac; background: #0f1f0f; }
+        body.dark-mode .tarea-item.bloqueada { border-color: #333; background: #1a1a1a; }
+        body.dark-mode .progreso-container { background: #1a1a1a; border-color: #333; }
+        body.dark-mode .racha-container { background: #2a1a0a; border-color: #f7971e; }
+        body.dark-mode .racha-container .racha-texto { color: #999; }
+        body.dark-mode .ganancia-stat { background: #1a1a1a; border-color: #333; }
+        body.dark-mode .ganancia-stat .number { color: #e0e0e0; }
+        body.dark-mode .filter-tabs .filter-btn { background: transparent; border-color: #444; color: #999; }
+        body.dark-mode .filter-tabs .filter-btn.active { background: #000; border-color: #000; color: #fff; }
+        body.dark-mode .historial-item { border-bottom-color: #333; }
+        body.dark-mode .historial-item .left .desc { color: #e0e0e0; }
+        body.dark-mode .historial-item .left .date { color: #666; }
+        body.dark-mode .profile-field { border-bottom-color: #333; }
+        body.dark-mode .profile-input-group input { background: #2a2a2a; border-color: #444; color: #e0e0e0; }
+        body.dark-mode .profile-input-group input:focus { background: #333; border-color: #666; }
+        body.dark-mode .plan-card { background: #1e1e1e; border-color: #333; }
+        body.dark-mode .plan-card.active-plan { background: #1a1a1a; border-color: #f7971e; }
+        body.dark-mode .plan-card .info .name { color: #e0e0e0; }
+        body.dark-mode .plan-card .action .price { color: #e0e0e0; }
+        body.dark-mode .cofre-item { background: #1a1a2e; }
+        body.dark-mode .cofre-item.abierto { background: #0f2a1f; }
+        body.dark-mode .address-box { background: #2a2a2a; border-color: #444; }
+        body.dark-mode .address-box .addr { color: #bbb; }
+        body.dark-mode .bottom-nav .nav-item { color: #666; }
+        body.dark-mode .bottom-nav .nav-item.active { color: #e0e0e0; }
+        body.dark-mode .bottom-nav .nav-item.active .label { color: #e0e0e0; }
+        body.dark-mode .alert-modal { background: #1e1e1e; border-color: #444; }
+        body.dark-mode .alert-modal .alert-message { color: #bbb; }
+        body.dark-mode .card-gold { background: #1a1a0a; border-color: #f7971e; }
+        body.dark-mode .card-blue { background: #0a1a2a; border-color: #64b5f6; }
+        body.dark-mode .card-green { background: #0a1a1a; border-color: #4db6ac; }
 
         @media (max-width: 480px) {
             .ganancias-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -546,6 +391,8 @@
             .tarea-item .tarea-info .nombre { font-size: 12px; }
             .profile-input-group { flex-direction: column; gap: 6px; }
             .profile-input-group .btn-action { width: 100%; text-align: center; }
+            .tree-level { gap: 10px; }
+            .tree-node .circle { width: 34px; height: 34px; font-size: 11px; }
         }
     </style>
 </head>
@@ -591,7 +438,7 @@
         </div>
 
         <!-- TAREAS DIARIAS -->
-        <div class="card card-blue">
+        <div class="card card-blue" id="tareasCard">
             <div class="label">📋 Tareas de Hoy</div>
             <div class="progreso-container">
                 <div class="progreso-texto">
@@ -630,7 +477,7 @@
     </div>
 
     <!-- ============================================================
-    TAB REFERIDOS (SIMPLIFICADO)
+    TAB REFERIDOS
     ============================================================ -->
     <div id="tab-referidos" class="tab-content">
         <div class="card">
@@ -734,13 +581,36 @@ NAVEGACIÓN INFERIOR
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
-const API_URL = 'https://apex-backend-cj21.onrender.com';
 var STORAGE_KEY = 'apex_users';
-var user = null;
+var REMEMBER_KEY = 'apex_remember';
+var PREMIOS_RULETA_KEY = 'apex_premios_ruleta';
+var PREMIOS_COFRES_KEY = 'apex_premios_cofres';
+var PREMIOS_DADOS_KEY = 'apex_premios_dados';
+var CANJES_KEY = 'apex_canjes';
+var TAREAS_KEY = 'apex_tareas';
+var LOGROS_KEY = 'apex_logros_sistema';
+var NIVELES_KEY = 'apex_niveles';
+var CUPONES_KEY = 'apex_cupones_sistema';
+var TAREAS_CONFIG_KEY = 'apex_tareas_config';
+var TAREAS_ACTIVACION_KEY = 'apex_tareas_activacion';
 
-// ============================================================
-// HORARIOS DE TAREAS
-// ============================================================
+const API_URL = 'https://apex-backend-cj21.onrender.com';
+
+var user = null;
+var maquinaGirando = false;
+var abriendoCofre = false;
+var dadosGirando = false;
+
+var PLANES_ORDEN = ['Sin plan', 'Trader', 'Analista', 'Gestor', 'Master', 'Elite'];
+
+var PLANS = [
+    { name: 'Trader', amount: 300, daily: 6, icon: '📈' },
+    { name: 'Analista', amount: 500, daily: 10, icon: '📊' },
+    { name: 'Gestor', amount: 800, daily: 17, icon: '💼' },
+    { name: 'Master', amount: 1200, daily: 27, icon: '🏆' },
+    { name: 'Elite', amount: 1800, daily: 42, icon: '👑' }
+];
+
 var HORARIOS_TAREAS = [
     { hora: 10, minuto: 0, nombre: 'Tarea 1', icono: '🌅' },
     { hora: 12, minuto: 0, nombre: 'Tarea 2', icono: '☀️' },
@@ -803,69 +673,34 @@ function saveUsers(users) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
 }
 
-function saveUserData() {
-    if (!user) return;
-    sessionStorage.setItem('apex_user', JSON.stringify(user));
-    var token = localStorage.getItem('apex_token');
-    if (!token) return;
-    fetch(API_URL + '/api/user/update', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({
-            balance: Number(user.balance || 0),
-            puntos: Number(user.puntos || 0),
-            plan: user.plan || 'Sin plan',
-            plan_amount: Number(user.plan_amount || 0),
-            daily_earnings: Number(user.daily_earnings || 0),
-            tareas_completadas_hoy: user.tareas_completadas_hoy || [],
-            ultima_fecha_tareas: user.ultima_fecha_tareas || null,
-            racha_dias: user.racha_dias || 0,
-            direccion_retiro: user.direccion_retiro || null,
-            historial: user.historial || [],
-            historial_detallado: user.historial_detallado || [],
-            ruleta_usos: Number(user.ruleta_usos || 0),
-            cofres_usos: Number(user.cofres_usos || 0),
-            dados_usos: Number(user.dados_usos || 0),
-            premio_ruleta: Number(user.premio_ruleta || 0),
-            premio_cofre: Number(user.premio_cofre || 0),
-            premio_dados: Number(user.premio_dados || 0),
-            cofres_abiertos: user.cofres_abiertos || []
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) console.error('❌ Error al guardar:', data.error);
-        else console.log('✅ Datos guardados en el backend');
-    })
-    .catch(error => console.error('❌ Error de red:', error));
+function getPremiosRuleta() {
+    try { var data = localStorage.getItem(PREMIOS_RULETA_KEY); if (data) { var parsed = JSON.parse(data); if (parsed.premios && parsed.premios.length > 0) return parsed; } } catch {}
+    return { premios: [10, 15, 20, 30, 50, 0] };
 }
 
-function getPlanData(nombre) {
-    var PLANS = [
-        { name: 'Trader', amount: 300, daily: 6, icon: '📈' },
-        { name: 'Analista', amount: 500, daily: 10, icon: '📊' },
-        { name: 'Gestor', amount: 800, daily: 17, icon: '💼' },
-        { name: 'Master', amount: 1200, daily: 27, icon: '🏆' },
-        { name: 'Elite', amount: 1800, daily: 42, icon: '👑' }
-    ];
-    for (var i = 0; i < PLANS.length; i++) {
-        if (PLANS[i].name === nombre) return PLANS[i];
-    }
-    return null;
+function getPremiosCofres() {
+    try { var data = localStorage.getItem(PREMIOS_COFRES_KEY); if (data) { var parsed = JSON.parse(data); if (parsed.premios && parsed.premios.length === 9) return parsed; } } catch {}
+    return { premios: [5, 8, 10, 12, 15, 20, 25, 30, 50] };
 }
 
-function getIndicePlan(plan) {
-    var PLANES_ORDEN = ['Sin plan', 'Trader', 'Analista', 'Gestor', 'Master', 'Elite'];
-    for (var i = 0; i < PLANES_ORDEN.length; i++) {
-        if (PLANES_ORDEN[i] === plan) return i;
-    }
-    return 0;
+function getCanjes() {
+    try { return JSON.parse(localStorage.getItem(CANJES_KEY)) || []; } catch { return []; }
 }
 
-function getPlanByIndex(index) {
-    var PLANES_ORDEN = ['Sin plan', 'Trader', 'Analista', 'Gestor', 'Master', 'Elite'];
-    if (index >= 0 && index < PLANES_ORDEN.length) return PLANES_ORDEN[index];
-    return 'Sin plan';
+function getLogrosSistema() {
+    try { return JSON.parse(localStorage.getItem(LOGROS_KEY)) || []; } catch { return []; }
+}
+
+function getTareas() {
+    try { return JSON.parse(localStorage.getItem(TAREAS_KEY)) || []; } catch { return []; }
+}
+
+function getNiveles() {
+    try { return JSON.parse(localStorage.getItem(NIVELES_KEY)) || {}; } catch { return {}; }
+}
+
+function getCuponesSistema() {
+    try { return JSON.parse(localStorage.getItem(CUPONES_KEY)) || []; } catch { return []; }
 }
 
 function generarDireccionPolygon() {
@@ -875,22 +710,41 @@ function generarDireccionPolygon() {
     return address;
 }
 
-function getCanjes() {
-    try { return JSON.parse(localStorage.getItem('apex_canjes')) || []; } catch { return []; }
+function getIndicePlan(plan) {
+    for (var i = 0; i < PLANES_ORDEN.length; i++) {
+        if (PLANES_ORDEN[i] === plan) return i;
+    }
+    return 0;
 }
 
-function getLogrosSistema() {
-    try { return JSON.parse(localStorage.getItem('apex_logros_sistema')) || []; } catch { return []; }
+function getPlanByIndex(index) {
+    if (index >= 0 && index < PLANES_ORDEN.length) return PLANES_ORDEN[index];
+    return 'Sin plan';
 }
 
-function getPremiosRuleta() {
-    try { var data = localStorage.getItem('apex_premios_ruleta'); if (data) { var parsed = JSON.parse(data); if (parsed.premios && parsed.premios.length > 0) return parsed; } } catch {}
-    return { premios: [10, 15, 20, 30, 50, 0] };
+function getPlanData(nombre) {
+    for (var i = 0; i < PLANS.length; i++) {
+        if (PLANS[i].name === nombre) return PLANS[i];
+    }
+    return null;
 }
 
-function getPremiosCofres() {
-    try { var data = localStorage.getItem('apex_premios_cofres'); if (data) { var parsed = JSON.parse(data); if (parsed.premios && parsed.premios.length === 9) return parsed; } } catch {}
-    return { premios: [5, 8, 10, 12, 15, 20, 25, 30, 50] };
+function getCostoUpgrade(planName) {
+    var planData = getPlanData(planName);
+    if (!planData) return 0;
+    var planActual = user.plan || 'Sin plan';
+    var planActualData = getPlanData(planActual);
+    if (!planActualData) return planData.amount;
+    var costo = planData.amount - planActualData.amount;
+    return costo > 0 ? costo : 0;
+}
+
+function getNivelAutorizado() {
+    var niveles = getNiveles();
+    if (niveles[user.telefono]) {
+        return niveles[user.telefono].nivelAutorizado || 0;
+    }
+    return 0;
 }
 
 // ============================================================
@@ -899,26 +753,10 @@ function getPremiosCofres() {
 function logout() {
     localStorage.removeItem('apex_token');
     localStorage.removeItem('apex_user');
+    localStorage.removeItem(REMEMBER_KEY);
     sessionStorage.removeItem('apex_user');
     window.location.href = 'index.html';
 }
-
-// ============================================================
-// MODO OSCURO
-// ============================================================
-function toggleDarkMode() {
-    document.body.classList.toggle('dark-mode');
-    var isDark = document.body.classList.contains('dark-mode');
-    localStorage.setItem('apex_dark_mode', isDark ? 'true' : 'false');
-    document.querySelector('.dark-mode-toggle').textContent = isDark ? '☀️' : '🌙';
-}
-
-(function() {
-    if (localStorage.getItem('apex_dark_mode') === 'true') {
-        document.body.classList.add('dark-mode');
-        document.querySelector('.dark-mode-toggle').textContent = '☀️';
-    }
-})();
 
 // ============================================================
 // CHECK SESSION
@@ -956,14 +794,13 @@ function checkSession() {
                 polygon_address: data.user.polygon_address || generarDireccionPolygon(),
                 direccion_retiro: data.user.direccion_retiro || null,
                 password_retiro: data.user.password_retiro || '000000',
-                referidos: data.user.referidos || { lista: [] },
+                referidos: data.user.referidos || { izquierda: null, derecha: null, lista: [] },
+                fechas_invito: data.user.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
+                verificado: data.user.verificado || { izquierdaCompleto: false, derechaCompleto: false, puedeUsarCodigo: true },
                 historial: data.user.historial || [],
                 historial_detallado: data.user.historial_detallado || [],
                 cuenta_habilitada: data.user.cuenta_habilitada !== undefined ? data.user.cuenta_habilitada : true,
-                // Tareas diarias
-                tareas_completadas_hoy: data.user.tareas_completadas_hoy || [],
-                ultima_fecha_tareas: data.user.ultima_fecha_tareas || null,
-                racha_dias: data.user.racha_dias || 0,
+                produccion_pausada: data.user.produccion_pausada || false,
                 ruleta_usos: data.user.ruleta_usos || 0,
                 cofres_usos: data.user.cofres_usos || 0,
                 dados_usos: data.user.dados_usos || 0,
@@ -973,10 +810,17 @@ function checkSession() {
                 cofres_abiertos: data.user.cofres_abiertos || [],
                 cupones_asignados: data.user.cupones_asignados || [],
                 logros_asignados: data.user.logros_asignados || [],
+                logros_pendientes_aprobar: data.user.logros_pendientes_aprobar || [],
                 tareas_asignadas: data.user.tareas_asignadas || [],
                 canjes_realizados: data.user.canjes_realizados || [],
                 logros_reclamados: data.user.logros_reclamados || [],
-                fecha_registro: data.user.fecha_registro || new Date().toISOString()
+                referidos_directos: data.user.referidos_directos || { izquierda: null, derecha: null },
+                descuentoRetiroActivo: data.user.descuentoRetiroActivo || null,
+                bonusReferidoActivo: data.user.bonusReferidoActivo || null,
+                fecha_registro: data.user.fecha_registro || new Date().toISOString(),
+                tareas_completadas_hoy: data.user.tareas_completadas_hoy || [],
+                ultima_fecha_tareas: data.user.ultima_fecha_tareas || null,
+                racha_dias: data.user.racha_dias || 0
             };
             
             sessionStorage.setItem('apex_user', JSON.stringify(user));
@@ -1006,22 +850,17 @@ function verificarNuevoDia() {
     var ultimaFecha = user.ultima_fecha_tareas || '';
 
     if (hoy !== ultimaFecha) {
-        // Es un nuevo día - reiniciar tareas
         var completadasAyer = user.tareas_completadas_hoy || [];
         var completoTodo = completadasAyer.length >= 5;
         
-        // Actualizar racha
         if (completoTodo) {
             user.racha_dias = (user.racha_dias || 0) + 1;
         } else {
             user.racha_dias = 0;
         }
         
-        // Reiniciar tareas del día
         user.tareas_completadas_hoy = [];
         user.ultima_fecha_tareas = hoy;
-        
-        // Reiniciar usos de actividades
         user.ruleta_usos = 0;
         user.cofres_usos = 0;
         user.dados_usos = 0;
@@ -1030,6 +869,68 @@ function verificarNuevoDia() {
         saveUserData();
         console.log('🔄 Nuevo día - Tareas reiniciadas. Racha:', user.racha_dias);
     }
+}
+
+// ============================================================
+// SAVE USER DATA
+// ============================================================
+function saveUserData() {
+    if (!user) return;
+    sessionStorage.setItem('apex_user', JSON.stringify(user));
+    
+    var token = localStorage.getItem('apex_token');
+    if (!token) {
+        console.warn('⚠️ No hay token, guardando solo localmente');
+        return;
+    }
+    
+    fetch(API_URL + '/api/user/update', {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+            balance: Number(user.balance || 0),
+            puntos: Number(user.puntos || 0),
+            plan: user.plan || 'Sin plan',
+            plan_amount: Number(user.plan_amount || 0),
+            daily_earnings: Number(user.daily_earnings || 0),
+            ruleta_usos: Number(user.ruleta_usos || 0),
+            cofres_usos: Number(user.cofres_usos || 0),
+            dados_usos: Number(user.dados_usos || 0),
+            premio_ruleta: Number(user.premio_ruleta || 0),
+            premio_cofre: Number(user.premio_cofre || 0),
+            premio_dados: Number(user.premio_dados || 0),
+            cofres_abiertos: user.cofres_abiertos || [],
+            historial: user.historial || [],
+            historial_detallado: user.historial_detallado || [],
+            direccion_retiro: user.direccion_retiro || null,
+            cupones_asignados: user.cupones_asignados || [],
+            logros_asignados: user.logros_asignados || [],
+            tareas_asignadas: user.tareas_asignadas || [],
+            canjes_realizados: user.canjes_realizados || [],
+            logros_reclamados: user.logros_reclamados || [],
+            logros_pendientes_aprobar: user.logros_pendientes_aprobar || [],
+            password_retiro: user.password_retiro || '000000',
+            tareas_completadas_hoy: user.tareas_completadas_hoy || [],
+            ultima_fecha_tareas: user.ultima_fecha_tareas || null,
+            racha_dias: user.racha_dias || 0
+        })
+    })
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(data) {
+        if (data.error) {
+            console.error('❌ Error al guardar:', data.error);
+        } else {
+            console.log('✅ Datos guardados en el backend');
+        }
+    })
+    .catch(function(error) {
+        console.error('❌ Error de red:', error);
+    });
 }
 
 // ============================================================
@@ -1046,9 +947,29 @@ function switchTab(tab) {
 
     if (tab === 'historial') { renderHistory('all'); calcularGanancias(); }
     if (tab === 'planes') renderPlans();
-    if (tab === 'referidos') renderReferidos();
+    if (tab === 'referidos') renderTree();
     if (tab === 'actividades') renderActividades();
     if (tab === 'perfil') renderPerfil();
+}
+
+// ============================================================
+// RENDER PERFIL
+// ============================================================
+function renderPerfil() {
+    if (!user) return;
+    document.getElementById('profileName').textContent = user.nombre + ' ' + user.apellido;
+    document.getElementById('profilePhone').textContent = '+51 ' + user.telefono;
+    document.getElementById('profilePlan').textContent = user.plan || 'Sin plan';
+    document.getElementById('profileReferralCode').textContent = user.codigo_referido || 'APEX000';
+    document.getElementById('withdrawBalance').textContent = '$' + Number(user.balance || 0).toFixed(2);
+    var currentEl = document.getElementById('currentWithdrawAddress');
+    if (user.direccion_retiro) {
+        currentEl.textContent = user.direccion_retiro;
+        currentEl.style.color = '#4db6ac';
+    } else {
+        currentEl.textContent = 'No configurada';
+        currentEl.style.color = '#999';
+    }
 }
 
 // ============================================================
@@ -1057,6 +978,20 @@ function switchTab(tab) {
 function renderDashboard() {
     if (!user) return;
 
+    if (user.produccion_pausada) {
+        document.getElementById('produccionPausada').style.display = 'block';
+        document.getElementById('cuentaBloqueada').style.display = 'none';
+        document.querySelector('.main').style.opacity = '0.5';
+        document.querySelector('.main').style.pointerEvents = 'none';
+        renderActividades();
+        verificarAdmin();
+        return;
+    } else {
+        document.getElementById('produccionPausada').style.display = 'none';
+        document.querySelector('.main').style.opacity = '1';
+        document.querySelector('.main').style.pointerEvents = 'auto';
+    }
+
     if (user.cuenta_habilitada === false) {
         document.getElementById('cuentaBloqueada').style.display = 'block';
         document.querySelector('.main').style.opacity = '0.5';
@@ -1064,20 +999,18 @@ function renderDashboard() {
         return;
     } else {
         document.getElementById('cuentaBloqueada').style.display = 'none';
-        document.querySelector('.main').style.opacity = '1';
-        document.querySelector('.main').style.pointerEvents = 'auto';
     }
 
     document.getElementById('userName').textContent = user.nombre + ' ' + user.apellido;
     document.getElementById('userPhone').textContent = '+51 ' + user.telefono;
-    document.getElementById('userAvatar').textContent = user.nombre[0] + (user.apellido ? user.apellido[0] : '');
+    document.getElementById('userAvatar').textContent = user.nombre[0] + user.apellido[0];
     document.getElementById('balanceAmount').textContent = '$' + Number(user.balance || 0).toFixed(2);
     document.getElementById('pointsAmount').textContent = user.puntos || 0;
     document.getElementById('walletAddress').textContent = user.polygon_address || generarDireccionPolygon();
 
     renderPerfil();
     renderPlans();
-    renderReferidos();
+    renderTree();
     renderHistory('all');
     calcularGanancias();
     renderTareas();
@@ -1098,23 +1031,23 @@ function verificarAdmin() {
 }
 
 // ============================================================
-// TAREAS DIARIAS
+// RENDER TAREAS
 // ============================================================
 function renderTareas() {
     var container = document.getElementById('tareasContainer');
     if (!container) return;
 
     var ahora = new Date();
-    var horaActual = ahora.getHours();
-    var minutoActual = ahora.getMinutes();
     var hoy = ahora.toDateString();
     var completadas = user.tareas_completadas_hoy || [];
 
-    // Verificar si es un nuevo día
     if (user.ultima_fecha_tareas !== hoy) {
         verificarNuevoDia();
         completadas = user.tareas_completadas_hoy || [];
     }
+
+    var activacion = JSON.parse(localStorage.getItem(TAREAS_ACTIVACION_KEY) || 'null');
+    var tareasActivas = activacion && activacion.fecha === hoy && activacion.activo === true;
 
     var html = '';
     var completadasCount = 0;
@@ -1124,7 +1057,6 @@ function renderTareas() {
         var yaCompletada = completadas.indexOf(i) !== -1;
         if (yaCompletada) completadasCount++;
 
-        var estaDisponible = false;
         var estado = 'bloqueada';
         var estadoTexto = '🔒 Bloqueada';
         var estadoClass = 'bloqueada';
@@ -1133,29 +1065,26 @@ function renderTareas() {
             estado = 'completada';
             estadoTexto = '✅ Completada';
             estadoClass = 'completada';
+        } else if (!tareasActivas) {
+            estado = 'bloqueada';
+            estadoTexto = '⏳ Pendiente activación';
+            estadoClass = 'bloqueada';
         } else {
-            // Verificar si la hora ya pasó
             var horaTarea = new Date(ahora);
             horaTarea.setHours(t.hora, t.minuto, 0, 0);
             
             if (ahora >= horaTarea) {
-                // La tarea ya está disponible
-                estaDisponible = true;
                 estado = 'disponible';
                 estadoTexto = '▶️ Disponible';
                 estadoClass = 'disponible';
             } else {
-                // La tarea aún no está disponible
                 estado = 'bloqueada';
                 estadoTexto = '🔒 ' + String(t.hora).padStart(2, '0') + ':' + String(t.minuto).padStart(2, '0');
                 estadoClass = 'bloqueada';
             }
         }
 
-        var onclick = '';
-        if (estado === 'disponible') {
-            onclick = "completarTarea(" + i + ")";
-        }
+        var onclick = estado === 'disponible' ? "completarTareaDiaria(" + i + ")" : '';
 
         html += '<div class="tarea-item ' + estadoClass + '" onclick="' + onclick + '">' +
             '<div class="tarea-info">' +
@@ -1171,11 +1100,9 @@ function renderTareas() {
 
     container.innerHTML = html;
 
-    // Actualizar progreso
     var porcentaje = (completadasCount / 5) * 100;
-    var porcentajePlan = completadasCount * 20; // 20% por tarea
+    var porcentajePlan = completadasCount * 20;
     
-    // Calcular ganancia diaria según el plan
     var dailyEarnings = user.daily_earnings || 0;
     if (dailyEarnings === 0) {
         if (user.plan === 'Trader') dailyEarnings = 6;
@@ -1185,15 +1112,21 @@ function renderTareas() {
         else if (user.plan === 'Elite') dailyEarnings = 42;
     }
     
-    var gananciaHoy = (dailyEarnings * porcentajePlan) / 100;
+    var progresoEl = document.getElementById('progresoTareas');
+    var porcentajeEl = document.getElementById('porcentajePlan');
+    var barraEl = document.getElementById('progresoBarra');
+    var rachaEl = document.getElementById('rachaDias');
     
-    document.getElementById('progresoTareas').textContent = completadasCount + '/5';
-    document.getElementById('porcentajePlan').textContent = porcentajePlan + '%';
-    document.getElementById('progresoBarra').style.width = porcentaje + '%';
-    document.getElementById('rachaDias').textContent = user.racha_dias || 0;
+    if (progresoEl) progresoEl.textContent = completadasCount + '/5';
+    if (porcentajeEl) porcentajeEl.textContent = porcentajePlan + '%';
+    if (barraEl) barraEl.style.width = porcentaje + '%';
+    if (rachaEl) rachaEl.textContent = user.racha_dias || 0;
 }
 
-function completarTarea(index) {
+// ============================================================
+// COMPLETAR TAREA DIARIA
+// ============================================================
+function completarTareaDiaria(index) {
     if (!user) return;
     if (user.cuenta_habilitada === false) {
         showAlert('⛔ Cuenta inhabilitada', 'danger');
@@ -1201,6 +1134,12 @@ function completarTarea(index) {
     }
 
     var hoy = new Date().toDateString();
+    var activacion = JSON.parse(localStorage.getItem(TAREAS_ACTIVACION_KEY) || 'null');
+    if (!activacion || activacion.fecha !== hoy || activacion.activo !== true) {
+        showAlert('⏳ Las tareas de hoy aún no han sido activadas por el administrador', 'warning');
+        return;
+    }
+
     var completadas = user.tareas_completadas_hoy || [];
 
     if (completadas.indexOf(index) !== -1) {
@@ -1208,7 +1147,6 @@ function completarTarea(index) {
         return;
     }
 
-    // Verificar que la tarea esté disponible
     var ahora = new Date();
     var t = HORARIOS_TAREAS[index];
     var horaTarea = new Date(ahora);
@@ -1219,16 +1157,13 @@ function completarTarea(index) {
         return;
     }
 
-    // Simular completado de tarea
     completadas.push(index);
     user.tareas_completadas_hoy = completadas;
     user.ultima_fecha_tareas = hoy;
 
-    // Calcular ganancia acumulada
     var completadasCount = completadas.length;
     var porcentajePlan = completadasCount * 20;
     
-    // Calcular ganancia diaria según el plan
     var dailyEarnings = user.daily_earnings || 0;
     if (dailyEarnings === 0) {
         if (user.plan === 'Trader') dailyEarnings = 6;
@@ -1237,10 +1172,7 @@ function completarTarea(index) {
         else if (user.plan === 'Master') dailyEarnings = 27;
         else if (user.plan === 'Elite') dailyEarnings = 42;
     }
-    
-    var gananciaHoy = (dailyEarnings * porcentajePlan) / 100;
 
-    // Si completó todas las tareas, actualizar racha
     if (completadasCount === 5) {
         user.racha_dias = (user.racha_dias || 0) + 1;
         showAlert('🎉 ¡Completaste todas las tareas de hoy! 🔥 Racha: ' + user.racha_dias + ' días', 'success');
@@ -1254,142 +1186,48 @@ function completarTarea(index) {
 }
 
 // ============================================================
-// REFERIDOS (SIMPLIFICADO)
-// ============================================================
-function renderReferidos() {
-    var container = document.getElementById('referidosListaContainer');
-    if (!container) return;
-
-    var users = getUsers();
-    var referidos = user.referidos || { lista: [] };
-    var listaReferidos = referidos.lista || [];
-
-    // Link de referido
-    var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
-    var referralLink = baseUrl + 'ref/' + (user.codigo_referido || 'APEX000');
-    document.getElementById('referralLinkDisplay').textContent = referralLink;
-
-    // Estadísticas
-    var totalReferidos = listaReferidos.length;
-    var conPlan = 0;
-
-    for (var i = 0; i < listaReferidos.length; i++) {
-        var ref = listaReferidos[i];
-        if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined') {
-            conPlan++;
-        } else {
-            var refUser = users.find(function(u) { return u.telefono === ref.id; });
-            if (refUser && refUser.plan && refUser.plan !== 'Sin plan') {
-                conPlan++;
-            }
-        }
-    }
-
-    document.getElementById('totalReferidos').textContent = totalReferidos;
-    document.getElementById('referidosConPlan').textContent = conPlan;
-
-    // Lista de referidos
-    if (listaReferidos.length === 0) {
-        container.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">No has referido a nadie todavía.<br>Comparte tu link para invitar amigos.</div>';
-        return;
-    }
-
-    var html = '<div style="display:flex; flex-direction:column; gap:4px;">';
-    for (var i = 0; i < listaReferidos.length; i++) {
-        var ref = listaReferidos[i];
-        var refUser = users.find(function(u) { return u.telefono === ref.id; });
-        
-        var tienePlan = false;
-        var planNombre = 'Sin plan';
-        
-        if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined') {
-            tienePlan = true;
-            planNombre = ref.plan;
-        } else if (refUser && refUser.plan && refUser.plan !== 'Sin plan') {
-            tienePlan = true;
-            planNombre = refUser.plan;
-        }
-        
-        var nombre = ref.nombre || ref.id;
-        var telefono = ref.id;
-        
-        html += '<div class="referido-item">' +
-            '<div class="info">' +
-                '<span style="font-weight:600;">#' + (i + 1) + '</span>' +
-                '<span class="nombre">' + nombre + '</span>' +
-                '<span class="telefono">📱 ' + telefono + '</span>' +
-            '</div>' +
-            '<span class="plan ' + (tienePlan ? 'activo' : 'inactivo') + '">' + (tienePlan ? '✅ ' + planNombre : '⏳ Sin plan') + '</span>' +
-        '</div>';
-    }
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-// ============================================================
-// COPIAR LINK DE REFERIDO
-// ============================================================
-function copyReferralLink() {
-    var link = document.getElementById('referralLinkDisplay').textContent;
-    navigator.clipboard.writeText(link).then(function() {
-        showAlert('📋 Link de referido copiado', 'success');
-    }).catch(function() {
-        var input = document.createElement('input');
-        input.value = link;
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand('copy');
-        document.body.removeChild(input);
-        showAlert('📋 Link de referido copiado', 'success');
-    });
-}
-
-// ============================================================
-// COPIAR DIRECCIÓN
-// ============================================================
-function copyAddress() {
-    var addr = document.getElementById('walletAddress').textContent;
-    navigator.clipboard.writeText(addr).then(function() {
-        showAlert('📋 Dirección copiada', 'success');
-    }).catch(function() {
-        var input = document.createElement('input');
-        input.value = addr;
-        document.body.appendChild(input);
-        input.select();
-        document.execCommand('copy');
-        document.body.removeChild(input);
-        showAlert('📋 Dirección copiada', 'success');
-    });
-}
-
-// ============================================================
 // PLANES
 // ============================================================
 function renderPlans() {
     var container = document.getElementById('planesContainer');
     if (!container) return;
-    
-    var PLANS = [
-        { name: 'Trader', amount: 300, daily: 6, icon: '📈' },
-        { name: 'Analista', amount: 500, daily: 10, icon: '📊' },
-        { name: 'Gestor', amount: 800, daily: 17, icon: '💼' },
-        { name: 'Master', amount: 1200, daily: 27, icon: '🏆' },
-        { name: 'Elite', amount: 1800, daily: 42, icon: '👑' }
-    ];
-    
     var currentPlan = user.plan || '';
+    var nivelAutorizado = getNivelAutorizado();
+    var indiceActual = getIndicePlan(currentPlan);
     var html = '';
     
     for (var p = 0; p < PLANS.length; p++) {
         var plan = PLANS[p];
+        var indicePlan = getIndicePlan(plan.name);
         var isActive = plan.name === currentPlan;
-        var canBuy = user.balance >= plan.amount;
+        var esSuperado = !isActive && indicePlan < indiceActual;
+        var esSiguiente = !isActive && !esSuperado && indicePlan === indiceActual + 1;
+        var estaBloqueado = !isActive && !esSuperado && !esSiguiente;
+        var puedeComprar = !isActive && !esSuperado && esSiguiente && indicePlan <= nivelAutorizado;
+        var costoUpgrade = getCostoUpgrade(plan.name);
         
         if (isActive) {
-            html += '<div class="plan-card active-plan"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + ' <span class="badge">✅ Activo</span></div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div></div></div><div class="action"><span class="active-tag">✅ Activo</span></div></div>';
-        } else {
-            var textoBoton = canBuy ? 'Comprar $' + plan.amount : 'Saldo insuficiente';
-            html += '<div class="plan-card ' + (canBuy ? '' : 'locked') + '"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + '</div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div></div></div><div class="action"><div class="price">$' + plan.amount + '</div><div class="sub">' + plan.daily + '/día</div><button class="buy-btn" ' + (canBuy ? 'onclick="buyPlan(\'' + plan.name + '\')"' : 'disabled') + '>' + textoBoton + '</button></div></div>';
+            html += '<div class="plan-card active-plan"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + ' <span class="badge badge-activo">✅ Activo</span></div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div></div></div><div class="action"><span class="active-tag">✅ Activo</span></div></div>';
+        } else if (esSuperado) {
+            html += '<div class="plan-card superado"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + ' <span class="badge badge-superado">✅ Superado</span></div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div><div class="superado-info">✅ Ya superaste este nivel</div></div></div><div class="action"><div class="price">$' + plan.amount + '</div><div class="sub">' + plan.daily + '/día</div><button class="buy-btn" disabled><span class="superado-tag">✅ Superado</span></button></div></div>';
+        } else if (estaBloqueado) {
+            var motivo = '';
+            if (indicePlan > indiceActual + 1) {
+                motivo = '🔒 Debes superar el nivel anterior primero';
+            } else if (indicePlan > nivelAutorizado) {
+                motivo = '🔒 Necesitas autorización del administrador';
+            } else {
+                motivo = '🔒 Bloqueado';
+            }
+            html += '<div class="plan-card locked"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + ' <span class="lock-icon">🔒</span></div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div><div class="locked-info">' + motivo + '</div></div></div><div class="action"><div class="price">$' + plan.amount + '</div><div class="sub">' + plan.daily + '/día</div><button class="buy-btn" disabled>' + motivo + '</button></div></div>';
+        } else if (esSiguiente) {
+            var canBuy = user.balance >= costoUpgrade;
+            var textoBoton = canBuy ? 'Subir por $' + costoUpgrade : 'Saldo insuficiente (necesitas $' + costoUpgrade + ')';
+            html += '<div class="plan-card"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + ' <span class="badge badge-unlocked">🔓 Disponible</span></div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div><div class="upgrade-info">💡 Subes de ' + currentPlan + ' a ' + plan.name + ', pagas solo <strong>$' + costoUpgrade + '</strong></div></div></div><div class="action"><div class="price">$' + plan.amount + '</div><div class="sub">' + plan.daily + '/día</div><button class="buy-btn" ' + (!canBuy ? 'disabled' : '') + ' onclick="buyPlan(\'' + plan.name + '\')">' + textoBoton + '</button></div></div>';
+        } else if (indicePlan === 0 && indiceActual === 0) {
+            var canBuy = user.balance >= plan.amount;
+            var textoBoton = canBuy ? 'Comprar $' + plan.amount : 'Saldo insuficiente (necesitas $' + plan.amount + ')';
+            html += '<div class="plan-card"><div class="info"><span class="icon">' + plan.icon + '</span><div><div class="name">' + plan.name + ' <span class="badge badge-unlocked">🔓 Disponible</span></div><div class="details">Depósito: <strong>$' + plan.amount + '</strong> · Gana: <strong>$' + plan.daily + '/día</strong></div></div></div><div class="action"><div class="price">$' + plan.amount + '</div><div class="sub">' + plan.daily + '/día</div><button class="buy-btn" ' + (!canBuy ? 'disabled' : '') + ' onclick="buyPlan(\'' + plan.name + '\')">' + textoBoton + '</button></div></div>';
         }
     }
     container.innerHTML = html;
@@ -1397,52 +1235,279 @@ function renderPlans() {
 
 function buyPlan(planName) {
     var plan = getPlanData(planName);
-    if (!plan) { showAlert('⚠️ Plan no encontrado', 'danger'); return; }
-    if (user.balance < plan.amount) {
-        showAlert('⚠️ Saldo insuficiente. Necesitas $' + plan.amount, 'danger');
+    if (!plan) {
+        showAlert('⚠️ Plan no encontrado', 'danger');
         return;
     }
-    if (!confirm('¿Confirmar compra del plan ' + planName + ' por $' + plan.amount + '?')) return;
+    
+    var currentPlan = user.plan || 'Sin plan';
+    var indiceActual = getIndicePlan(currentPlan);
+    var indicePlan = getIndicePlan(planName);
+    var nivelAutorizado = getNivelAutorizado();
+    
+    if (planName === currentPlan) {
+        showAlert('⚠️ Ya tienes el plan ' + planName + ' activo', 'warning');
+        return;
+    }
+    
+    if (indicePlan < indiceActual && currentPlan !== 'Sin plan') {
+        showAlert('⚠️ Ya tienes un plan superior (' + currentPlan + '). No puedes comprar ' + planName, 'warning');
+        return;
+    }
+    
+    if (currentPlan === 'Sin plan' && planName === 'Trader') {
+        if (user.balance < plan.amount) {
+            showAlert('⚠️ Saldo insuficiente. Necesitas $' + plan.amount.toFixed(2), 'danger');
+            return;
+        }
+        if (!confirm('¿Confirmar compra del plan ' + planName + ' por $' + plan.amount + '?')) return;
+        
+        user.balance -= plan.amount;
+        user.plan = planName;
+        user.daily_earnings = plan.daily;
+        user.plan_amount = plan.amount;
+        user.fecha_plan = new Date().toISOString();
 
-    user.balance -= plan.amount;
+        var users = getUsers();
+        for (var i = 0; i < users.length; i++) {
+            var u = users[i];
+            if (u.referidos && u.referidos.lista) {
+                for (var j = 0; j < u.referidos.lista.length; j++) {
+                    if (u.referidos.lista[j].id === user.telefono) {
+                        u.referidos.lista[j].plan = planName;
+                        u.referidos.lista[j].tienePlan = true;
+                        u.referidos.lista[j].fechaPlan = new Date().toISOString();
+                        u.referidos.lista[j].status = 'activo';
+                        u.referidos.lista[j].plan_comprado = true;
+                        saveUsers(users);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!user.fechas_invito) {
+            user.fechas_invito = { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null };
+        }
+        if (!user.fechas_invito.fechaPrimerPlan) {
+            user.fechas_invito.fechaPrimerPlan = new Date().toISOString();
+        }
+        
+        if (!user.historial_detallado) user.historial_detallado = [];
+        user.historial_detallado.push({
+            tipo: 'compra',
+            concepto: '📊 Compra de plan ' + planName,
+            monto: plan.amount,
+            fecha: new Date().toISOString(),
+            estado: 'completado'
+        });
+        
+        if (!user.historial) user.historial = [];
+        user.historial.push({
+            type: 'compra',
+            plan: planName,
+            amount: plan.amount,
+            date: new Date().toISOString(),
+            status: 'completado',
+            concepto: '📊 Compra de plan ' + planName + ' - $' + plan.amount,
+            origen: 'compra'
+        });
+        
+        saveUserData();
+        showAlert('✅ Plan ' + planName + ' adquirido!', 'success');
+        renderDashboard();
+        return;
+    }
+    
+    var costoUpgrade = getCostoUpgrade(planName);
+    
+    if (indicePlan !== indiceActual + 1) {
+        showAlert('⚠️ Solo puedes comprar el siguiente nivel (' + getPlanByIndex(indiceActual + 1) + ')', 'warning');
+        return;
+    }
+    
+    if (indicePlan > nivelAutorizado) {
+        showAlert('🔒 Necesitas autorización del administrador para subir a ' + planName, 'danger');
+        return;
+    }
+    
+    if (user.balance < costoUpgrade) {
+        showAlert('⚠️ Saldo insuficiente. Necesitas $' + costoUpgrade.toFixed(2) + ' para subir a ' + planName, 'danger');
+        return;
+    }
+    
+    if (!confirm('¿Confirmar upgrade de ' + currentPlan + ' a ' + planName + ' por $' + costoUpgrade + '?')) return;
+
+    user.balance -= costoUpgrade;
     user.plan = planName;
-    user.daily_earnings = plan.daily;
     user.plan_amount = plan.amount;
+    user.daily_earnings = plan.daily;
+    user.fecha_plan = new Date().toISOString();
+
+    if (!user.fechas_invito) {
+        user.fechas_invito = { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null };
+    }
+    if (!user.fechas_invito.fechaPrimerPlan) {
+        user.fechas_invito.fechaPrimerPlan = new Date().toISOString();
+    }
 
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
         tipo: 'compra',
-        concepto: '📊 Compra de plan ' + planName,
-        monto: plan.amount,
+        concepto: '📊 Upgrade a ' + planName + ' (desde ' + currentPlan + ')',
+        monto: costoUpgrade,
         fecha: new Date().toISOString(),
         estado: 'completado'
     });
 
+    if (!user.historial) user.historial = [];
+    user.historial.push({
+        type: 'compra',
+        plan: planName,
+        amount: costoUpgrade,
+        date: new Date().toISOString(),
+        status: 'completado',
+        concepto: '📊 Upgrade a ' + planName + ' - $' + costoUpgrade,
+        origen: 'compra'
+    });
+
     saveUserData();
-    showAlert('✅ Plan ' + planName + ' adquirido!', 'success');
+    showAlert('✅ Upgrade a ' + planName + ' completado! Pagaste $' + costoUpgrade.toFixed(2), 'success');
     renderDashboard();
 }
 
 // ============================================================
-// PERFIL
+// ÁRBOL DE REFERIDOS
 // ============================================================
-function renderPerfil() {
-    if (!user) return;
-    document.getElementById('profileName').textContent = user.nombre + ' ' + user.apellido;
-    document.getElementById('profilePhone').textContent = '+51 ' + user.telefono;
-    document.getElementById('profilePlan').textContent = user.plan || 'Sin plan';
-    document.getElementById('profileReferralCode').textContent = user.codigo_referido || 'APEX000';
-    document.getElementById('withdrawBalance').textContent = '$' + Number(user.balance || 0).toFixed(2);
-    var currentEl = document.getElementById('currentWithdrawAddress');
-    if (user.direccion_retiro) {
-        currentEl.textContent = user.direccion_retiro;
-        currentEl.style.color = '#4db6ac';
-    } else {
-        currentEl.textContent = 'No configurada';
-        currentEl.style.color = '#999';
+function renderTree() {
+    var container = document.getElementById('treeContainer');
+    if (!container) return;
+
+    var users = getUsers();
+    var referidos = user.referidos || { izquierda: null, derecha: null, lista: [] };
+    var listaReferidos = referidos.lista || [];
+
+    function obtenerUsuario(telefono) {
+        if (!telefono) return null;
+        for (var i = 0; i < users.length; i++) {
+            if (users[i].telefono === telefono) {
+                return users[i];
+            }
+        }
+        return null;
     }
+
+    var html = '';
+    var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
+    var referralLink = baseUrl + 'ref/' + (user.codigo_referido || 'APEX000');
+    
+    html += '<div style="margin-bottom:16px; background:#f8f9fa; border-radius:12px; padding:14px 16px; border:1px solid #e0e0e0;">';
+    html += '<div style="font-size:13px; color:#666; font-weight:600; margin-bottom:6px;">🔗 Tu Link de Referido</div>';
+    html += '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">';
+    html += '<span style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;">' + referralLink + '</span>';
+    html += '<button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>';
+    html += '</div></div>';
+
+    var totalReferidos = listaReferidos.length;
+    
+    html += '<div style="display:flex; gap:16px; margin-bottom:12px;">';
+    html += '<div style="flex:1; background:#f5f5f5; border-radius:10px; padding:12px; text-align:center; border:1px solid #e0e0e0;">';
+    html += '<div style="font-size:28px; font-weight:700; color:#000;">' + totalReferidos + '</div>';
+    html += '<div style="font-size:12px; color:#666;">📊 Referidos Totales</div>';
+    html += '</div>';
+    html += '</div>';
+
+    if (listaReferidos.length > 0) {
+        html += '<div style="margin-top:12px;">';
+        html += '<div style="font-size:14px; font-weight:600; color:#333; margin-bottom:10px;">📋 Tus Referidos</div>';
+        html += '<div style="display:flex; flex-direction:column; gap:6px;">';
+        
+        for (var i = 0; i < listaReferidos.length; i++) {
+            var ref = listaReferidos[i];
+            var refUser = obtenerUsuario(ref.id);
+            
+            var tienePlan = false;
+            var planNombre = 'Sin plan';
+            
+            if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined' && ref.plan !== '') {
+                tienePlan = true;
+                planNombre = ref.plan;
+            }
+            if (ref.tienePlan === true) {
+                tienePlan = true;
+                planNombre = ref.plan || 'Trader';
+            }
+            
+            if (refUser) {
+                if (refUser.plan && refUser.plan !== 'Sin plan' && refUser.plan !== 'null' && refUser.plan !== 'undefined' && refUser.plan !== '') {
+                    tienePlan = true;
+                    planNombre = refUser.plan;
+                }
+            }
+            
+            var colorFondo = tienePlan ? '#e8f5e9' : '#f8f9fa';
+            var borderColor = tienePlan ? '#4db6ac' : '#e0e0e0';
+            var fechaRegistro = ref.date || new Date().toISOString();
+            var fechaFormateada = formatDate(fechaRegistro);
+            
+            html += '<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; background:' + colorFondo + '; border:1px solid ' + borderColor + '; border-radius:8px; padding:10px 14px; gap:6px;">';
+            html += '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">';
+            html += '<span style="font-weight:600; color:#333; font-size:13px;">#' + (i + 1) + '</span>';
+            html += '<span style="font-weight:600; color:#333;">' + (ref.nombre || ref.id) + '</span>';
+            html += '<span style="font-size:11px; color:#999;">📱 ' + ref.id + '</span>';
+            html += '<span style="font-size:10px; color:#999;">📅 ' + fechaFormateada + '</span>';
+            html += '</div>';
+            if (tienePlan) {
+                html += '<span style="font-size:11px; color:#4db6ac; font-weight:500;">' + planNombre + '</span>';
+            }
+            html += '</div>';
+        }
+        
+        html += '</div></div>';
+    } else {
+        html += '<div style="text-align:center; color:#999; padding:20px;">No has referido a nadie todavía.<br>Comparte tu link para invitar amigos.</div>';
+    }
+
+    container.innerHTML = html;
+    document.getElementById('referralCount').textContent = totalReferidos;
 }
 
+// ============================================================
+// HISTORIAL
+// ============================================================
+function filterHistory(filter) {
+    var btns = document.querySelectorAll('#filterTabs .filter-btn');
+    for (var b = 0; b < btns.length; b++) {
+        btns[b].classList.toggle('active', btns[b].dataset.filter === filter);
+    }
+    renderHistory(filter);
+}
+
+function calcularGanancias() {
+    if (!user) return;
+    var historial = user.historial || [];
+    var hoy = new Date();
+    var inicioSemana = new Date(hoy);
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay());
+    inicioSemana.setHours(0, 0, 0, 0);
+
+    var totalSemana = 0, totalGeneral = 0;
+    for (var i = 0; i < historial.length; i++) {
+        var h = historial[i];
+        if (h.type === 'ganancia' || h.tipo === 'produccion') {
+            var fecha = new Date(h.date || h.fecha);
+            var monto = h.amount || h.monto || 0;
+            totalGeneral += monto;
+            if (fecha >= inicioSemana) totalSemana += monto;
+        }
+    }
+    document.getElementById('gananciaSemanal').textContent = '$' + Number(totalSemana).toFixed(2);
+    document.getElementById('gananciaTotal').textContent = '$' + Number(totalGeneral).toFixed(2);
+}
+
+// ============================================================
+// PERFIL Y RETIROS
+// ============================================================
 function updateWithdrawAddress() {
     var input = document.getElementById('withdrawAddress');
     var address = input.value.trim();
@@ -1519,89 +1584,7 @@ function requestWithdraw() {
 }
 
 // ============================================================
-// HISTORIAL
-// ============================================================
-function filterHistory(filter) {
-    var btns = document.querySelectorAll('#filterTabs .filter-btn');
-    for (var b = 0; b < btns.length; b++) {
-        btns[b].classList.toggle('active', btns[b].dataset.filter === filter);
-    }
-    renderHistory(filter);
-}
-
-function calcularGanancias() {
-    if (!user) return;
-    var historial = user.historial || [];
-    var hoy = new Date();
-    var inicioSemana = new Date(hoy);
-    inicioSemana.setDate(hoy.getDate() - hoy.getDay());
-    inicioSemana.setHours(0, 0, 0, 0);
-
-    var totalSemana = 0, totalGeneral = 0;
-    for (var i = 0; i < historial.length; i++) {
-        var h = historial[i];
-        if (h.type === 'ganancia' || h.tipo === 'produccion') {
-            var fecha = new Date(h.date || h.fecha);
-            var monto = h.amount || h.monto || 0;
-            totalGeneral += monto;
-            if (fecha >= inicioSemana) totalSemana += monto;
-        }
-    }
-    document.getElementById('gananciaSemanal').textContent = '$' + Number(totalSemana).toFixed(2);
-    document.getElementById('gananciaTotal').textContent = '$' + Number(totalGeneral).toFixed(2);
-}
-
-function renderHistory(filter) {
-    if (filter === undefined) filter = 'all';
-    var list = document.getElementById('historyList');
-    if (!list) return;
-
-    var history = user.historial_detallado || user.historial || [];
-
-    var filtered = [];
-    if (filter === 'all') { filtered = history; }
-    else {
-        for (var h = 0; h < history.length; h++) {
-            var tipo = history[h].tipo || history[h].type || '';
-            var origen = history[h].origen || '';
-            if (tipo === filter || origen === filter) {
-                filtered.push(history[h]);
-            }
-        }
-    }
-
-    if (filtered.length === 0) {
-        list.innerHTML = '<div style="text-align:center;color:#ccc;padding:20px 0;font-size:14px;">No hay registros disponibles</div>';
-        return;
-    }
-
-    filtered.sort(function(a, b) { return new Date(b.fecha || b.date) - new Date(a.fecha || a.date); });
-
-    var html = '';
-    for (var f = 0; f < filtered.length; f++) {
-        var h = filtered[f];
-        var monto = h.monto || h.amount || 0;
-        var puntos = h.puntos || 0;
-        var label = h.concepto || 'Transacción';
-        var fecha = h.fecha || h.date;
-        var estado = h.estado || h.status || 'completado';
-        
-        var esPositivo = true;
-        var tipo = h.tipo || h.type || '';
-        if (tipo === 'retiro' || tipo === 'compra') esPositivo = false;
-        else if (tipo === 'canje' && estado === 'pendiente') esPositivo = false;
-        
-        var sign = esPositivo ? '+' : '-';
-        var amountClass = esPositivo ? 'positive' : 'negative';
-        var estadoColor = estado === 'aprobado' || estado === 'completado' ? '#4db6ac' : (estado === 'pendiente' ? '#f7971e' : '#ef5350');
-
-        html += '<div class="historial-item"><div class="left"><div class="desc">' + label + '</div><div class="date">' + formatDateTime(fecha) + '</div></div><div class="right"><div class="amount ' + amountClass + '">' + sign + '$' + monto.toFixed(2) + '</div><div class="status" style="color:' + estadoColor + ';">' + estado + '</div></div></div>';
-    }
-    list.innerHTML = html;
-}
-
-// ============================================================
-// ACTIVIDADES (Máquina, Cofres, Dados, etc.)
+// ACTIVIDADES
 // ============================================================
 function renderActividades() {
     var grid = document.getElementById('actividadesGrid');
@@ -1615,15 +1598,18 @@ function renderActividades() {
         { id: 'ruleta', icono: '🎰', nombre: 'Máquina de Bolas', desc: 'Saca una bola y gana premio', badge: usosRuleta > 0 ? usosRuleta + ' usos' : 'Sin usos', disponible: usosRuleta > 0 },
         { id: 'cofres', icono: '🎁', nombre: '9 Cofres', desc: 'Elige un cofre y descubre premio', badge: usosCofres > 0 ? usosCofres + ' usos' : 'Sin usos', disponible: usosCofres > 0 },
         { id: 'dados', icono: '🎲', nombre: 'Dados', desc: 'Lanza el dado y gana premio', badge: usosDados > 0 ? usosDados + ' usos' : 'Sin usos', disponible: usosDados > 0 },
+        { id: 'cupones', icono: '🎫', nombre: 'Mis Cupones', desc: 'Activa cupones de descuento y bonos', badge: (user.cupones_asignados || []).filter(function(c) { return !c.usado; }).length + ' disponibles', disponible: true },
+        { id: 'tareas', icono: '📋', nombre: 'Mis Tareas', desc: 'Completa tareas asignadas', badge: (user.tareas_asignadas || []).length + ' tareas', disponible: true },
+        { id: 'logros', icono: '🏆', nombre: 'Mis Logros', desc: 'Completa logros y gana recompensas', badge: (user.logros_reclamados || []).length + ' obtenidos', disponible: true },
         { id: 'puntos', icono: '⭐', nombre: 'Mis Puntos', desc: 'Canjea tus puntos por USDT', badge: (user.puntos || 0) + ' pts', disponible: true }
     ];
 
     var html = '';
     for (var a = 0; a < actividades.length; a++) {
         var act = actividades[a];
-        var onclick = act.disponible ? "abrirActividad('" + act.id + "')" : '';
-        var estadoText = act.disponible ? '🎯 Disponible' : '🔒 Bloqueado';
-        html += '<div class="actividad-card ' + (act.disponible ? '' : 'bloqueada') + '" onclick="' + onclick + '">' +
+        var onclick = "abrirActividad('" + act.id + "')";
+        var estadoText = '🎯 Disponible';
+        html += '<div class="actividad-card" onclick="' + onclick + '">' +
             '<span class="badge-prox">' + act.badge + '</span>' +
             '<span class="icono">' + act.icono + '</span>' +
             '<div class="nombre">' + act.nombre + '</div>' +
@@ -1638,13 +1624,18 @@ function abrirActividad(id) {
     if (id === 'ruleta') abrirRuleta();
     else if (id === 'cofres') abrirCofres();
     else if (id === 'dados') abrirDados();
+    else if (id === 'cupones') abrirCupones();
+    else if (id === 'tareas') abrirTareasAsignadas();
     else if (id === 'puntos') abrirPuntos();
+    else if (id === 'logros') abrirLogros();
 }
 
 // ============================================================
 // MÁQUINA DE BOLAS
 // ============================================================
 function abrirRuleta() {
+    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
+    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
     var usos = user.ruleta_usos || 0;
     if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
     var premioAsignado = user.premio_ruleta || 0;
@@ -1677,12 +1668,13 @@ function abrirRuleta() {
 function cerrarRuleta() {
     var modal = document.getElementById('ruletaModal');
     if (modal) modal.remove();
+    maquinaGirando = false;
 }
-
-var maquinaGirando = false;
 
 function sacarBola() {
     if (maquinaGirando) return;
+    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
+    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
     var usos = user.ruleta_usos || 0;
     if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
 
@@ -1758,9 +1750,9 @@ function sacarBola() {
 // ============================================================
 // COFRES
 // ============================================================
-var abriendoCofre = false;
-
 function abrirCofres() {
+    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
+    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
     var usos = user.cofres_usos || 0;
     if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
     var premioReal = user.premio_cofre || 0;
@@ -1811,6 +1803,8 @@ function renderCofres() {
 
 function abrirCofre(index) {
     if (abriendoCofre) return;
+    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
+    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
     var usos = user.cofres_usos || 0;
     if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
     var abiertos = user.cofres_abiertos || [];
@@ -1855,9 +1849,9 @@ function cerrarCofres() {
 // ============================================================
 // DADOS
 // ============================================================
-var dadosGirando = false;
-
 function abrirDados() {
+    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
+    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
     var usos = user.dados_usos || 0;
     if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
     var premioReal = user.premio_dados || 0;
@@ -1887,6 +1881,8 @@ function cerrarDados() {
 
 function lanzarDado() {
     if (dadosGirando) return;
+    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
+    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
     var usos = user.dados_usos || 0;
     if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
 
@@ -1945,6 +1941,159 @@ function lanzarDado() {
 }
 
 // ============================================================
+// CUPONES
+// ============================================================
+function abrirCupones() {
+    var cupones = user.cupones_asignados || [];
+    var disponibles = cupones.filter(function(c) { return !c.usado; });
+
+    if (disponibles.length === 0) {
+        showAlert('⛔ No tienes cupones disponibles.', 'danger');
+        return;
+    }
+
+    var modal = document.createElement('div');
+    modal.id = 'cuponesModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
+    var html = '<div style="background:#ffffff;border-radius:20px;padding:24px;max-width:450px;width:100%;max-height:90vh;overflow-y:auto;position:relative;">' +
+        '<button onclick="cerrarCupones()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:#999;">✕</button>' +
+        '<h2 style="margin-bottom:12px;">🎫 Mis Cupones</h2>' +
+        '<p style="font-size:12px;color:#666;margin-bottom:12px;">Selecciona un cupón para activarlo</p>';
+
+    for (var i = 0; i < cupones.length; i++) {
+        var c = cupones[i];
+        var tipoLabel = c.tipo === 'descuento_retiro' ? '🔽 Descuento Retiro' : c.tipo === 'bonus_referido' ? '👥 Bono Referido' : '💰 Bono Depósito';
+        var usado = c.usado || false;
+        
+        html += '<div class="cupon-modal-item" style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid ' + (usado ? '#e0e0e0' : '#4db6ac') + ';' + (usado ? 'opacity:0.5;' : 'cursor:pointer;') + '" onclick="' + (!usado ? 'activarCupon(' + i + ')' : '') + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                '<span style="font-weight:600;">' + (c.titulo || 'Cupón') + '</span>' +
+                '<span style="color:' + (usado ? '#999' : '#4db6ac') + ';font-weight:600;font-size:11px;">' + (usado ? '✅ USADO' : '🔓 ACTIVAR') + '</span>' +
+            '</div>' +
+            '<div style="font-size:12px;color:#666;margin-top:4px;">' + (c.descripcion || '') + '</div>' +
+            '<div style="font-size:11px;color:#999;margin-top:4px;">' + tipoLabel + ' · <strong>' + c.valor + '%</strong></div>' +
+            (usado ? '<div style="font-size:10px;color:#999;margin-top:4px;">Usado: ' + formatDate(c.fechaUso) + '</div>' : '') +
+        '</div>';
+    }
+
+    html += '<button onclick="cerrarCupones()" style="width:100%;padding:12px;background:#000;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;margin-top:8px;">Cerrar</button></div>';
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+}
+
+function cerrarCupones() {
+    var modal = document.getElementById('cuponesModal');
+    if (modal) modal.remove();
+}
+
+function activarCupon(index) {
+    var cupones = user.cupones_asignados || [];
+    if (index >= cupones.length) return;
+    if (cupones[index].usado) { showAlert('⚠️ Este cupón ya fue usado', 'warning'); return; }
+
+    var cupon = cupones[index];
+    var tipo = cupon.tipo || 'descuento_retiro';
+    var valor = cupon.valor || 0;
+
+    switch (tipo) {
+        case 'descuento_retiro':
+            user.descuentoRetiroActivo = {
+                porcentaje: valor,
+                expiracion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                cuponUsado: cupon.id
+            };
+            showAlert('✅ Descuento del ' + valor + '% en tu próxima comisión de retiro activado. Válido por 7 días.', 'success');
+            break;
+        case 'puntos_extra':
+            user.puntos = (user.puntos || 0) + valor;
+            showAlert('✅ Has recibido ' + valor + ' puntos extra!', 'success');
+            break;
+        case 'usdt_extra':
+            user.balance = (user.balance || 0) + valor;
+            showAlert('✅ Has recibido $' + valor.toFixed(2) + ' USDT extra!', 'success');
+            break;
+        default:
+            showAlert('⚠️ Tipo de cupón no reconocido', 'danger');
+            return;
+    }
+
+    cupon.usado = true;
+    cupon.fechaUso = new Date().toISOString();
+    user.cupones_asignados[index] = cupon;
+    
+    saveUserData();
+    renderDashboard();
+    cerrarCupones();
+}
+
+// ============================================================
+// TAREAS ASIGNADAS (Modal)
+// ============================================================
+function abrirTareasAsignadas() {
+    var tareasAsignadas = user.tareas_asignadas || [];
+
+    var modal = document.createElement('div');
+    modal.id = 'tareasModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
+    var html = '<div style="background:#ffffff;border-radius:20px;padding:24px;max-width:450px;width:100%;max-height:90vh;overflow-y:auto;position:relative;">' +
+        '<button onclick="cerrarTareas()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:#999;">✕</button>' +
+        '<h2 style="margin-bottom:12px;">📋 Mis Tareas</h2>';
+
+    if (tareasAsignadas.length === 0) {
+        html += '<div style="text-align:center;color:#999;padding:20px;">No tienes tareas asignadas</div>';
+    } else {
+        for (var i = 0; i < tareasAsignadas.length; i++) {
+            var t = tareasAsignadas[i];
+            var estadoColor = '#f7971e';
+            var estadoTexto = '⏳ Pendiente';
+            if (t.estado === 'completada') { estadoColor = '#4db6ac'; estadoTexto = '📤 En revisión'; }
+            else if (t.estado === 'aprobada') { estadoColor = '#4db6ac'; estadoTexto = '✅ Aprobada'; }
+            else if (t.estado === 'rechazada') { estadoColor = '#ef5350'; estadoTexto = '❌ Rechazada'; }
+
+            var boton = '';
+            if (t.estado === 'pendiente') {
+                boton = '<button onclick="completarTareaAsignada(' + i + ')" style="margin-top:8px;padding:6px 16px;background:#000;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;">📤 Subir comprobante</button>';
+            }
+
+            html += '<div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:10px;border-left:4px solid ' + estadoColor + ';">' +
+                '<div style="display:flex;justify-content:space-between;">' +
+                    '<div><strong>' + (t.tareaNombre || 'Tarea') + '</strong><div style="font-size:12px;color:#666;">' + (t.tareaDescripcion || '') + '</div></div>' +
+                    '<div style="color:' + estadoColor + ';font-weight:600;font-size:12px;">' + estadoTexto + '</div>' +
+                '</div>' +
+                (t.comprobante ? '<div style="font-size:11px;color:#4db6ac;margin-top:4px;">📎 Comprobante enviado</div>' : '') +
+                boton +
+            '</div>';
+        }
+    }
+
+    html += '<button onclick="cerrarTareas()" style="width:100%;padding:12px;background:#000;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;margin-top:8px;">Cerrar</button></div>';
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+}
+
+function cerrarTareas() {
+    var modal = document.getElementById('tareasModal');
+    if (modal) modal.remove();
+}
+
+function completarTareaAsignada(index) {
+    var comprobante = prompt('📤 Sube tu comprobante (enlace o descripción):');
+    if (!comprobante) return;
+    if (!confirm('¿Confirmas que has completado la tarea?')) return;
+
+    var tareas = user.tareas_asignadas || [];
+    if (index >= tareas.length) return;
+    tareas[index].estado = 'completada';
+    tareas[index].comprobante = comprobante;
+    tareas[index].fechaCompletado = new Date().toISOString();
+    user.tareas_asignadas = tareas;
+    saveUserData();
+    cerrarTareas();
+    showAlert('✅ Comprobante enviado. Espera aprobación.', 'success');
+    renderDashboard();
+}
+
+// ============================================================
 // PUNTOS Y CANJES
 // ============================================================
 function abrirPuntos() {
@@ -1992,6 +2141,8 @@ function cerrarPuntos() {
 }
 
 function solicitarCanje(canjeId) {
+    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
+    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
     var canjes = getCanjes();
     var canje = null;
     for (var i = 0; i < canjes.length; i++) {
@@ -2033,6 +2184,253 @@ function solicitarCanje(canjeId) {
 }
 
 // ============================================================
+// LOGROS
+// ============================================================
+function abrirLogros() {
+    var logros = getLogrosSistema();
+    if (logros.length === 0) {
+        showAlert('⚠️ No hay logros disponibles.', 'warning');
+        return;
+    }
+
+    var logrosAsignados = user.logros_asignados || [];
+
+    var modal = document.createElement('div');
+    modal.id = 'logrosModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
+    var html = '<div style="background:linear-gradient(145deg,#1a1a2e,#16213e);border-radius:30px;padding:30px 24px 32px;max-width:450px;width:100%;max-height:90vh;overflow-y:auto;position:relative;border:2px solid #f7971e;">' +
+        '<button onclick="cerrarLogros()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;color:#999;cursor:pointer;">✕</button>' +
+        '<h2 style="text-align:center;font-size:22px;color:#fff;">🏆 Mis Logros</h2>';
+
+    var logrosMostrados = 0;
+    for (var i = 0; i < logros.length; i++) {
+        var l = logros[i];
+        var reclamado = user.logros_reclamados && user.logros_reclamados.indexOf(l.id) !== -1;
+        var asignado = logrosAsignados.indexOf(l.id) !== -1;
+
+        if (!asignado && !reclamado) continue;
+
+        logrosMostrados++;
+        var progreso = 0;
+        var total = 0;
+        // Calcular progreso según tipo
+        if (l.tipo === 'referidos') {
+            total = (user.referidos && user.referidos.lista) ? user.referidos.lista.length : 0;
+        } else if (l.tipo === 'ganancias') {
+            var historial = user.historial || [];
+            for (var h = 0; h < historial.length; h++) {
+                if (historial[h].type === 'ganancia' || historial[h].tipo === 'produccion') {
+                    total += historial[h].amount || historial[h].monto || 0;
+                }
+            }
+        } else if (l.tipo === 'depositos') {
+            var historial = user.historial || [];
+            for (var h = 0; h < historial.length; h++) {
+                if (historial[h].type === 'deposito' || historial[h].tipo === 'deposito') {
+                    total += historial[h].amount || historial[h].monto || 0;
+                }
+            }
+        } else if (l.tipo === 'plan') {
+            total = (user.plan && user.plan !== 'Sin plan') ? 1 : 0;
+        } else if (l.tipo === 'ruleta_usos') {
+            total = user.ruleta_usos || 0;
+        } else if (l.tipo === 'cofres_usos') {
+            total = user.cofres_usos || 0;
+        } else if (l.tipo === 'dados_usos') {
+            total = user.dados_usos || 0;
+        }
+        progreso = total;
+
+        var completado = progreso >= l.meta;
+        var porcentaje = Math.min(100, (progreso / l.meta) * 100);
+
+        var pendienteAprobar = false;
+        if (user.logros_pendientes_aprobar) {
+            for (var p = 0; p < user.logros_pendientes_aprobar.length; p++) {
+                if (user.logros_pendientes_aprobar[p].logroId === l.id && user.logros_pendientes_aprobar[p].estado === 'pendiente') {
+                    pendienteAprobar = true;
+                    break;
+                }
+            }
+        }
+
+        var colorBorde = reclamado ? '#4db6ac' : (pendienteAprobar ? '#f7971e' : (completado ? '#f7971e' : '#333'));
+        var estadoTexto = reclamado ? '✅ Reclamado' : (pendienteAprobar ? '⏳ En revisión' : (completado ? '🎯 Reclamar' : '⏳ ' + progreso + '/' + l.meta));
+        var estadoColor = reclamado ? '#4db6ac' : (pendienteAprobar ? '#f7971e' : (completado ? '#f7971e' : '#999'));
+        var recompensaTexto = l.recompensa_tipo === 'usdt' ? '$' + l.recompensa : l.recompensa + ' pts';
+
+        html += '<div style="background:rgba(255,255,255,0.05);border:2px solid ' + colorBorde + ';border-radius:16px;padding:16px;margin-bottom:10px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                '<div><span style="font-size:16px;font-weight:600;color:#fff;">' + l.nombre + '</span>' +
+                (reclamado ? ' <span style="color:#4db6ac;font-size:11px;">✅ Reclamado</span>' : '') +
+                (pendienteAprobar ? ' <span style="color:#f7971e;font-size:11px;">⏳ En revisión</span>' : '') +
+                '<div style="color:#999;font-size:11px;margin-top:2px;">' + (l.descripcion || '') + '</div>' +
+                '<div style="color:#666;font-size:9px;margin-top:2px;">🎯 Meta: ' + l.meta + ' | 🏆 Recompensa: ' + recompensaTexto + '</div>' +
+                '</div>' +
+                '<div style="text-align:right;"><div style="color:#f7971e;font-weight:700;font-size:16px;">+' + recompensaTexto + '</div>' +
+                '<div style="color:' + estadoColor + ';font-size:11px;font-weight:600;">' + estadoTexto + '</div></div>' +
+            '</div>' +
+            '<div style="width:100%;height:6px;background:#2a2a2a;border-radius:10px;margin-top:8px;overflow:hidden;">' +
+                '<div style="width:' + porcentaje + '%;height:100%;background:' + (reclamado ? '#4db6ac' : (completado ? '#f7971e' : '#4db6ac')) + ';border-radius:10px;"></div>' +
+            '</div>' +
+            (completado && !reclamado && !pendienteAprobar ? '<button onclick="reclamarLogro(\'' + l.id + '\')" style="margin-top:8px;width:100%;padding:8px;background:#f7971e;color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer;">🎯 Reclamar Logro</button>' : '') +
+            (pendienteAprobar ? '<div style="margin-top:8px;font-size:11px;color:#f7971e;text-align:center;">⏳ Esperando aprobación del administrador</div>' : '') +
+        '</div>';
+    }
+
+    if (logrosMostrados === 0) {
+        html += '<div style="text-align:center;color:#999;padding:30px;">No tienes logros asignados.<br>El administrador debe asignarte logros.</div>';
+    }
+
+    html += '<button onclick="cerrarLogros()" style="background:#4db6ac;color:#000;border:none;padding:12px;border-radius:30px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;">Cerrar</button></div>';
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+}
+
+function cerrarLogros() {
+    var modal = document.getElementById('logrosModal');
+    if (modal) modal.remove();
+}
+
+function reclamarLogro(logroId) {
+    var logros = getLogrosSistema();
+    var logro = null;
+    for (var i = 0; i < logros.length; i++) {
+        if (logros[i].id === logroId) { logro = logros[i]; break; }
+    }
+    if (!logro) { showAlert('⚠️ Logro no encontrado', 'danger'); return; }
+    
+    if (user.logros_reclamados && user.logros_reclamados.indexOf(logro.id) !== -1) {
+        showAlert('⚠️ Ya reclamado', 'warning');
+        return;
+    }
+    
+    if (!user.logros_asignados || user.logros_asignados.indexOf(logro.id) === -1) {
+        showAlert('⚠️ Este logro no está asignado a tu cuenta', 'warning');
+        return;
+    }
+    
+    if (user.logros_pendientes_aprobar) {
+        for (var p = 0; p < user.logros_pendientes_aprobar.length; p++) {
+            if (user.logros_pendientes_aprobar[p].logroId === logroId && user.logros_pendientes_aprobar[p].estado === 'pendiente') {
+                showAlert('⚠️ Ya enviaste solicitud de aprobación para este logro', 'warning');
+                return;
+            }
+        }
+    }
+
+    var comprobante = prompt('📤 Sube tu comprobante para este logro (enlace o descripción):');
+    if (!comprobante) return;
+
+    if (!confirm('¿Confirmas que has completado el logro "' + logro.nombre + '" y quieres enviar el comprobante?')) return;
+
+    if (!user.logros_pendientes_aprobar) user.logros_pendientes_aprobar = [];
+    user.logros_pendientes_aprobar.push({
+        logroId: logro.id,
+        nombre: logro.nombre,
+        recompensa: logro.recompensa,
+        recompensa_tipo: logro.recompensa_tipo || 'puntos',
+        comprobante: comprobante,
+        estado: 'pendiente',
+        fecha: new Date().toISOString()
+    });
+
+    saveUserData();
+    cerrarLogros();
+    showAlert('✅ Comprobante enviado. Espera aprobación del administrador.', 'success');
+    renderDashboard();
+}
+
+// ============================================================
+// COPY
+// ============================================================
+function copyAddress() {
+    var addr = document.getElementById('walletAddress').textContent;
+    navigator.clipboard.writeText(addr).then(function() {
+        showAlert('📋 Dirección copiada', 'success');
+    }).catch(function() {
+        var input = document.createElement('input');
+        input.value = addr;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        showAlert('📋 Dirección copiada', 'success');
+    });
+}
+
+function copyReferralLink() {
+    var link = document.getElementById('referralLinkDisplay').textContent;
+    navigator.clipboard.writeText(link).then(function() {
+        showAlert('📋 Link de referido copiado', 'success');
+    }).catch(function() {
+        var input = document.createElement('input');
+        input.value = link;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        showAlert('📋 Link de referido copiado', 'success');
+    });
+}
+
+// ============================================================
+// SINCRONIZAR USUARIO CON BACKEND
+// ============================================================
+function sincronizarUsuarioConBackend(telefono) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user) return;
+
+    var token = localStorage.getItem('apex_token');
+    if (!token) return;
+    if (!user.id) return;
+
+    fetch(API_URL + '/api/admin/user/' + user.id, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+            balance: Number(user.balance || 0),
+            puntos: Number(user.puntos || 0),
+            plan: user.plan || 'Sin plan',
+            plan_amount: Number(user.plan_amount || 0),
+            daily_earnings: Number(user.daily_earnings || 0),
+            ruleta_usos: Number(user.ruleta_usos || 0),
+            cofres_usos: Number(user.cofres_usos || 0),
+            dados_usos: Number(user.dados_usos || 0),
+            premio_ruleta: Number(user.premio_ruleta || 0),
+            premio_cofre: Number(user.premio_cofre || 0),
+            premio_dados: Number(user.premio_dados || 0),
+            cupones_asignados: user.cupones_asignados || [],
+            logros_asignados: user.logros_asignados || [],
+            tareas_asignadas: user.tareas_asignadas || [],
+            canjes_realizados: user.canjes_realizados || [],
+            logros_reclamados: user.logros_reclamados || [],
+            historial_detallado: user.historial_detallado || [],
+            direccion_retiro: user.direccion_retiro || null,
+            cuenta_habilitada: user.cuenta_habilitada !== false,
+            produccion_pausada: user.produccion_pausada || false,
+            nivel_autorizado: Number(user.nivel_autorizado || 0),
+            tareas_completadas_hoy: user.tareas_completadas_hoy || [],
+            ultima_fecha_tareas: user.ultima_fecha_tareas || null,
+            racha_dias: user.racha_dias || 0
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('❌ Error al sincronizar usuario:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Error de red:', error);
+    });
+}
+
+// ============================================================
 // VIGILANTE
 // ============================================================
 function iniciarVigilante() {
@@ -2051,6 +2449,7 @@ function iniciarVigilante() {
                 if (Number(data.user.puntos || 0) !== Number(user.puntos || 0)) huboCambios = true;
                 if (data.user.plan !== user.plan) huboCambios = true;
                 if (data.user.cuenta_habilitada !== user.cuenta_habilitada) huboCambios = true;
+                if (data.user.produccion_pausada !== user.produccion_pausada) huboCambios = true;
                 if (data.user.tareas_completadas_hoy && user.tareas_completadas_hoy) {
                     if (data.user.tareas_completadas_hoy.length !== user.tareas_completadas_hoy.length) huboCambios = true;
                 }
@@ -2066,45 +2465,105 @@ function iniciarVigilante() {
 }
 
 // ============================================================
-// SINCRONIZAR USUARIO CON BACKEND
+// RENDER HISTORY
 // ============================================================
-function sincronizarUsuarioConBackend(telefono) {
-    var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) return;
+function renderHistory(filter) {
+    if (filter === undefined) filter = 'all';
+    var list = document.getElementById('historyList');
+    if (!list) return;
 
-    var token = localStorage.getItem('apex_token');
-    if (!token) return;
-    if (!user.id) return;
+    var history = user.historial_detallado || user.historial || [];
 
-    fetch(API_URL + '/api/admin/user/' + user.id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({
-            balance: Number(user.balance || 0),
-            puntos: Number(user.puntos || 0),
-            plan: user.plan || 'Sin plan',
-            plan_amount: Number(user.plan_amount || 0),
-            daily_earnings: Number(user.daily_earnings || 0),
-            tareas_completadas_hoy: user.tareas_completadas_hoy || [],
-            ultima_fecha_tareas: user.ultima_fecha_tareas || null,
-            racha_dias: user.racha_dias || 0,
-            direccion_retiro: user.direccion_retiro || null,
-            ruleta_usos: Number(user.ruleta_usos || 0),
-            cofres_usos: Number(user.cofres_usos || 0),
-            dados_usos: Number(user.dados_usos || 0),
-            premio_ruleta: Number(user.premio_ruleta || 0),
-            premio_cofre: Number(user.premio_cofre || 0),
-            premio_dados: Number(user.premio_dados || 0),
-            cofres_abiertos: user.cofres_abiertos || []
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) console.error('❌ Error al sincronizar:', data.error);
-    })
-    .catch(error => console.error('❌ Error de red:', error));
+    var filtered = [];
+    if (filter === 'all') { filtered = history; }
+    else {
+        for (var h = 0; h < history.length; h++) {
+            var tipo = history[h].tipo || history[h].type || '';
+            var origen = history[h].origen || '';
+            if (tipo === filter || origen === filter) {
+                filtered.push(history[h]);
+            }
+        }
+    }
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<div style="text-align:center;color:#ccc;padding:20px 0;font-size:14px;">No hay registros disponibles</div>';
+        return;
+    }
+
+    filtered.sort(function(a, b) { return new Date(b.fecha || b.date) - new Date(a.fecha || a.date); });
+
+    var html = '';
+    for (var f = 0; f < filtered.length; f++) {
+        var h = filtered[f];
+        var monto = h.monto || h.amount || 0;
+        var puntos = h.puntos || 0;
+        var label = h.concepto || 'Transacción';
+        var fecha = h.fecha || h.date;
+        var estado = h.estado || h.status || 'completado';
+        
+        var esPositivo = false;
+        var tipo = h.tipo || h.type || '';
+
+        if (tipo === 'retiro' || tipo === 'compra') {
+            esPositivo = false;
+        } else if (tipo === 'canje' && estado === 'aprobado') {
+            esPositivo = true;
+        } else if (tipo === 'canje' && estado === 'pendiente') {
+            esPositivo = false;
+        } else {
+            esPositivo = true;
+        }
+
+        var sign = esPositivo ? '+' : '-';
+        var amountClass = esPositivo ? 'positive' : 'negative';
+        var estadoColor = estado === 'aprobado' || estado === 'completado' ? '#4db6ac' : (estado === 'pendiente' ? '#f7971e' : '#ef5350');
+
+        var iconOrigen = '';
+        if (tipo === 'produccion') iconOrigen = '⚡';
+        else if (tipo === 'canje') iconOrigen = '🔄';
+        else if (tipo === 'retiro') iconOrigen = '💸';
+        else if (tipo === 'compra') iconOrigen = '📊';
+        else if (tipo === 'admin') iconOrigen = '👑';
+
+        var puntosTexto = '';
+        if (puntos !== 0) {
+            var signoPuntos = puntos > 0 ? '+' : '';
+            puntosTexto = '<div class="origen">⭐ ' + signoPuntos + puntos + ' pts</div>';
+        }
+
+        html += '<div class="historial-item"><div class="left"><div class="desc">' + iconOrigen + ' ' + label + '</div><div class="date">' + formatDateTime(fecha) + '</div></div><div class="right"><div class="amount ' + amountClass + '">' + sign + '$' + monto.toFixed(2) + '</div>' +
+            puntosTexto +
+            '<div class="status" style="color:' + estadoColor + ';">' + estado + '</div>' +
+            '<div class="origen">' + tipo + '</div></div></div>';
+    }
+    list.innerHTML = html;
 }
+
+// ============================================================
+// MODO OSCURO
+// ============================================================
+function toggleDarkMode() {
+    var body = document.body;
+    body.classList.toggle('dark-mode');
+    var isDark = body.classList.contains('dark-mode');
+    localStorage.setItem('apex_dark_mode', isDark ? 'true' : 'false');
+    var toggle = document.getElementById('darkModeToggle');
+    if (toggle) {
+        toggle.textContent = isDark ? '☀️' : '🌙';
+    }
+}
+
+(function() {
+    var isDark = localStorage.getItem('apex_dark_mode') === 'true';
+    if (isDark) {
+        document.body.classList.add('dark-mode');
+        var toggle = document.getElementById('darkModeToggle');
+        if (toggle) {
+            toggle.textContent = '☀️';
+        }
+    }
+})();
 
 // ============================================================
 // INICIALIZACIÓN
@@ -2112,7 +2571,9 @@ function sincronizarUsuarioConBackend(telefono) {
 checkSession();
 
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { cerrarAlerta(); }
+    if (e.key === 'Escape') {
+        cerrarAlerta();
+    }
 });
 </script>
 </body>
