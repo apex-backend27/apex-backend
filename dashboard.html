@@ -1163,6 +1163,7 @@ async function cobrarTareasDelDia() {
         if (!response.ok) throw new Error(data.error || 'No se pudo cobrar');
         if (data.user) {
             localStorage.setItem('apex_user', JSON.stringify(data.user));
+            sessionStorage.setItem('apex_user', JSON.stringify(data.user));
             cargarUsuario(data.user);
         }
         showAlert('✅ Cobro realizado: +' + Number(data.recompensa || 0).toFixed(2) + ' USDT (' + data.porcentaje + '%)', 'success');
@@ -2110,6 +2111,20 @@ function abrirTareasAsignadas(){var ts=Array.isArray(user.tareas_asignadas)?user
 // Compatibilidad final: modales visibles y operaciones administrativas verificadas en servidor
 async function sincronizarUsuarioActual(){try{var tok=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/verify',{headers:{Authorization:'Bearer '+tok}});var x=await r.json();if(x.user){user=Object.assign(user,x.user);localStorage.setItem('apex_user',JSON.stringify(x.user));sessionStorage.setItem('apex_user',JSON.stringify(x.user));}}catch(e){}}
 window.addEventListener('load',function(){setTimeout(sincronizarUsuarioActual,700);});
+</script>
+<script>
+var apexCatalogos={canjes:[],logros:[]};
+async function cargarCatalogosRemotos(){try{var tok=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/catalogs/config',{headers:{Authorization:'Bearer '+tok}});if(r.ok){apexCatalogos=await r.json();if(apexCatalogos.canjes.length)window.apexCanjesRemotos=apexCatalogos.canjes;if(apexCatalogos.logros.length)window.apexLogrosRemotos=apexCatalogos.logros;}}catch(e){console.warn('Catálogos remotos no disponibles',e)}}
+function getCanjes(){return Array.isArray(window.apexCanjesRemotos)&&window.apexCanjesRemotos.length?window.apexCanjesRemotos:(JSON.parse(localStorage.getItem(CANJES_KEY)||'[]')||[])}
+function getLogrosSistema(){return Array.isArray(window.apexLogrosRemotos)&&window.apexLogrosRemotos.length?window.apexLogrosRemotos:(JSON.parse(localStorage.getItem(LOGROS_KEY)||'[]')||[])}
+window.addEventListener('load',function(){setTimeout(cargarCatalogosRemotos,900)});
+</script>
+<script>
+// APEX v7: datos remotos se vuelven visibles inmediatamente
+async function cargarCatalogosRemotos(){try{var tok=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/catalogs/config',{headers:{Authorization:'Bearer '+tok}});if(r.ok){var x=await r.json();window.apexCanjesRemotos=Array.isArray(x.canjes)?x.canjes:[];window.apexLogrosRemotos=Array.isArray(x.logros)?x.logros:[];if(typeof renderActividades==='function')renderActividades();if(typeof renderLogros==='function')renderLogros();}}catch(e){console.warn(e)}}
+function abrirTareasAsignadas(){var ts=Array.isArray(user.tareas_asignadas)?user.tareas_asignadas:[];var body=ts.length?ts.map(function(t,i){var done=t.estado==='completada'||t.estado==='aprobada'||t.completada;var desc=t.descripcion||t.tareaDescripcion||t.descripcion_tarea||'Sin descripción';return '<div style="padding:14px;border:1px solid #27d3ff;border-radius:14px;margin:9px 0;background:rgba(10,20,40,.7)"><strong>'+(t.tareaNombre||t.nombre||t.titulo||'Actividad '+(i+1))+'</strong><p style="opacity:.85;margin:8px 0">'+desc+'</p>'+(t.nota?'<small>Tu comprobante: '+t.nota+'</small><br>':'')+(t.notaAdmin?'<small>Nota del admin: '+t.notaAdmin+'</small><br>':'')+'<button class="btn-action apex-use-task" data-i="'+i+'" '+(done?'disabled':'')+'>'+(done?'✅ Enviada':'▶️ Completar con comprobante')+'</button></div>';}).join(''):'<p>No tienes actividades asignadas.</p>';var modal=apexModal('📋 Actividades asignadas',body);modal.querySelectorAll('.apex-use-task').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.i),nota=prompt('📝 Escribe el comprobante o nota de la actividad:');if(nota===null||!nota.trim()){showAlert('⚠️ Debes escribir un comprobante','warning');return;}user.tareas_asignadas[i].estado='completada';user.tareas_asignadas[i].completada=true;user.tareas_asignadas[i].nota=nota.trim();apexPersist();modal.remove();showAlert('✅ Actividad enviada con comprobante','success');};});}
+function actualizarEstadoBotonCobro(completadasCount){var b=document.getElementById('cobrarTareasBtn'),info=document.getElementById('cobroTareasInfo');if(!b||!info||!user)return;var hoy=new Date().toISOString().slice(0,10),ya=user.cobro_tareas_fecha&&String(user.cobro_tareas_fecha).slice(0,10)===hoy,h=new Date().getHours();if(ya){b.style.display='block';b.disabled=true;b.textContent='✅ Cobrado hoy';info.textContent='Ya cobraste hoy.'}else if(h<20){b.style.display='block';b.disabled=true;b.textContent='⏳ Disponible a las 20:00';info.textContent='El cobro se habilita automáticamente a las 20:00.'}else if(completadasCount>0&&!tareasPausadasRemoto){b.style.display='block';b.disabled=false;b.textContent='💰 Cobrar '+Math.round(completadasCount/5*100)+'% del plan';info.textContent='Puedes cobrar una sola vez hoy.'}else{b.style.display='none';info.textContent='Completa tareas para cobrar.'}}
+var _completarTareaDiariaOriginal=window.completarTareaDiaria;window.completarTareaDiaria=function(index){var n=prompt('📝 Comprobante o nota de la tarea:');if(n===null||!n.trim()){showAlert('⚠️ Debes escribir un comprobante','warning');return;}user.comprobantes_tareas=user.comprobantes_tareas||{};user.comprobantes_tareas[index]=n.trim();return _completarTareaDiariaOriginal.apply(this,arguments)};
 </script>
 </body>
 </html>
