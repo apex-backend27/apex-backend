@@ -23,6 +23,13 @@ async function ensureTaskColumns() {
             )
         `);
         await pool.query(`
+            ALTER TABLE configuracion
+            ADD COLUMN IF NOT EXISTS tareas_config JSONB DEFAULT '[]'::jsonb,
+            ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS juegos_config JSONB DEFAULT '{}'::jsonb
+        `);
+        await pool.query(`
             ALTER TABLE users
             ADD COLUMN IF NOT EXISTS tareas_completadas_hoy JSONB DEFAULT '[]'::jsonb,
             ADD COLUMN IF NOT EXISTS ultima_fecha_tareas TEXT,
@@ -436,7 +443,16 @@ app.put('/api/user/update', async (req, res) => {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.userId;
         
-        const updates = req.body;
+        const updates = { ...req.body };
+        if (updates.password) {
+            updates.password_hash = await bcrypt.hash(String(updates.password), 10);
+            delete updates.password;
+        }
+        if (updates.password_retiro) {
+            updates.password_retiro_hash = await bcrypt.hash(String(updates.password_retiro), 10);
+            delete updates.password_retiro;
+        }
+        delete updates.username;
         
         // Construir consulta dinámica
         const fields = [];
@@ -539,6 +555,23 @@ const tareasPorDefecto = [
     { id: 'tarea_4', hora: 16, minuto: 0, nombre: 'Tarea 4', icono: '🌥️', activo: true },
     { id: 'tarea_5', hora: 18, minuto: 0, nombre: 'Tarea 5', icono: '🌆', activo: true }
 ];
+
+app.get('/api/games/config', authenticate, async (req, res) => {
+    try {
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS juegos_config JSONB DEFAULT '{}'::jsonb`);
+        const r = await pool.query('SELECT juegos_config FROM configuracion WHERE id = 1');
+        const cfg = (r.rows[0] && r.rows[0].juegos_config) || {};
+        res.json({ ruleta: cfg.ruleta || { premios: [10,15,20,30,50,0] }, cofres: cfg.cofres || { premios: [5,8,10,12,15,20,25,30,50] }, dados: cfg.dados || { premios: [5,10,15,20,25,30] } });
+    } catch (e) { console.error('Error config juegos:', e); res.status(500).json({error:'Error obteniendo premios'}); }
+});
+app.put('/api/admin/games/config', authenticate, isAdmin, async (req, res) => {
+    try {
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS juegos_config JSONB DEFAULT '{}'::jsonb`);
+        const cfg = req.body || {};
+        const r = await pool.query(`INSERT INTO configuracion (id,juegos_config,updated_at) VALUES (1,$1,NOW()) ON CONFLICT (id) DO UPDATE SET juegos_config=$1,updated_at=NOW() RETURNING juegos_config`, [JSON.stringify(cfg)]);
+        res.json({message:'Premios guardados', config:r.rows[0].juegos_config});
+    } catch (e) { console.error('Error guardando premios:', e); res.status(500).json({error:'Error guardando premios'}); }
+});
 
 app.get('/api/tasks/config', authenticate, async (req, res) => {
     try {
@@ -863,7 +896,7 @@ app.put('/api/admin/user/:id', async (req, res) => {
                 'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
                 'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto', 'historial',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
-                'nombre', 'apellido', 'username', 'password', 'password_retiro', 'plan_amount', 'daily_earnings',
+                'nombre', 'apellido', 'password_hash', 'password_retiro_hash', 'plan_amount', 'daily_earnings',
                 'es_admin', 'es_super_admin'];
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
@@ -991,6 +1024,30 @@ app.post('/api/admin/user/:id/points', authenticate, isAdmin, async (req, res) =
         await client.query('COMMIT');
         res.json({ message: 'Puntos actualizados', user: updated.rows[0], oldPoints, newPoints });
     } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudieron actualizar los puntos' }); } finally { client.release(); }
+});
+
+app.post('/api/user/withdraw', authenticate, async (req, res) => {
+    const { amount, password, address } = req.body || {};
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value < 30) return res.status(400).json({error:'Monto mínimo $30'});
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const q = await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);
+        if (!q.rows.length) throw new Error('Usuario no encontrado');
+        const u=q.rows[0];
+        const stored=u.password_retiro_hash || u.password_retiro;
+        const valid=stored ? (String(stored).startsWith('$2') ? await bcrypt.compare(String(password||''),String(stored)) : String(password||'')===String(stored)) : false;
+        if (!valid) { await client.query('ROLLBACK'); return res.status(401).json({error:'Contraseña incorrecta'}); }
+        const addr=String(address || u.direccion_retiro || '');
+        if (!addr.startsWith('0x')) { await client.query('ROLLBACK'); return res.status(400).json({error:'Dirección de retiro no configurada'}); }
+        if (Number(u.balance||0) < value) { await client.query('ROLLBACK'); return res.status(400).json({error:'Saldo insuficiente'}); }
+        const commission=value*0.23, net=value-commission, item={type:'retiro',amount:value,commission,netAmount:net,date:new Date().toISOString(),status:'pendiente',address:addr};
+        const hist=Array.isArray(u.historial)?u.historial:[]; hist.push(item);
+        const detail=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; detail.push({tipo:'retiro',concepto:'Retiro de $'+value.toFixed(2),monto:value,comision:commission,neto:net,fecha:item.date,estado:'pendiente'});
+        const updated=await client.query('UPDATE users SET balance=balance-$1,historial=$2,historial_detallado=$3 WHERE id=$4 RETURNING balance,historial,historial_detallado',[value,JSON.stringify(hist),JSON.stringify(detail),req.userId]);
+        await client.query('COMMIT'); res.json({message:'Solicitud de retiro enviada',user:updated.rows[0]});
+    } catch(e) { try{await client.query('ROLLBACK')}catch{}; console.error('Error retiro:',e); res.status(500).json({error:'Error en el servidor'}); } finally { client.release(); }
 });
 
 app.post('/api/user/plan/purchase', authenticate, async (req, res) => {

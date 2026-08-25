@@ -6712,5 +6712,12 @@ async function resetearTareasHoy(){
 }
 </script>
 
+<script>
+async function guardarJuegoRemoto(tipo,premios){try{var token=localStorage.getItem('apex_token');var cfg={ruleta:getPremiosRuleta(),cofres:getPremiosCofres(),dados:getPremiosDados()};cfg[tipo]={premios:premios};var r=await fetch(API_URL+'/api/admin/games/config',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(cfg)});var data=await r.json();if(!r.ok||data.error)throw new Error(data.error||'Error del servidor');showAlert('✅ Premios sincronizados con el backend','success');}catch(e){showAlert('❌ Error al sincronizar: '+e.message,'danger');}}
+async function guardarPremiosRuleta(){var vals=[...document.querySelectorAll('.premio-ruleta-valor')].map(function(x){return Number(x.value)||0;});localStorage.setItem(PREMIOS_RULETA_KEY,JSON.stringify({premios:vals}));await guardarJuegoRemoto('ruleta',vals);}
+async function guardarPremiosCofres(){var vals=[...document.querySelectorAll('.premio-cofre-valor')].map(function(x){return Number(x.value)||0;});localStorage.setItem(PREMIOS_COFRES_KEY,JSON.stringify({premios:vals}));await guardarJuegoRemoto('cofres',vals);}
+async function guardarPremiosDados(){var vals=[...document.querySelectorAll('.premio-dados-valor')].map(function(x){return Number(x.value)||0;});localStorage.setItem(PREMIOS_DADOS_KEY,JSON.stringify({premios:vals}));await guardarJuegoRemoto('dados',vals);}
+</script>
+
 </body>
 </html>
