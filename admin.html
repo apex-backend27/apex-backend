@@ -3462,8 +3462,8 @@ async function guardarPremiosUsuario(telefono) {
         showAlert('⚠️ ' + user.nombre + ' tiene ' + usosRuleta + ' usos de máquina pero NO tiene premio asignado.', 'warning');
         return;
     }
-    if (usosCofres > 0 && premioCofre <= 0) {
-        showAlert('⚠️ ' + user.nombre + ' tiene ' + usosCofres + ' usos de cofres pero NO tiene premio asignado.', 'warning');
+    if (usosCofre > 0 && premioCofre <= 0) {
+        showAlert('⚠️ ' + user.nombre + ' tiene ' + usosCofre + ' usos de cofres pero NO tiene premio asignado.', 'warning');
         return;
     }
     if (usosDados > 0 && premioDados <= 0) {
@@ -3472,7 +3472,7 @@ async function guardarPremiosUsuario(telefono) {
     }
     
     user.ruleta_usos = usosRuleta;
-    user.cofres_usos = usosCofres;
+    user.cofres_usos = usosCofre;
     user.dados_usos = usosDados;
     user.premio_ruleta = premioRuleta;
     user.premio_cofre = premioCofre;
