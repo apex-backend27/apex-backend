@@ -1575,7 +1575,7 @@ TAB TAREAS (NUEVO)
         </div>
         
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-            <button class="btn btn-success" onclick="agregarTareaConfig()">➕ Agregar Tarea</button>
+            <button class="btn btn-success" onclick="agregarTareaConfig()">➕ Agregar Tarea</button><button class="btn btn-warning" onclick="agregarTareaPrueba()">🧪 Agregar tarea de prueba sin horario</button>
             <button class="btn btn-primary" onclick="guardarTareasConfig()">💾 Guardar Tareas</button>
         </div>
     </div>
@@ -6724,6 +6724,12 @@ async function guardarPremiosDados(){var vals=[...document.querySelectorAll('.pr
 <script>
 async function aprobarTarea(telefono,index){if(!confirm('¿Aprobar esta tarea?'))return;var us=getUsers(),u=us.find(function(x){return x.telefono===telefono;}),token=localStorage.getItem('apex_token');if(!u||!u.id)return;var nota=prompt('Nota del administrador (opcional):')||'';try{var r=await fetch(API_URL+'/api/admin/user/'+u.id+'/task/approve',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({index:index,nota:nota})});var x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'Error en servidor');showAlert('✅ Tarea aprobada y recompensa acreditada','success');renderTareasPendientes();renderUsuarios();}catch(e){showAlert('❌ '+e.message,'danger');}}
 async function rechazarTarea(telefono,index){if(!confirm('¿Rechazar esta tarea?'))return;var us=getUsers(),u=us.find(function(x){return x.telefono===telefono;}),token=localStorage.getItem('apex_token');if(!u||!u.id)return;try{var r=await fetch(API_URL+'/api/admin/user/'+u.id+'/task/reject',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({index:index,nota:prompt('Motivo (opcional):')||''})});var x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'Error en servidor');showAlert('✅ Tarea rechazada','success');renderTareasPendientes();}catch(e){showAlert('❌ '+e.message,'danger');}}
+</script>
+<script>
+async function guardarCatalogosRemotos(){var token=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/admin/catalogs/config',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({canjes:getCanjes(),logros:getLogrosSistema()})});var x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'Error del servidor');}
+async function agregarTareaPrueba(){var ts=getTareasConfig();ts.push({id:'prueba_'+Date.now(),hora:0,minuto:0,nombre:'Tarea de prueba',icono:'🧪',activo:false,sin_horario:true,descripcion:'Actividad manual para pruebas'});saveTareasConfig(ts);renderTareasConfig();showAlert('✅ Tarea de prueba agregada. Actívala desde el selector y guarda.','success');}
+var _guardarCanjesOriginal=guardarCanjes; guardarCanjes=async function(){_guardarCanjesOriginal();try{await guardarCatalogosRemotos();showAlert('✅ Canjes sincronizados con NeonTech','success')}catch(e){showAlert('❌ '+e.message,'danger')}};
+var _guardarLogrosSistemaOriginal=guardarLogrosSistema; guardarLogrosSistema=async function(){_guardarLogrosSistemaOriginal.apply(this,arguments);try{await guardarCatalogosRemotos();showAlert('✅ Logros sincronizados con NeonTech','success')}catch(e){showAlert('❌ '+e.message,'danger')}};
 </script>
 </body>
 </html>
