@@ -385,7 +385,7 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;ba
 #apexActionModal .modal-close{position:absolute;right:14px;top:10px;background:transparent;color:#fff;border:0;font-size:28px;cursor:pointer}
 #apexActionModal .btn-action{background:linear-gradient(135deg,#0ad9ff,#8b5cf6);color:#fff;border:0;border-radius:12px;padding:11px 16px;cursor:pointer;font-weight:700;margin:6px 0}
 </style>
-</head>
+<style>#apexActionModal{position:fixed!important;inset:0!important;z-index:999999!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:20px 20px 96px!important;overflow:auto!important}#apexActionModal .modal{max-height:calc(100vh - 130px)!important;overflow:auto!important}</style></head>
 <body>
 
 <header class="header">
@@ -751,7 +751,7 @@ function getCostoUpgrade(planName) {
 function getNivelAutorizado() {
     var niveles = getNiveles();
     if (niveles[user.telefono]) {
-        return Number(user.nivel_autorizado ?? niveles[user.telefono].nivelAutorizado ?? 0);
+        return Number(user.nivel_autorizado || niveles[user.telefono].nivelAutorizado || 0);
     }
     return Number(user.nivel_autorizado || 0);
 }
@@ -887,7 +887,9 @@ function cargarUsuario(dataUser) {
         tareas_completadas_hoy: dataUser.tareas_completadas_hoy || [],
         ultima_fecha_tareas: dataUser.ultima_fecha_tareas || null,
         racha_dias: dataUser.racha_dias || 0,
-        daily_earnings: dataUser.daily_earnings || 0
+        daily_earnings: dataUser.daily_earnings || 0,
+        nivel_autorizado: Number(dataUser.nivel_autorizado || 0),
+        username: dataUser.username || null
     };
     
     sessionStorage.setItem('apex_user', JSON.stringify(user));
@@ -2100,5 +2102,14 @@ function abrirPuntos(){var cs=getCanjes();var html='<p>Tienes <strong>'+Number(u
 window.addEventListener('load',function(){setTimeout(cargarJuegosConfigRemota,500);});
 </script>
 
+<script>
+async function verificarPlanRemoto(){try{var t=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/verify',{headers:{Authorization:'Bearer '+t}});var x=await r.json();if(x.user){user=Object.assign(user,x.user);sessionStorage.setItem('apex_user',JSON.stringify(user));localStorage.setItem('apex_user',JSON.stringify(user));}}catch(e){}}
+function abrirTareasAsignadas(){var ts=Array.isArray(user.tareas_asignadas)?user.tareas_asignadas:[];var body=ts.length?ts.map(function(t,i){var done=t.estado==='completada'||t.estado==='aprobada'||t.completada;return '<div style="padding:12px;border:1px solid #21466a;border-radius:12px;margin:8px 0"><strong>'+(t.tareaNombre||t.nombre||t.titulo||'Actividad '+(i+1))+'</strong><p>'+(t.descripcion||'')+'</p>'+(t.notaAdmin?'<small>Nota del admin: '+t.notaAdmin+'</small>':'')+'<br><button class="btn-action apex-use-task" data-i="'+i+'" '+(done?'disabled':'')+'>'+(done?'✅ Enviada':'▶️ Completar')+'</button></div>';}).join(''):'<p>No tienes actividades asignadas.</p>';var modal=apexModal('📋 Actividades asignadas',body+'<textarea id="apexTaskNote" placeholder="Nota o comentario para el administrador" style="width:100%;min-height:80px;margin-top:10px;background:#081326;color:#fff;border:1px solid #26709a;border-radius:10px;padding:10px"></textarea>');modal.querySelectorAll('.apex-use-task').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.i);user.tareas_asignadas[i].estado='completada';user.tareas_asignadas[i].completada=true;user.tareas_asignadas[i].nota=document.getElementById('apexTaskNote').value.trim();apexPersist();modal.remove();showAlert('✅ Actividad enviada al administrador','success');};});}
+</script>
+<script>
+// Compatibilidad final: modales visibles y operaciones administrativas verificadas en servidor
+async function sincronizarUsuarioActual(){try{var tok=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/verify',{headers:{Authorization:'Bearer '+tok}});var x=await r.json();if(x.user){user=Object.assign(user,x.user);localStorage.setItem('apex_user',JSON.stringify(x.user));sessionStorage.setItem('apex_user',JSON.stringify(x.user));}}catch(e){}}
+window.addEventListener('load',function(){setTimeout(sincronizarUsuarioActual,700);});
+</script>
 </body>
 </html>

@@ -365,7 +365,10 @@ app.get('/api/verify', authenticate, async (req, res) => {
                 daily_earnings: Number(userData.daily_earnings || 0),
                 cuenta_habilitada: userData.cuenta_habilitada !== false,
                 produccion_pausada: userData.produccion_pausada || false,
-                password_retiro: userData.password_retiro || userData.password_retiro_hash || '000000',
+                password_retiro: userData.password_retiro || null,
+                nivel_autorizado: Number(userData.nivel_autorizado || 0),
+                username: userData.username || null,
+                nivel_autorizado: Number(userData.nivel_autorizado || 0),
                 username: userData.username || null,
                 nivel_autorizado: Number(userData.nivel_autorizado || 0),
                 direccion_retiro: userData.direccion_retiro || null,
@@ -639,7 +642,9 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const planDaily = { Trader: 6, Analista: 10, Gestor: 17, Master: 27, Elite: 42 };
         const planNormalizado = normalizarPlan(u.plan);
         const diario = Number(u.daily_earnings || (planNormalizado ? planDaily[planNormalizado] : 0) || 0);
-        if (!planNormalizado || diario <= 0) {
+        const planText = String(u.plan || '').trim().toLowerCase();
+        const tienePlanActivo = (planText && planText !== 'sin plan' && diario > 0) || Boolean(planNormalizado);
+        if (!tienePlanActivo || diario <= 0) {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: 'Necesitas adquirir un plan activo antes de cobrar tareas' });
         }
@@ -882,7 +887,9 @@ app.put('/api/admin/user/:id', async (req, res) => {
         }
         
         const userId = req.params.id;
-        const updates = req.body;
+        const updates = { ...req.body };
+        if (updates.password) { updates.password_hash = await bcrypt.hash(String(updates.password), 10); delete updates.password; }
+        if (updates.password_retiro) { updates.password_retiro_hash = await bcrypt.hash(String(updates.password_retiro), 10); delete updates.password_retiro; }
         
         const fields = [];
         const values = [];
@@ -892,7 +899,7 @@ app.put('/api/admin/user/:id', async (req, res) => {
         for (const [key, value] of Object.entries(updates)) {
             const camposPermitidos = ['balance', 'puntos', 'plan', 'cuenta_habilitada', 'produccion_pausada', 
                 'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados', 
-                'nivel_autorizado', 'codigos_usados_hoy', 'ultimo_reinicio_codigos',
+                'nivel_autorizado', 'nombre', 'apellido', 'username', 'password_hash', 'password_retiro_hash', 'direccion_retiro', 'plan_amount', 'daily_earnings', 'codigos_usados_hoy', 'ultimo_reinicio_codigos',
                 'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
                 'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto', 'historial',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
@@ -1082,6 +1089,11 @@ app.post('/api/admin/user/:id/authorize-plan', authenticate, isAdmin, async (req
     res.json({ message: 'Autorización actualizada', user: result.rows[0] });
 });
 
+app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req,res)=>{
+ const client=await pool.connect(); try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],i=Number(req.body.index),ts=Array.isArray(u.tareas_asignadas)?u.tareas_asignadas:[],t=ts[i];if(!t)throw new Error('Tarea no encontrada');if(t.estado==='aprobada')throw new Error('Tarea ya aprobada');t.estado='aprobada';t.fechaAprobacion=new Date().toISOString();if(req.body.nota!==undefined)t.notaAdmin=String(req.body.nota);const qty=Number(t.cantidad||0),points=t.tipo_recompensa==='usdt'?0:qty,money=t.tipo_recompensa==='usdt'?qty:0;const h=Array.isArray(u.historial_detallado)?u.historial_detallado:[];h.push({tipo:'tarea',concepto:'Tarea aprobada: '+(t.tareaNombre||t.nombre||'Actividad'),puntos:points,monto:money,nota:t.notaAdmin||null,fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET tareas_asignadas=$1,puntos=COALESCE(puntos,0)+$2,balance=COALESCE(balance,0)+$3,historial_detallado=$4 WHERE id=$5 RETURNING *',[JSON.stringify(ts),points,money,JSON.stringify(h),req.params.id]);await client.query('COMMIT');res.json({message:'Tarea aprobada',user:r.rows[0]});}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}
+});
+app.post('/api/admin/user/:id/task/reject', authenticate, isAdmin, async (req,res)=>{try{const q=await pool.query('SELECT tareas_asignadas FROM users WHERE id=$1',[req.params.id]);if(!q.rows.length)return res.status(404).json({error:'Usuario no encontrado'});const ts=q.rows[0].tareas_asignadas||[],t=ts[Number(req.body.index)];if(!t)return res.status(404).json({error:'Tarea no encontrada'});t.estado='rechazada';t.fechaRechazo=new Date().toISOString();t.notaAdmin=String(req.body.nota||'');const r=await pool.query('UPDATE users SET tareas_asignadas=$1 WHERE id=$2 RETURNING *',[JSON.stringify(ts),req.params.id]);res.json({message:'Tarea rechazada',user:r.rows[0]});}catch(e){res.status(500).json({error:'Error procesando tarea'})}});
+app.post('/api/admin/user/:id/withdraw/reject', authenticate, isAdmin, async (req,res)=>{const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],h=Array.isArray(u.historial)?u.historial:[],i=Number(req.body.index),w=h[i];if(!w||w.type!=='retiro'||w.status!=='pendiente')throw new Error('Retiro pendiente no encontrado');w.status='rechazado';w.rejectedAt=new Date().toISOString();const amount=Number(w.amount||0);const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'retiro_reembolso',concepto:'Saldo devuelto por retiro rechazado',monto:amount,fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET balance=COALESCE(balance,0)+$1,historial=$2,historial_detallado=$3 WHERE id=$4 RETURNING *',[amount,JSON.stringify(h),JSON.stringify(d),req.params.id]);await client.query('COMMIT');res.json({message:'Retiro rechazado y saldo devuelto',user:r.rows[0]})}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}});
 // ============================================================
 // INICIAR SERVIDOR
 // ============================================================

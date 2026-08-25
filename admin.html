@@ -2711,6 +2711,8 @@ function sincronizarUsuarioConBackend(telefono) {
         cuenta_habilitada: user.cuenta_habilitada !== false,
         produccion_pausada: user.produccion_pausada || false,
         nivel_autorizado: Number(user.nivel_autorizado || 0),
+        nombre: user.nombre || '',
+        apellido: user.apellido || '',
         username: user.username || null,
         password: user.password || null,
         password_retiro: user.password_retiro || null,
@@ -6719,5 +6721,9 @@ async function guardarPremiosCofres(){var vals=[...document.querySelectorAll('.p
 async function guardarPremiosDados(){var vals=[...document.querySelectorAll('.premio-dados-valor')].map(function(x){return Number(x.value)||0;});localStorage.setItem(PREMIOS_DADOS_KEY,JSON.stringify({premios:vals}));await guardarJuegoRemoto('dados',vals);}
 </script>
 
+<script>
+async function aprobarTarea(telefono,index){if(!confirm('¿Aprobar esta tarea?'))return;var us=getUsers(),u=us.find(function(x){return x.telefono===telefono;}),token=localStorage.getItem('apex_token');if(!u||!u.id)return;var nota=prompt('Nota del administrador (opcional):')||'';try{var r=await fetch(API_URL+'/api/admin/user/'+u.id+'/task/approve',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({index:index,nota:nota})});var x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'Error en servidor');showAlert('✅ Tarea aprobada y recompensa acreditada','success');renderTareasPendientes();renderUsuarios();}catch(e){showAlert('❌ '+e.message,'danger');}}
+async function rechazarTarea(telefono,index){if(!confirm('¿Rechazar esta tarea?'))return;var us=getUsers(),u=us.find(function(x){return x.telefono===telefono;}),token=localStorage.getItem('apex_token');if(!u||!u.id)return;try{var r=await fetch(API_URL+'/api/admin/user/'+u.id+'/task/reject',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({index:index,nota:prompt('Motivo (opcional):')||''})});var x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'Error en servidor');showAlert('✅ Tarea rechazada','success');renderTareasPendientes();}catch(e){showAlert('❌ '+e.message,'danger');}}
+</script>
 </body>
 </html>
