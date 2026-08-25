@@ -1108,7 +1108,19 @@
         }
 
        
-    </style>
+    
+/* APEX FUTURISTIC THEME */
+:root{--fx-bg:#070b16;--fx-surface:rgba(14,22,40,.82);--fx-surface-2:rgba(19,31,54,.78);--fx-line:rgba(91,220,255,.22);--fx-cyan:#57e6ff;--fx-violet:#9b7bff;--fx-green:#5df2bd;--fx-text:#ecf7ff;--fx-muted:#8ca7bd;--fx-shadow:0 18px 55px rgba(0,0,0,.3)}
+html{background:var(--fx-bg)}body{background:radial-gradient(circle at 15% 0%,rgba(61,126,255,.18),transparent 32%),radial-gradient(circle at 90% 20%,rgba(155,123,255,.14),transparent 28%),var(--fx-bg)!important;color:var(--fx-text)!important}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;background-image:linear-gradient(rgba(87,230,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(87,230,255,.06) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,#000,transparent 80%);z-index:-1}
+.header,.bottom-nav,.card,.actividad-card,.plan-card,.stat-card,.modal,.config-bar{background:var(--fx-surface)!important;border-color:var(--fx-line)!important;box-shadow:var(--fx-shadow);backdrop-filter:blur(18px)}
+.header{border-bottom:1px solid var(--fx-line)!important}.brand h1,.card-title,.label,.name,.amount,.number,.tarea-info .nombre{color:var(--fx-text)!important}.slogan,.sub,.desc,.phone,.details,.withdraw-hint,.label,.info,.hora{color:var(--fx-muted)!important}
+.card{border-radius:20px!important}.card-blue{background:linear-gradient(135deg,rgba(21,55,90,.72),rgba(13,24,48,.85))!important}.card-gold{background:linear-gradient(135deg,rgba(88,64,22,.62),rgba(28,22,16,.9))!important}.card-green{background:linear-gradient(135deg,rgba(18,75,70,.62),rgba(10,28,35,.88))!important}
+.tarea-item,.ganancia-stat,.address-box,.profile-input-group input,.campo-select{background:var(--fx-surface-2)!important;border-color:var(--fx-line)!important;color:var(--fx-text)!important}.tarea-item.disponible{border-color:var(--fx-cyan)!important;box-shadow:0 0 18px rgba(87,230,255,.16)}.tarea-item.completada{border-color:var(--fx-green)!important}.btn-withdraw,.btn-action,.buy-btn,.copy-btn,.btn-primary,.btn-success,.btn-warning,.btn-danger,.btn-info{background:linear-gradient(135deg,#1768a5,#744ee8)!important;color:#fff!important;border:1px solid rgba(255,255,255,.18)!important;box-shadow:0 8px 20px rgba(86,99,255,.24)}button:hover{filter:brightness(1.16);transform:translateY(-1px)}
+.bottom-nav .nav-item.active,.bottom-nav .nav-item:hover{color:var(--fx-cyan)!important}.balance-card .amount{color:var(--fx-cyan)!important;text-shadow:0 0 22px rgba(87,230,255,.32)}.balance-card .points span,.number.gold{color:var(--fx-violet)!important}
+.alert-success{background:rgba(35,180,130,.16)!important;color:var(--fx-green)!important;border-color:rgba(93,242,189,.35)!important}.alert-danger{background:rgba(240,75,110,.14)!important;color:#ff91a9!important;border-color:rgba(255,100,130,.3)!important}.alert-warning{background:rgba(255,183,77,.14)!important;color:#ffd080!important;border-color:rgba(255,190,90,.3)!important}
+
+</style>
 </head>
 <body>
 
@@ -1534,9 +1546,6 @@ TAB TAREAS (NUEVO)
             <button class="btn btn-success" onclick="activarTareasDiarias()" id="btnActivarTareas" style="padding:10px 24px; font-size:14px; font-weight:700;">
                 🚀 Activar Tareas de Hoy
             </button>
-            <button class="btn btn-warning" onclick="pausarTareasGlobales()" id="btnPausarTareas" style="padding:10px 20px; font-size:13px; font-weight:600;">
-                ⏸️ Pausar Tareas
-            </button>
             <button class="btn btn-warning" onclick="resetearTareasHoy()" style="padding:10px 20px; font-size:13px; font-weight:600;">
                 🔄 Resetear
             </button>
@@ -1735,9 +1744,6 @@ TAB TAREAS (NUEVO)
 // CONFIGURACIÓN
 // ============================================================
 const API_URL = 'https://apex-backend-cj21.onrender.com';
-var tareasPausadasRemoto = false;
-var tareasConfigRemota = [];
-var tareasFechaActivacionRemota = null;
 var STORAGE_KEY = 'apex_users';
 var REMEMBER_KEY = 'apex_remember';
 
@@ -6350,22 +6356,6 @@ function getTareasConfig() {
 
 function saveTareasConfig(tareas) {
     localStorage.setItem(TAREAS_CONFIG_KEY, JSON.stringify({ tareas: tareas, actualizado: new Date().toISOString() }));
-    var token = localStorage.getItem('apex_token');
-    if (!token) return Promise.resolve();
-    return fetch(API_URL + '/api/admin/tasks/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({
-            tareas: tareas,
-            fecha: tareasFechaActivacionRemota || new Date().toISOString().slice(0, 10),
-            pausadas: tareasPausadasRemoto === true
-        })
-    }).then(function(response) {
-        return response.json().then(function(data) {
-            if (!response.ok || data.error) throw new Error(data.error || 'HTTP ' + response.status);
-            return data;
-        });
-    });
 }
 
 function renderTareasConfig() {
@@ -6549,51 +6539,6 @@ function getTareasActivacion() {
 
 function saveTareasActivacion(estado) {
     localStorage.setItem(TAREAS_ACTIVACION_KEY, JSON.stringify(estado));
-    var token = localStorage.getItem('apex_token');
-    if (!token) return Promise.resolve();
-    return fetch(API_URL + '/api/admin/tasks/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({
-            tareas: getTareasConfig(),
-            fecha: estado && estado.activo ? new Date().toISOString().slice(0, 10) : null,
-            pausadas: tareasPausadasRemoto === true
-        })
-    }).then(function(response) {
-        return response.json().then(function(data) {
-            if (!response.ok || data.error) throw new Error(data.error || 'HTTP ' + response.status);
-            return data;
-        });
-    });
-}
-
-function cargarConfiguracionTareasRemota() {
-    var token = localStorage.getItem('apex_token');
-    if (!token) return;
-    fetch(API_URL + '/api/tasks/config', { headers: { 'Authorization': 'Bearer ' + token } })
-        .then(function(response) { return response.json(); })
-        .then(function(data) {
-            tareasConfigRemota = Array.isArray(data.tareas) ? data.tareas : [];
-            tareasPausadasRemoto = data.pausadas === true;
-            tareasFechaActivacionRemota = data.fecha || null;
-            if (tareasConfigRemota.length) saveTareasConfigLocal(tareasConfigRemota);
-            actualizarEstadoActivacionTareas();
-            renderTareasConfig();
-        })
-        .catch(function(error) { console.error('Error cargando tareas remotas:', error); });
-}
-
-function saveTareasConfigLocal(tareas) {
-    localStorage.setItem(TAREAS_CONFIG_KEY, JSON.stringify({ tareas: tareas, actualizado: new Date().toISOString() }));
-}
-
-function pausarTareasGlobales() {
-    var nuevoEstado = !tareasPausadasRemoto;
-    if (!confirm(nuevoEstado ? '¿Pausar las tareas para todos los usuarios?' : '¿Reanudar las tareas para todos los usuarios?')) return;
-    tareasPausadasRemoto = nuevoEstado;
-    saveTareasActivacion({ activo: !nuevoEstado, fecha: nuevoEstado ? null : new Date().toISOString().slice(0, 10) })
-        .then(function() { actualizarEstadoActivacionTareas(); showAlert(nuevoEstado ? '⏸️ Tareas pausadas para todos' : '▶️ Tareas reanudadas para todos', 'success'); })
-        .catch(function(error) { showAlert('❌ No se pudo actualizar la pausa: ' + error.message, 'danger'); });
 }
 
 function activarTareasDiarias() {
@@ -6609,12 +6554,11 @@ function activarTareasDiarias() {
         return;
     }
     
-    tareasPausadasRemoto = false;
     saveTareasActivacion({
         fecha: hoy,
         activo: true,
         horaActivacion: new Date().toISOString()
-    }).catch(function(error) { showAlert('❌ No se pudo activar en el servidor: ' + error.message, 'danger'); });
+    });
     
     actualizarEstadoActivacionTareas();
     renderTareasConfig();
@@ -6628,17 +6572,8 @@ function actualizarEstadoActivacionTareas() {
     var badge = document.getElementById('tareasStatusBadge');
     var fechaDisplay = document.getElementById('tareasFechaDisplay');
     var btn = document.getElementById('btnActivarTareas');
-    var pauseBtn = document.getElementById('btnPausarTareas');
     
     if (!badge || !fechaDisplay || !btn) return;
-    if (tareasPausadasRemoto) {
-        badge.textContent = '⏸️ Pausadas';
-        badge.style.background = '#fff8e1'; badge.style.color = '#e65100';
-        btn.disabled = false; btn.textContent = '▶️ Reanudar Tareas';
-        if (pauseBtn) pauseBtn.textContent = '▶️ Reanudar Tareas';
-    } else if (pauseBtn) {
-        pauseBtn.textContent = '⏸️ Pausar Tareas';
-    }
     
     var activacion = getTareasActivacion();
     var hoy = new Date().toDateString();
@@ -6701,5 +6636,53 @@ function resetearTareasHoy() {
 }
 
 </script>
+
+<script>
+// APEX: acciones administrativas atómicas y sincronizadas con NeonTech
+async function adminCommandByPhone(telefono, endpoint, delta, concepto) {
+    var lista = getUsers();
+    var objetivo = lista.find(function(u){ return u.telefono === telefono; });
+    var token = localStorage.getItem('apex_token');
+    if (!objetivo || !objetivo.id || !token) { showAlert('❌ No se encontró el usuario o la sesión expiró', 'danger'); return null; }
+    var response = await fetch(API_URL + '/api/admin/user/' + objetivo.id + '/' + endpoint, {
+        method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({delta:delta, concepto:concepto})
+    });
+    var data = await response.json();
+    if (!response.ok || data.error) throw new Error(data.error || 'Error del servidor');
+    var i = lista.findIndex(function(u){ return u.id === objetivo.id; });
+    if (i >= 0 && data.user) lista[i] = Object.assign({}, lista[i], data.user);
+    saveUsers(lista); users = lista;
+    return data;
+}
+
+async function agregarSaldo(telefono) {
+    var monto=prompt('💰 Monto a agregar al saldo:','10'); if(!monto)return;
+    var cantidad=Number(monto); if(!Number.isFinite(cantidad)||cantidad<=0){showAlert('⚠️ Monto inválido','danger');return;}
+    try { var d=await adminCommandByPhone(telefono,'balance',Math.round(cantidad*100)/100,'Saldo agregado por admin'); showAlert('✅ Saldo actualizado: +$'+Number(d.newBalance).toFixed(2),'success'); renderUsuarios(); renderUsuariosActivos(); } catch(e){showAlert('❌ '+e.message,'danger');}
+}
+async function quitarSaldo(telefono) {
+    var monto=prompt('💰 Monto a quitar del saldo:','10'); if(!monto)return;
+    var cantidad=Number(monto); if(!Number.isFinite(cantidad)||cantidad<=0){showAlert('⚠️ Monto inválido','danger');return;}
+    try { var d=await adminCommandByPhone(telefono,'balance',-Math.round(cantidad*100)/100,'Saldo retirado por admin'); showAlert('✅ Saldo actualizado: $'+Number(d.newBalance).toFixed(2),'success'); renderUsuarios(); renderUsuariosActivos(); } catch(e){showAlert('❌ '+e.message,'danger');}
+}
+async function agregarPuntosAdmin(telefono) {
+    var puntos=prompt('⭐ Cantidad de puntos a agregar:','10'); if(!puntos)return;
+    var cantidad=Math.round(Number(puntos)); if(!Number.isFinite(cantidad)||cantidad<=0){showAlert('⚠️ Cantidad inválida','danger');return;}
+    try { var d=await adminCommandByPhone(telefono,'points',cantidad,'Puntos agregados por admin'); showAlert('✅ Puntos actualizados: '+d.newPoints,'success'); renderUsuarios(); renderUsuariosActivos(); } catch(e){showAlert('❌ '+e.message,'danger');}
+}
+async function quitarPuntos(telefono) {
+    var puntos=prompt('⭐ Puntos a quitar:','10'); if(!puntos)return;
+    var cantidad=Math.round(Number(puntos)); if(!Number.isFinite(cantidad)||cantidad<=0){showAlert('⚠️ Cantidad inválida','danger');return;}
+    try { var d=await adminCommandByPhone(telefono,'points',-cantidad,'Puntos retirados por admin'); showAlert('✅ Puntos actualizados: '+d.newPoints,'success'); renderUsuarios(); renderUsuariosActivos(); } catch(e){showAlert('❌ '+e.message,'danger');}
+}
+async function toggleProduccion(telefono) {
+    var lista=getUsers(), objetivo=lista.find(function(u){return u.telefono===telefono;});
+    if(!objetivo||!objetivo.id){showAlert('❌ Usuario no encontrado','danger');return;}
+    var token=localStorage.getItem('apex_token'), paused=!objetivo.produccion_pausada;
+    try { var r=await fetch(API_URL+'/api/admin/user/'+objetivo.id+'/pause',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({paused:paused})}); var d=await r.json(); if(!r.ok||d.error)throw new Error(d.error||'Error del servidor'); objetivo.produccion_pausada=paused; saveUsers(lista); users=lista; showAlert(paused?'⏸️ Usuario pausado':'▶️ Usuario reanudado','success'); renderUsuarios(); renderUsuariosActivos(); } catch(e){showAlert('❌ '+e.message,'danger');}
+}
+</script>
+
 </body>
 </html>

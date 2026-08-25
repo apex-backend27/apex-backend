@@ -591,6 +591,10 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         }
         const planDaily = { Trader: 6, Analista: 10, Gestor: 17, Master: 27, Elite: 42 };
         const diario = Number(u.daily_earnings || planDaily[u.plan] || 0);
+        if (!u.plan || u.plan === 'Sin plan' || diario <= 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Necesitas adquirir un plan activo antes de cobrar tareas' });
+        }
         const recompensa = Number((diario * porcentaje).toFixed(2));
         const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
         historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas ${Math.round(porcentaje * 100)}%`, monto: recompensa, fecha: new Date().toISOString(), estado: 'aprobado' });
@@ -915,6 +919,93 @@ app.delete('/api/admin/user/:id', async (req, res) => {
         console.error('Error al eliminar usuario:', error);
         res.status(500).json({ error: 'Error en el servidor' });
     }
+});
+
+
+// ============================================================
+// COMANDOS TRANSACCIONALES DEL SISTEMA APEX
+// ============================================================
+const PLANES_APEX = {
+    Trader: { amount: 250, daily: 6 },
+    Analista: { amount: 500, daily: 10 },
+    Gestor: { amount: 800, daily: 17 },
+    Master: { amount: 1200, daily: 27 },
+    Elite: { amount: 1800, daily: 42 }
+};
+
+async function registrarMovimiento(client, userId, tipo, monto, concepto, metadata = {}) {
+    const r = await client.query('SELECT historial_detallado FROM users WHERE id = $1 FOR UPDATE', [userId]);
+    const historial = Array.isArray(r.rows[0]?.historial_detallado) ? r.rows[0].historial_detallado : [];
+    historial.push({ tipo, monto: Number(monto || 0), concepto, fecha: new Date().toISOString(), estado: 'aprobado', ...metadata });
+    return historial;
+}
+
+app.post('/api/admin/user/:id/balance', authenticate, isAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const delta = Number(req.body.delta);
+        if (!Number.isFinite(delta) || delta === 0) return res.status(400).json({ error: 'El ajuste de saldo debe ser un número distinto de cero' });
+        await client.query('BEGIN');
+        const current = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.params.id]);
+        if (!current.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Usuario no encontrado' }); }
+        const oldBalance = Number(current.rows[0].balance || 0);
+        const newBalance = oldBalance + delta;
+        if (newBalance < 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'El saldo no puede quedar negativo' }); }
+        const history = await registrarMovimiento(client, req.params.id, delta > 0 ? 'admin_saldo_agregado' : 'admin_saldo_retirado', delta, req.body.concepto || 'Ajuste administrativo', { adminId: req.userId });
+        const updated = await client.query('UPDATE users SET balance = $1, historial_detallado = $2 WHERE id = $3 RETURNING *', [newBalance, JSON.stringify(history), req.params.id]);
+        await client.query('COMMIT');
+        res.json({ message: 'Saldo actualizado', user: updated.rows[0], oldBalance, newBalance });
+    } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudo actualizar el saldo' }); } finally { client.release(); }
+});
+
+app.post('/api/admin/user/:id/points', authenticate, isAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const delta = Number(req.body.delta);
+        if (!Number.isFinite(delta) || delta === 0) return res.status(400).json({ error: 'El ajuste de puntos debe ser un número distinto de cero' });
+        await client.query('BEGIN');
+        const current = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.params.id]);
+        if (!current.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Usuario no encontrado' }); }
+        const oldPoints = Number(current.rows[0].puntos || 0);
+        const newPoints = oldPoints + delta;
+        if (newPoints < 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Los puntos no pueden quedar negativos' }); }
+        const history = await registrarMovimiento(client, req.params.id, delta > 0 ? 'admin_puntos_agregados' : 'admin_puntos_retirados', 0, req.body.concepto || 'Ajuste de puntos', { puntos: delta, adminId: req.userId });
+        const updated = await client.query('UPDATE users SET puntos = $1, historial_detallado = $2 WHERE id = $3 RETURNING *', [newPoints, JSON.stringify(history), req.params.id]);
+        await client.query('COMMIT');
+        res.json({ message: 'Puntos actualizados', user: updated.rows[0], oldPoints, newPoints });
+    } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudieron actualizar los puntos' }); } finally { client.release(); }
+});
+
+app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
+    const plan = PLANES_APEX[req.body.plan];
+    if (!plan) return res.status(400).json({ error: 'Plan inválido' });
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const current = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
+        const u = current.rows[0];
+        const balance = Number(u.balance || 0);
+        if (balance < plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Saldo insuficiente' }); }
+        if (u.plan && u.plan !== 'Sin plan' && Number(u.plan_amount || 0) >= plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Ya tienes este plan o uno superior' }); }
+        const history = await registrarMovimiento(client, req.userId, 'compra_plan', -plan.amount, 'Compra del plan ' + req.body.plan, { plan: req.body.plan });
+        const updated = await client.query('UPDATE users SET balance = $1, plan = $2, plan_amount = $3, daily_earnings = $4, historial_detallado = $5 WHERE id = $6 RETURNING *', [balance - plan.amount, req.body.plan, plan.amount, plan.daily, JSON.stringify(history), req.userId]);
+        await client.query('COMMIT');
+        res.json({ message: 'Plan adquirido', user: updated.rows[0] });
+    } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudo adquirir el plan' }); } finally { client.release(); }
+});
+
+app.post('/api/admin/user/:id/pause', authenticate, isAdmin, async (req, res) => {
+    const paused = req.body.paused !== false;
+    const result = await pool.query('UPDATE users SET produccion_pausada = $1 WHERE id = $2 RETURNING *', [paused, req.params.id]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json({ message: paused ? 'Usuario pausado' : 'Usuario reanudado', user: result.rows[0] });
+});
+
+app.post('/api/admin/user/:id/authorize-plan', authenticate, isAdmin, async (req, res) => {
+    const level = Number(req.body.level || 0);
+    const result = await pool.query('UPDATE users SET nivel_autorizado = $1 WHERE id = $2 RETURNING *', [level, req.params.id]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+    res.json({ message: 'Autorización actualizada', user: result.rows[0] });
 });
 
 // ============================================================

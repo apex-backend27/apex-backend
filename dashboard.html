@@ -366,7 +366,19 @@
             .tree-level { gap: 10px; }
             .tree-node .circle { width: 34px; height: 34px; font-size: 11px; }
         }
-    </style>
+    
+/* APEX FUTURISTIC THEME */
+:root{--fx-bg:#070b16;--fx-surface:rgba(14,22,40,.82);--fx-surface-2:rgba(19,31,54,.78);--fx-line:rgba(91,220,255,.22);--fx-cyan:#57e6ff;--fx-violet:#9b7bff;--fx-green:#5df2bd;--fx-text:#ecf7ff;--fx-muted:#8ca7bd;--fx-shadow:0 18px 55px rgba(0,0,0,.3)}
+html{background:var(--fx-bg)}body{background:radial-gradient(circle at 15% 0%,rgba(61,126,255,.18),transparent 32%),radial-gradient(circle at 90% 20%,rgba(155,123,255,.14),transparent 28%),var(--fx-bg)!important;color:var(--fx-text)!important}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;background-image:linear-gradient(rgba(87,230,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(87,230,255,.06) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,#000,transparent 80%);z-index:-1}
+.header,.bottom-nav,.card,.actividad-card,.plan-card,.stat-card,.modal,.config-bar{background:var(--fx-surface)!important;border-color:var(--fx-line)!important;box-shadow:var(--fx-shadow);backdrop-filter:blur(18px)}
+.header{border-bottom:1px solid var(--fx-line)!important}.brand h1,.card-title,.label,.name,.amount,.number,.tarea-info .nombre{color:var(--fx-text)!important}.slogan,.sub,.desc,.phone,.details,.withdraw-hint,.label,.info,.hora{color:var(--fx-muted)!important}
+.card{border-radius:20px!important}.card-blue{background:linear-gradient(135deg,rgba(21,55,90,.72),rgba(13,24,48,.85))!important}.card-gold{background:linear-gradient(135deg,rgba(88,64,22,.62),rgba(28,22,16,.9))!important}.card-green{background:linear-gradient(135deg,rgba(18,75,70,.62),rgba(10,28,35,.88))!important}
+.tarea-item,.ganancia-stat,.address-box,.profile-input-group input,.campo-select{background:var(--fx-surface-2)!important;border-color:var(--fx-line)!important;color:var(--fx-text)!important}.tarea-item.disponible{border-color:var(--fx-cyan)!important;box-shadow:0 0 18px rgba(87,230,255,.16)}.tarea-item.completada{border-color:var(--fx-green)!important}.btn-withdraw,.btn-action,.buy-btn,.copy-btn,.btn-primary,.btn-success,.btn-warning,.btn-danger,.btn-info{background:linear-gradient(135deg,#1768a5,#744ee8)!important;color:#fff!important;border:1px solid rgba(255,255,255,.18)!important;box-shadow:0 8px 20px rgba(86,99,255,.24)}button:hover{filter:brightness(1.16);transform:translateY(-1px)}
+.bottom-nav .nav-item.active,.bottom-nav .nav-item:hover{color:var(--fx-cyan)!important}.balance-card .amount{color:var(--fx-cyan)!important;text-shadow:0 0 22px rgba(87,230,255,.32)}.balance-card .points span,.number.gold{color:var(--fx-violet)!important}
+.alert-success{background:rgba(35,180,130,.16)!important;color:var(--fx-green)!important;border-color:rgba(93,242,189,.35)!important}.alert-danger{background:rgba(240,75,110,.14)!important;color:#ff91a9!important;border-color:rgba(255,100,130,.3)!important}.alert-warning{background:rgba(255,183,77,.14)!important;color:#ffd080!important;border-color:rgba(255,190,90,.3)!important}
+
+</style>
 </head>
 <body>
 
