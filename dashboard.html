@@ -2067,20 +2067,24 @@ function apexModal(title, body) {
 }
 function apexPersist(){ if(typeof saveUserData==='function') saveUserData(); if(typeof renderDashboard==='function') renderDashboard(); if(typeof renderActividades==='function') renderActividades(); }
 function premioAleatorio(values){ return Number(values[Math.floor(Math.random()*values.length)]||0); }
+function registrarPremioActividad(tipo, monto){
+  user.historial_detallado = Array.isArray(user.historial_detallado) ? user.historial_detallado : [];
+  user.historial_detallado.push({tipo:'actividad',actividad:tipo,monto:Number(monto||0),fecha:new Date().toISOString(),descripcion:'Premio de '+tipo});
+}
 function abrirRuleta(){
   if(!user || Number(user.ruleta_usos||0)<=0){showAlert('🎰 No tienes usos disponibles','warning');return;}
-  var cfg=getPremiosRuleta(), modal=apexModal('🎰 Máquina de Bolas','<p>Usos disponibles: <strong>'+user.ruleta_usos+'</strong></p><button class="btn-action" id="apexSpin">Girar ruleta</button>');
-  document.getElementById('apexSpin').onclick=function(){var p=premioAleatorio(cfg.premios||[0]);user.ruleta_usos--;user.premio_ruleta=Number(user.premio_ruleta||0)+p;user.balance=Number(user.balance||0)+p;apexPersist();modal.remove();showAlert('🎉 Premio obtenido: $'+p.toFixed(2),'success');};
+  var p=Number(user.premio_ruleta||0), modal=apexModal('🎰 Máquina de Bolas','<p>Usos disponibles: <strong>'+user.ruleta_usos+'</strong></p><button class="btn-action" id="apexSpin">Girar ruleta</button>');
+  document.getElementById('apexSpin').onclick=function(){user.ruleta_usos--;user.balance=Number(user.balance||0)+p;registrarPremioActividad('máquina de bolas',p);apexPersist();modal.remove();showAlert('🎉 Premio obtenido: $'+p.toFixed(2),'success');};
 }
 function abrirCofres(){
   if(!user || Number(user.cofres_usos||0)<=0){showAlert('🎁 No tienes usos disponibles','warning');return;}
-  var cfg=getPremiosCofres(), modal=apexModal('🎁 Elige un cofre','<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+(cfg.premios||[]).map(function(_,i){return '<button class="btn-action apex-chest" data-i="'+i+'">Cofre '+(i+1)+'</button>';}).join('')+'</div>');
-  modal.querySelectorAll('.apex-chest').forEach(function(btn){btn.onclick=function(){var p=Number((cfg.premios||[])[Number(btn.dataset.i)]||0);user.cofres_usos--;user.cofres_abiertos=user.cofres_abiertos||[];user.cofres_abiertos.push(Number(btn.dataset.i));user.premio_cofre=Number(user.premio_cofre||0)+p;user.balance=Number(user.balance||0)+p;apexPersist();modal.remove();showAlert('🎉 Cofre abierto: $'+p.toFixed(2),'success');};});
+  var p=Number(user.premio_cofre||0), modal=apexModal('🎁 Elige un cofre','<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+Array.from({length:9},function(_,i){return '<button class="btn-action apex-chest" data-i="'+i+'">Cofre '+(i+1)+'</button>';}).join('')+'</div>');
+  modal.querySelectorAll('.apex-chest').forEach(function(btn){btn.onclick=function(){user.cofres_usos--;user.cofres_abiertos=user.cofres_abiertos||[];user.cofres_abiertos.push(Number(btn.dataset.i));user.balance=Number(user.balance||0)+p;registrarPremioActividad('cofre',p);apexPersist();modal.remove();showAlert('🎉 Cofre abierto: $'+p.toFixed(2),'success');};});
 }
 function abrirDados(){
   if(!user || Number(user.dados_usos||0)<=0){showAlert('🎲 No tienes usos disponibles','warning');return;}
-  var cfg=getPremiosDados(), modal=apexModal('🎲 Dados','<p>Lanza el dado para obtener tu premio.</p><button class="btn-action" id="apexDice">Lanzar dado</button>');
-  document.getElementById('apexDice').onclick=function(){var p=premioAleatorio(cfg.premios||[0,0,0,0,0,0]);user.dados_usos--;user.premio_dados=Number(user.premio_dados||0)+p;user.balance=Number(user.balance||0)+p;apexPersist();modal.remove();showAlert('🎉 Resultado: $'+p.toFixed(2),'success');};
+  var p=Number(user.premio_dados||0), modal=apexModal('🎲 Dados','<p>Lanza el dado para obtener tu premio.</p><button class="btn-action" id="apexDice">Lanzar dado</button>');
+  document.getElementById('apexDice').onclick=function(){user.dados_usos--;user.balance=Number(user.balance||0)+p;registrarPremioActividad('dados',p);apexPersist();modal.remove();showAlert('🎉 Resultado: $'+p.toFixed(2),'success');};
 }
 function abrirTareasAsignadas(){
   var ts=Array.isArray(user.tareas_asignadas)?user.tareas_asignadas:[];
