@@ -3404,9 +3404,9 @@ function renderUsuariosActivos() {
             '<td><strong>' + u.nombre + ' ' + u.apellido + '</strong></td>' +
             '<td><span class="usuario-telefono">' + u.telefono + '</span></td>' +
             '<td>' + formatDate(fechaPlan) + '</td>' +
-            '<td><input type="number" class="input-usos" id="ruleta_display_' + u.telefono + '" value="' + Number(u.ruleta_usos || 0) + '" min="0" step="1" title="Oportunidades de máquina"></td>' +
-            '<td><input type="number" class="input-usos" id="cofres_display_' + u.telefono + '" value="' + Number(u.cofres_usos || 0) + '" min="0" step="1" title="Oportunidades de cofres"></td>' +
-            '<td><input type="number" class="input-usos" id="dados_display_' + u.telefono + '" value="' + Number(u.dados_usos || 0) + '" min="0" step="1" title="Oportunidades de dados"></td>' +
+            '<td><span class="usos-badge">🎰 <span class="numero" id="ruleta_display_' + u.telefono + '">' + Number(u.ruleta_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'ruleta\')" data-tooltip="+1 oportunidad">+</button></td>' +
+            '<td><span class="usos-badge">🎁 <span class="numero" id="cofres_display_' + u.telefono + '">' + Number(u.cofres_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'cofres\')" data-tooltip="+1 oportunidad">+</button></td>' +
+            '<td><span class="usos-badge">🎲 <span class="numero" id="dados_display_' + u.telefono + '">' + Number(u.dados_usos || 0) + '</span></span> <button class="btn btn-success btn-xs" onclick="sumarUso(\'' + u.telefono + '\', \'dados\')" data-tooltip="+1 oportunidad">+</button></td>' +
             '<td><input type="number" class="input-premio" id="premio_ruleta_' + u.telefono + '" value="' + Number(u.premio_ruleta || 0) + '" min="0" step="1"></td>' +
             '<td><input type="number" class="input-premio" id="premio_cofre_' + u.telefono + '" value="' + Number(u.premio_cofre || 0) + '" min="0" step="1"></td>' +
             '<td><input type="number" class="input-premio" id="premio_dados_' + u.telefono + '" value="' + Number(u.premio_dados || 0) + '" min="0" step="1"></td>' +
@@ -3435,24 +3435,24 @@ function sumarUso(telefono, tipo) {
     if (!user) return;
     
     if (tipo === 'ruleta') {
-        var el = document.getElementById('ruleta_display_' + telefono); el.value = (parseInt(el.value) || 0) + 1;
+        var el = document.getElementById('ruleta_display_' + telefono); el.textContent = (parseInt(el.textContent) || 0) + 1;
     } else if (tipo === 'cofres') {
-        var el = document.getElementById('cofres_display_' + telefono); el.value = (parseInt(el.value) || 0) + 1;
+        var el = document.getElementById('cofres_display_' + telefono); el.textContent = (parseInt(el.textContent) || 0) + 1;
     } else if (tipo === 'dados') {
-        var el = document.getElementById('dados_display_' + telefono); el.value = (parseInt(el.value) || 0) + 1;
+        var el = document.getElementById('dados_display_' + telefono); el.textContent = (parseInt(el.textContent) || 0) + 1;
     }
     
     showAlert('✅ +1 uso de ' + tipo + ' (guarda cambios para aplicar)', 'success');
 }
 
-function guardarPremiosUsuario(telefono) {
+async function guardarPremiosUsuario(telefono) {
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
     if (!user) return;
     
-    var usosRuleta = Math.max(0, parseInt(document.getElementById('ruleta_display_' + telefono).value) || 0);
-    var usosCofre = Math.max(0, parseInt(document.getElementById('cofres_display_' + telefono).value) || 0);
-    var usosDados = Math.max(0, parseInt(document.getElementById('dados_display_' + telefono).value) || 0);
+    var usosRuleta = Math.max(0, parseInt(document.getElementById('ruleta_display_' + telefono).textContent) || 0);
+    var usosCofre = Math.max(0, parseInt(document.getElementById('cofres_display_' + telefono).textContent) || 0);
+    var usosDados = Math.max(0, parseInt(document.getElementById('dados_display_' + telefono).textContent) || 0);
     
     var premioRuleta = parseFloat(document.getElementById('premio_ruleta_' + telefono).value) || 0;
     var premioCofre = parseFloat(document.getElementById('premio_cofre_' + telefono).value) || 0;
@@ -3478,10 +3478,18 @@ function guardarPremiosUsuario(telefono) {
     user.premio_cofre = premioCofre;
     user.premio_dados = premioDados;
     
-    saveUsers(users);
-    sincronizarUsuarioConBackend(telefono);
-    
-    showAlert('✅ Usos y premios guardados para ' + user.nombre, 'success');
+        saveUsers(users);
+    var token = localStorage.getItem('apex_token');
+    try {
+        var response = await fetch(API_URL + '/api/admin/user/' + user.id + '/activities', {
+            method: 'PUT', headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
+            body: JSON.stringify({ruleta_usos:usosRuleta, cofres_usos:usosCofre, dados_usos:usosDados, premio_ruleta:premioRuleta, premio_cofre:premioCofre, premio_dados:premioDados})
+        });
+        var data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || 'No se pudo guardar');
+        if (data.user) { Object.assign(user, data.user); saveUsers(users); }
+        showAlert('✅ Oportunidades y premios guardados en NeonTech para ' + user.nombre, 'success');
+    } catch (e) { showAlert('❌ No se guardaron las actividades: ' + e.message, 'danger'); return; }
     renderUsuariosActivos();
     renderUsuarios();
 }
@@ -3492,9 +3500,9 @@ function reiniciarUsos(telefono) {
     var user = users.find(function(u) { return u.telefono === telefono; });
     if (!user) return;
     
-    document.getElementById('ruleta_display_' + telefono).value = '0';
-    document.getElementById('cofres_display_' + telefono).value = '0';
-    document.getElementById('dados_display_' + telefono).value = '0';
+    document.getElementById('ruleta_display_' + telefono).textContent = '0';
+    document.getElementById('cofres_display_' + telefono).textContent = '0';
+    document.getElementById('dados_display_' + telefono).textContent = '0';
     
     user.ruleta_usos = 0;
     user.cofres_usos = 0;

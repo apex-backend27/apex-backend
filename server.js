@@ -1023,6 +1023,36 @@ app.put('/api/admin/user/:id', async (req, res) => {
 
 
 // ============================================================
+// ASIGNAR ACTIVIDADES A USUARIO CON PLAN ACTIVO
+// ============================================================
+app.put('/api/admin/user/:id/activities', async (req, res) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const admin = await pool.query('SELECT es_admin FROM users WHERE id = $1', [decoded.userId]);
+        if (!admin.rows[0]?.es_admin) return res.status(403).json({ error: 'Acceso denegado' });
+        const id = req.params.id;
+        const values = [
+            Math.max(0, Math.floor(Number(req.body.ruleta_usos) || 0)),
+            Math.max(0, Math.floor(Number(req.body.cofres_usos) || 0)),
+            Math.max(0, Math.floor(Number(req.body.dados_usos) || 0)),
+            Math.max(0, Number(req.body.premio_ruleta) || 0),
+            Math.max(0, Number(req.body.premio_cofre) || 0),
+            Math.max(0, Number(req.body.premio_dados) || 0),
+            id
+        ];
+        const result = await pool.query(`UPDATE users SET ruleta_usos=$1, cofres_usos=$2, dados_usos=$3,
+            premio_ruleta=$4, premio_cofre=$5, premio_dados=$6 WHERE id=$7 RETURNING *`, values);
+        if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        res.json({ message: 'Actividades asignadas', user: result.rows[0] });
+    } catch (error) {
+        console.error('Error asignando actividades:', error);
+        res.status(500).json({ error: 'No se pudieron guardar las actividades' });
+    }
+});
+
+// ============================================================
 // ELIMINAR USUARIO (ADMIN)
 // ============================================================
 app.delete('/api/admin/user/:id', async (req, res) => {
