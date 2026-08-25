@@ -3478,11 +3478,10 @@ async function guardarPremiosUsuario(telefono) {
     user.premio_cofre = premioCofre;
     user.premio_dados = premioDados;
     
-        saveUsers(users);
     var token = localStorage.getItem('apex_token');
     try {
         var activityUserId = user.id || user.telefono;
-        var response = await fetch(API_URL + '/api/admin/user/' + encodeURIComponent(activityUserId), {
+        var response = await fetch(API_URL + '/api/admin/user/' + encodeURIComponent(activityUserId) + '/activities', {
             method: 'PUT', headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
             body: JSON.stringify({ruleta_usos:usosRuleta, cofres_usos:usosCofre, dados_usos:usosDados, premio_ruleta:premioRuleta, premio_cofre:premioCofre, premio_dados:premioDados})
         });
