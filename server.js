@@ -36,7 +36,8 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS ultima_fecha_tareas TEXT,
             ADD COLUMN IF NOT EXISTS racha_dias INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS cobro_tareas_fecha DATE,
-            ADD COLUMN IF NOT EXISTS cobro_tareas_monto NUMERIC DEFAULT 0
+            ADD COLUMN IF NOT EXISTS cobro_tareas_monto NUMERIC DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS plan_activo BOOLEAN DEFAULT TRUE
         `);
         await pool.query(`
             ALTER TABLE configuracion
@@ -367,6 +368,7 @@ app.get('/api/verify', authenticate, async (req, res) => {
                 plan: userData.plan || 'Sin plan',
                 plan_amount: Number(userData.plan_amount || 0),
                 daily_earnings: Number(userData.daily_earnings || 0),
+                plan_activo: userData.plan_activo !== false,
                 cuenta_habilitada: userData.cuenta_habilitada !== false,
                 produccion_pausada: userData.produccion_pausada || false,
                 password_retiro: userData.password_retiro || null,
