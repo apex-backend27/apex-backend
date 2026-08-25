@@ -1033,6 +1033,13 @@ app.put('/api/admin/user/:id/activities', async (req, res) => {
         const admin = await pool.query('SELECT es_admin FROM users WHERE id = $1', [decoded.userId]);
         if (!admin.rows[0]?.es_admin) return res.status(403).json({ error: 'Acceso denegado' });
         const id = req.params.id;
+        await pool.query(`ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS ruleta_usos INTEGER DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS cofres_usos INTEGER DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS dados_usos INTEGER DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS premio_ruleta NUMERIC DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS premio_cofre NUMERIC DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS premio_dados NUMERIC DEFAULT 0`);
         const values = [
             Math.max(0, Math.floor(Number(req.body.ruleta_usos) || 0)),
             Math.max(0, Math.floor(Number(req.body.cofres_usos) || 0)),
@@ -1043,7 +1050,7 @@ app.put('/api/admin/user/:id/activities', async (req, res) => {
             id
         ];
         const result = await pool.query(`UPDATE users SET ruleta_usos=$1, cofres_usos=$2, dados_usos=$3,
-            premio_ruleta=$4, premio_cofre=$5, premio_dados=$6 WHERE id=$7 RETURNING *`, values);
+            premio_ruleta=$4, premio_cofre=$5, premio_dados=$6 WHERE (id::text=$7 OR telefono=$7) RETURNING *`, values);
         if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
         res.json({ message: 'Actividades asignadas', user: result.rows[0] });
     } catch (error) {
