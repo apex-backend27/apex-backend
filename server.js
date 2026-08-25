@@ -12,6 +12,35 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+async function ensureTaskColumns() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS configuracion (
+                id SERIAL PRIMARY KEY,
+                tiempo_produccion INTEGER DEFAULT 10,
+                puntos_por_codigo INTEGER DEFAULT 10,
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        await pool.query(`
+            ALTER TABLE users
+            ADD COLUMN IF NOT EXISTS tareas_completadas_hoy JSONB DEFAULT '[]'::jsonb,
+            ADD COLUMN IF NOT EXISTS ultima_fecha_tareas TEXT,
+            ADD COLUMN IF NOT EXISTS racha_dias INTEGER DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS cobro_tareas_fecha DATE,
+            ADD COLUMN IF NOT EXISTS cobro_tareas_monto NUMERIC DEFAULT 0
+        `);
+        await pool.query(`
+            ALTER TABLE configuracion
+            ADD COLUMN IF NOT EXISTS tareas_config JSONB DEFAULT '[]'::jsonb,
+            ADD COLUMN IF NOT EXISTS tareas_activacion DATE,
+            ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT false
+        `);
+    } catch (error) {
+        console.error('Error preparando columnas de tareas:', error.message);
+    }
+}
+
 // ============================================================
 // MIDDLEWARE DE AUTENTICACIÓN
 // ============================================================
@@ -56,6 +85,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
+
+ensureTaskColumns();
 
 // ============================================================
 // RUTAS PÚBLICAS
@@ -342,6 +373,12 @@ app.get('/api/verify', authenticate, async (req, res) => {
                 premio_ruleta: Number(userData.premio_ruleta || 0),
                 premio_cofre: Number(userData.premio_cofre || 0),
                 premio_dados: Number(userData.premio_dados || 0),
+                tareas_asignadas: userData.tareas_asignadas || [],
+                tareas_completadas_hoy: userData.tareas_completadas_hoy || [],
+                ultima_fecha_tareas: userData.ultima_fecha_tareas || null,
+                racha_dias: Number(userData.racha_dias || 0),
+                cobro_tareas_fecha: userData.cobro_tareas_fecha || null,
+                cobro_tareas_monto: Number(userData.cobro_tareas_monto || 0),
                 referidos: userData.referidos || { izquierda: null, derecha: null, lista: [] }
             }
         });
@@ -412,7 +449,9 @@ app.put('/api/user/update', async (req, res) => {
                 'fecha_produccion', 'codigos_usados_hoy', 'codigos_usados', 'ultimo_reinicio_codigos',
                 'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados',
                 'cofres_abiertos', 'cupones_asignados', 'logros_asignados', 'logros_pendientes_aprobar',
-                'tareas_asignadas', 'canjes_realizados', 'logros_reclamados', 'referidos',
+                'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
+                'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto',
+                'canjes_realizados', 'logros_reclamados', 'referidos',
                 'referidos_directos', 'fechas_invito', 'historial', 'historial_detallado',
                 'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
                 'direccion_retiro', 'password_retiro',
@@ -476,6 +515,101 @@ app.put('/api/user/update', async (req, res) => {
         res.status(500).json({ error: 'Error en el servidor' });
     }
 });
+// ============================================================
+// CONFIGURACIÓN CENTRALIZADA DE TAREAS
+// ============================================================
+const tareasPorDefecto = [
+    { id: 'tarea_1', hora: 10, minuto: 0, nombre: 'Tarea 1', icono: '🌅', activo: true },
+    { id: 'tarea_2', hora: 12, minuto: 0, nombre: 'Tarea 2', icono: '☀️', activo: true },
+    { id: 'tarea_3', hora: 14, minuto: 0, nombre: 'Tarea 3', icono: '🌤️', activo: true },
+    { id: 'tarea_4', hora: 16, minuto: 0, nombre: 'Tarea 4', icono: '🌥️', activo: true },
+    { id: 'tarea_5', hora: 18, minuto: 0, nombre: 'Tarea 5', icono: '🌆', activo: true }
+];
+
+app.get('/api/tasks/config', authenticate, async (req, res) => {
+    try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
+        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_pausadas FROM configuracion WHERE id = 1');
+        const row = result.rows[0] || {};
+        res.json({
+            tareas: Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto,
+            fecha: row.tareas_activacion || null,
+            pausadas: row.tareas_pausadas === true
+        });
+    } catch (error) {
+        console.error('Error obteniendo configuración de tareas:', error);
+        res.status(500).json({ error: 'Error al obtener configuración de tareas' });
+    }
+});
+
+app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
+    try {
+        const tareas = Array.isArray(req.body.tareas) ? req.body.tareas : tareasPorDefecto;
+        const fecha = req.body.fecha || null;
+        const pausadas = req.body.pausadas === true;
+        await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
+        const result = await pool.query(
+            `INSERT INTO configuracion (id, tareas_config, tareas_activacion, tareas_pausadas, updated_at)
+             VALUES (1, $1, $2, $3, NOW())
+             ON CONFLICT (id) DO UPDATE SET tareas_config = $1, tareas_activacion = $2, tareas_pausadas = $3, updated_at = NOW()
+             RETURNING tareas_config, tareas_activacion, tareas_pausadas`,
+            [JSON.stringify(tareas), fecha, pausadas]
+        );
+        res.json({ message: 'Configuración de tareas actualizada', config: result.rows[0] });
+    } catch (error) {
+        console.error('Error guardando configuración de tareas:', error);
+        res.status(500).json({ error: 'Error al guardar configuración de tareas' });
+    }
+});
+
+// ============================================================
+// COBRO DIARIO DE TAREAS: UNA SOLA VEZ POR DÍA
+// ============================================================
+app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const u = result.rows[0];
+        const cfgResult = await client.query('SELECT tareas_pausadas FROM configuracion WHERE id = 1');
+        if (cfgResult.rows[0]?.tareas_pausadas === true) {
+            await client.query('ROLLBACK');
+            return res.status(423).json({ error: 'Las tareas están pausadas por el administrador' });
+        }
+        const hoy = new Date().toISOString().slice(0, 10);
+        if (u.cobro_tareas_fecha && String(u.cobro_tareas_fecha).slice(0, 10) === hoy) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'El cobro de hoy ya fue realizado' });
+        }
+        const completadas = Array.isArray(u.tareas_completadas_hoy) ? u.tareas_completadas_hoy : [];
+        const total = 5;
+        const porcentaje = Math.min(total, completadas.length) / total;
+        if (porcentaje <= 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Debes completar al menos una tarea' });
+        }
+        const planDaily = { Trader: 6, Analista: 10, Gestor: 17, Master: 27, Elite: 42 };
+        const diario = Number(u.daily_earnings || planDaily[u.plan] || 0);
+        const recompensa = Number((diario * porcentaje).toFixed(2));
+        const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
+        historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas ${Math.round(porcentaje * 100)}%`, monto: recompensa, fecha: new Date().toISOString(), estado: 'aprobado' });
+        const updated = await client.query(
+            `UPDATE users SET balance = COALESCE(balance, 0) + $1, cobro_tareas_fecha = $2, cobro_tareas_monto = $1, historial_detallado = $3 WHERE id = $4 RETURNING *`,
+            [recompensa, hoy, JSON.stringify(historial), req.userId]
+        );
+        await client.query('COMMIT');
+        const saved = updated.rows[0];
+        res.json({ message: 'Cobro realizado', recompensa, porcentaje: Math.round(porcentaje * 100), user: saved });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error en cobro diario:', error);
+        res.status(500).json({ error: 'Error al procesar el cobro diario' });
+    } finally {
+        client.release();
+    }
+});
+
 // ============================================================
 // RUTAS DE ADMINISTRACIÓN
 // ============================================================
@@ -707,6 +841,8 @@ app.put('/api/admin/user/:id', async (req, res) => {
             const camposPermitidos = ['balance', 'puntos', 'plan', 'cuenta_habilitada', 'produccion_pausada', 
                 'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados', 
                 'nivel_autorizado', 'codigos_usados_hoy', 'ultimo_reinicio_codigos',
+                'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
+                'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto', 'historial',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
                 'es_admin', 'es_super_admin'];
             if (camposPermitidos.includes(key)) {
