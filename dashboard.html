@@ -1081,11 +1081,22 @@ function cargarConfiguracionTareasRemota() {
         if (!response.ok) throw new Error('HTTP ' + response.status);
         return response.json();
     }).then(function(data) {
-        tareasConfigRemota = Array.isArray(data.tareas) ? data.tareas : null;
         tareasPausadasRemoto = data.pausadas === true;
         tareasFechaActivacionRemota = data.fecha || null;
-        if (tareasConfigRemota && tareasConfigRemota.length) {
-            HORARIOS_TAREAS = tareasConfigRemota;
+        var remotasValidas = Array.isArray(data.tareas) && data.tareas.length > 0 && data.tareas.every(function(t) {
+            return t && Number.isFinite(Number(t.hora)) && Number.isFinite(Number(t.minuto));
+        });
+        if (remotasValidas) {
+            tareasConfigRemota = data.tareas;
+            HORARIOS_TAREAS = data.tareas;
+        } else {
+            // Compatibilidad: conservar la configuración anterior del navegador.
+            try {
+                var localConfig = JSON.parse(localStorage.getItem(TAREAS_CONFIG_KEY) || 'null');
+                if (localConfig && Array.isArray(localConfig.tareas) && localConfig.tareas.length) {
+                    HORARIOS_TAREAS = localConfig.tareas;
+                }
+            } catch (e) { console.warn('Configuración local de tareas inválida'); }
         }
         renderTareas();
     }).catch(function(error) {
@@ -1154,6 +1165,10 @@ function renderTareas() {
     var activacion = JSON.parse(localStorage.getItem(TAREAS_ACTIVACION_KEY) || 'null');
     var fechaRemota = tareasFechaActivacionRemota ? String(tareasFechaActivacionRemota).slice(0, 10) : null;
     var tareasActivas = fechaRemota ? fechaRemota === ahora.toISOString().slice(0, 10) : (activacion && activacion.fecha === hoy && activacion.activo === true);
+    // Si aún no existe activación remota, conserva la activación local previa.
+    if (!fechaRemota && !tareasPausadasRemoto && activacion && activacion.fecha === hoy && activacion.activo === true) {
+        tareasActivas = true;
+    }
     if (tareasPausadasRemoto) tareasActivas = false;
 
     var html = '';
