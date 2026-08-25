@@ -518,6 +518,14 @@ app.put('/api/user/update', async (req, res) => {
 // ============================================================
 // CONFIGURACIÓN CENTRALIZADA DE TAREAS
 // ============================================================
+function normalizarPlan(plan) {
+    const value = String(plan || '').trim().toLowerCase();
+    const match = Object.keys(PLANES_APEX || {}).find(function(name) {
+        return name.toLowerCase() === value || value.includes(name.toLowerCase());
+    });
+    return match || null;
+}
+
 const tareasPorDefecto = [
     { id: 'tarea_1', hora: 10, minuto: 0, nombre: 'Tarea 1', icono: '🌅', activo: true },
     { id: 'tarea_2', hora: 12, minuto: 0, nombre: 'Tarea 2', icono: '☀️', activo: true },
@@ -590,8 +598,9 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Debes completar al menos una tarea' });
         }
         const planDaily = { Trader: 6, Analista: 10, Gestor: 17, Master: 27, Elite: 42 };
-        const diario = Number(u.daily_earnings || planDaily[u.plan] || 0);
-        if (!u.plan || u.plan === 'Sin plan' || diario <= 0) {
+        const planNormalizado = normalizarPlan(u.plan);
+        const diario = Number(u.daily_earnings || (planNormalizado ? planDaily[planNormalizado] : 0) || 0);
+        if (!planNormalizado || diario <= 0) {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: 'Necesitas adquirir un plan activo antes de cobrar tareas' });
         }
