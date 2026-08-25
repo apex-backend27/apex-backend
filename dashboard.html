@@ -1017,6 +1017,10 @@ function renderDashboard() {
         return;
     }
 
+    // Renderizar tareas primero: no deben quedar en "Cargando tareas..."
+    // aunque la cuenta esté pausada o bloqueada.
+    try { renderTareas(); } catch (error) { console.error('Error renderizando tareas:', error); }
+
     if (user.produccion_pausada) {
         document.getElementById('produccionPausada').style.display = 'block';
         document.getElementById('cuentaBloqueada').style.display = 'none';
@@ -1035,6 +1039,7 @@ function renderDashboard() {
         document.getElementById('cuentaBloqueada').style.display = 'block';
         document.querySelector('.main').style.opacity = '0.5';
         document.querySelector('.main').style.pointerEvents = 'none';
+                try { renderTareas(); } catch (error) { console.error('Error renderizando tareas:', error); }
         return;
     } else {
         document.getElementById('cuentaBloqueada').style.display = 'none';
@@ -2014,6 +2019,15 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         cerrarAlerta();
     }
+});
+// Respaldo de inicialización para sesiones restauradas.
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        if (typeof user !== 'undefined' && user) {
+            try { renderDashboard(); } catch (error) { console.error('Error en inicialización:', error); }
+            try { renderTareas(); } catch (error) { console.error('Error en tareas:', error); }
+        }
+    }, 300);
 });
 </script>
 </body>
