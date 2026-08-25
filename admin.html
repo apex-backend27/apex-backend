@@ -1534,6 +1534,9 @@ TAB TAREAS (NUEVO)
             <button class="btn btn-success" onclick="activarTareasDiarias()" id="btnActivarTareas" style="padding:10px 24px; font-size:14px; font-weight:700;">
                 🚀 Activar Tareas de Hoy
             </button>
+            <button class="btn btn-warning" onclick="pausarTareasGlobales()" id="btnPausarTareas" style="padding:10px 20px; font-size:13px; font-weight:600;">
+                ⏸️ Pausar Tareas
+            </button>
             <button class="btn btn-warning" onclick="resetearTareasHoy()" style="padding:10px 20px; font-size:13px; font-weight:600;">
                 🔄 Resetear
             </button>
@@ -1732,6 +1735,9 @@ TAB TAREAS (NUEVO)
 // CONFIGURACIÓN
 // ============================================================
 const API_URL = 'https://apex-backend-cj21.onrender.com';
+var tareasPausadasRemoto = false;
+var tareasConfigRemota = [];
+var tareasFechaActivacionRemota = null;
 var STORAGE_KEY = 'apex_users';
 var REMEMBER_KEY = 'apex_remember';
 
@@ -6344,6 +6350,22 @@ function getTareasConfig() {
 
 function saveTareasConfig(tareas) {
     localStorage.setItem(TAREAS_CONFIG_KEY, JSON.stringify({ tareas: tareas, actualizado: new Date().toISOString() }));
+    var token = localStorage.getItem('apex_token');
+    if (!token) return Promise.resolve();
+    return fetch(API_URL + '/api/admin/tasks/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({
+            tareas: tareas,
+            fecha: tareasFechaActivacionRemota || new Date().toISOString().slice(0, 10),
+            pausadas: tareasPausadasRemoto === true
+        })
+    }).then(function(response) {
+        return response.json().then(function(data) {
+            if (!response.ok || data.error) throw new Error(data.error || 'HTTP ' + response.status);
+            return data;
+        });
+    });
 }
 
 function renderTareasConfig() {
@@ -6527,6 +6549,51 @@ function getTareasActivacion() {
 
 function saveTareasActivacion(estado) {
     localStorage.setItem(TAREAS_ACTIVACION_KEY, JSON.stringify(estado));
+    var token = localStorage.getItem('apex_token');
+    if (!token) return Promise.resolve();
+    return fetch(API_URL + '/api/admin/tasks/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({
+            tareas: getTareasConfig(),
+            fecha: estado && estado.activo ? new Date().toISOString().slice(0, 10) : null,
+            pausadas: tareasPausadasRemoto === true
+        })
+    }).then(function(response) {
+        return response.json().then(function(data) {
+            if (!response.ok || data.error) throw new Error(data.error || 'HTTP ' + response.status);
+            return data;
+        });
+    });
+}
+
+function cargarConfiguracionTareasRemota() {
+    var token = localStorage.getItem('apex_token');
+    if (!token) return;
+    fetch(API_URL + '/api/tasks/config', { headers: { 'Authorization': 'Bearer ' + token } })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            tareasConfigRemota = Array.isArray(data.tareas) ? data.tareas : [];
+            tareasPausadasRemoto = data.pausadas === true;
+            tareasFechaActivacionRemota = data.fecha || null;
+            if (tareasConfigRemota.length) saveTareasConfigLocal(tareasConfigRemota);
+            actualizarEstadoActivacionTareas();
+            renderTareasConfig();
+        })
+        .catch(function(error) { console.error('Error cargando tareas remotas:', error); });
+}
+
+function saveTareasConfigLocal(tareas) {
+    localStorage.setItem(TAREAS_CONFIG_KEY, JSON.stringify({ tareas: tareas, actualizado: new Date().toISOString() }));
+}
+
+function pausarTareasGlobales() {
+    var nuevoEstado = !tareasPausadasRemoto;
+    if (!confirm(nuevoEstado ? '¿Pausar las tareas para todos los usuarios?' : '¿Reanudar las tareas para todos los usuarios?')) return;
+    tareasPausadasRemoto = nuevoEstado;
+    saveTareasActivacion({ activo: !nuevoEstado, fecha: nuevoEstado ? null : new Date().toISOString().slice(0, 10) })
+        .then(function() { actualizarEstadoActivacionTareas(); showAlert(nuevoEstado ? '⏸️ Tareas pausadas para todos' : '▶️ Tareas reanudadas para todos', 'success'); })
+        .catch(function(error) { showAlert('❌ No se pudo actualizar la pausa: ' + error.message, 'danger'); });
 }
 
 function activarTareasDiarias() {
@@ -6542,11 +6609,12 @@ function activarTareasDiarias() {
         return;
     }
     
+    tareasPausadasRemoto = false;
     saveTareasActivacion({
         fecha: hoy,
         activo: true,
         horaActivacion: new Date().toISOString()
-    });
+    }).catch(function(error) { showAlert('❌ No se pudo activar en el servidor: ' + error.message, 'danger'); });
     
     actualizarEstadoActivacionTareas();
     renderTareasConfig();
@@ -6560,8 +6628,17 @@ function actualizarEstadoActivacionTareas() {
     var badge = document.getElementById('tareasStatusBadge');
     var fechaDisplay = document.getElementById('tareasFechaDisplay');
     var btn = document.getElementById('btnActivarTareas');
+    var pauseBtn = document.getElementById('btnPausarTareas');
     
     if (!badge || !fechaDisplay || !btn) return;
+    if (tareasPausadasRemoto) {
+        badge.textContent = '⏸️ Pausadas';
+        badge.style.background = '#fff8e1'; badge.style.color = '#e65100';
+        btn.disabled = false; btn.textContent = '▶️ Reanudar Tareas';
+        if (pauseBtn) pauseBtn.textContent = '▶️ Reanudar Tareas';
+    } else if (pauseBtn) {
+        pauseBtn.textContent = '⏸️ Pausar Tareas';
+    }
     
     var activacion = getTareasActivacion();
     var hoy = new Date().toDateString();
