@@ -1578,16 +1578,24 @@ function renderTree() {
             var ref = listaReferidos[i];
             var refUser = obtenerUsuario(ref.id);
             
-            var tienePlan = false;
+                        var tienePlan = false;
             var planNombre = 'Sin plan';
-            
-            if (ref.plan && ref.plan !== 'Sin plan' && ref.plan !== 'null' && ref.plan !== 'undefined' && ref.plan !== '') {
+            var planValor = ref && typeof ref.plan === 'object' ? (ref.plan.nombre || ref.plan.name || ref.plan.id || '') : (ref.plan || '');
+            var planTexto = String(planValor).trim().toLowerCase();
+            var planesPorGanancia = { '6':'Trader', '10':'Analista', '17':'Gestor', '27':'Master', '42':'Elite' };
+            if (planTexto && ['sin plan','sin_plan','null','undefined','ninguno','0'].indexOf(planTexto) === -1) {
                 tienePlan = true;
-                planNombre = ref.plan;
+                planNombre = String(planValor).trim();
+            } else if (ref && planesPorGanancia[String(Number(ref.daily_earnings || 0))]) {
+                tienePlan = true;
+                planNombre = planesPorGanancia[String(Number(ref.daily_earnings || 0))];
+            } else if (ref && Number(ref.plan_amount || 0) > 0) {
+                tienePlan = true;
+                planNombre = 'Plan activo';
             }
             if (ref.tienePlan === true) {
                 tienePlan = true;
-                planNombre = ref.plan || 'Trader';
+                if (planTexto && ['sin plan','sin_plan','null','undefined','ninguno','0'].indexOf(planTexto) === -1) planNombre = String(planValor).trim();
             }
             
             if (refUser) {
