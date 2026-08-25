@@ -264,10 +264,7 @@
             <button class="login-btn" id="loginBtn" onclick="login()">🚀 Iniciar Sesión</button>
             <div class="error-msg" id="loginError">❌ Usuario o contraseña incorrectos</div>
             
-            <!-- Credenciales de admin -->
-            <div class="credenciales-admin">
-                👑 <strong>Admin:</strong> 999999999 · admin123
-            </div>
+
         </div>
 
         <!-- FORM REGISTRO -->
@@ -300,7 +297,7 @@
         </div>
 
         <div class="admin-hint">
-            💡 ¿No tienes cuenta? <strong>Regístrate</strong> o usa el <strong>admin</strong> para probar.
+            💡 ¿No tienes cuenta? <strong>Regístrate</strong> para comenzar.
         </div>
     </div>
 
@@ -365,7 +362,7 @@
             fetch(API_URL + '/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user: userInput, password: password })
+                body: JSON.stringify({ telefono: userInput, password: password })
             })
             .then(response => response.json())
             .then(data => {
@@ -549,95 +546,12 @@
         });
 
         // ============================================================
-        // CREAR ADMIN AUTOMÁTICAMENTE SI NO EXISTE
-        // ============================================================
-        function crearAdminSiNoExiste() {
-            var users = JSON.parse(localStorage.getItem('apex_users') || '[]');
-            var adminExiste = users.some(function(u) { return u.telefono === '999999999'; });
-            
-            if (adminExiste) {
-                console.log('✅ Admin ya existe en local');
-                return;
-            }
+        // El administrador se gestiona exclusivamente desde el backend.
 
-            console.log('🔄 Creando administrador en el backend...');
-
-            fetch(API_URL + '/api/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    nombre: 'Admin',
-                    apellido: 'Principal',
-                    telefono: '999999999',
-                    password: 'admin123',
-                    es_admin: true,
-                    es_super_admin: true
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    console.error('❌ Error al crear admin:', data.error);
-                    // Si falla, intentar crear localmente
-                    crearAdminLocal();
-                    return;
-                }
-                console.log('✅ Administrador creado en el backend');
-                // Guardar en localStorage
-                var users = JSON.parse(localStorage.getItem('apex_users') || '[]');
-                users.push({
-                    id: data.user?.id || Date.now(),
-                    nombre: 'Admin',
-                    apellido: 'Principal',
-                    telefono: '999999999',
-                    password: 'admin123',
-                    es_admin: true,
-                    es_super_admin: true,
-                    balance: 0,
-                    puntos: 0,
-                    plan: 'Sin plan',
-                    codigo_referido: 'APEX999',
-                    fecha_registro: new Date().toISOString()
-                });
-                localStorage.setItem('apex_users', JSON.stringify(users));
-                console.log('✅ Admin guardado en localStorage');
-            })
-            .catch(function(error) {
-                console.error('❌ Error de red al crear admin:', error);
-                crearAdminLocal();
-            });
-        }
-
-        function crearAdminLocal() {
-            console.log('🔄 Creando admin localmente...');
-            var users = JSON.parse(localStorage.getItem('apex_users') || '[]');
-            var adminExiste = users.some(function(u) { return u.telefono === '999999999'; });
-            
-            if (!adminExiste) {
-                users.push({
-                    id: Date.now(),
-                    nombre: 'Admin',
-                    apellido: 'Principal',
-                    telefono: '999999999',
-                    password: 'admin123',
-                    es_admin: true,
-                    es_super_admin: true,
-                    balance: 0,
-                    puntos: 0,
-                    plan: 'Sin plan',
-                    codigo_referido: 'APEX999',
-                    fecha_registro: new Date().toISOString()
-                });
-                localStorage.setItem('apex_users', JSON.stringify(users));
-                console.log('✅ Admin creado localmente');
-            }
-        }
-
-        // ============================================================
         // INICIALIZACIÓN
         // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
-            crearAdminSiNoExiste();
+            // El administrador se crea y administra únicamente desde el backend.
             // Verificar si hay código de referido en la URL
             var urlParams = new URLSearchParams(window.location.search);
             var refCode = urlParams.get('ref');
