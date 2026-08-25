@@ -3411,7 +3411,7 @@ function renderUsuariosActivos() {
             '<td><input type="number" class="input-premio" id="premio_cofre_' + u.telefono + '" value="' + Number(u.premio_cofre || 0) + '" min="0" step="1"></td>' +
             '<td><input type="number" class="input-premio" id="premio_dados_' + u.telefono + '" value="' + Number(u.premio_dados || 0) + '" min="0" step="1"></td>' +
             '<td><div class="action-buttons">' +
-                '<button class="btn btn-primary btn-sm" onclick="guardarPremiosUsuario(\'' + u.telefono + '\')" data-tooltip="Guardar premios">💾</button>' +
+                '<button class="btn btn-primary btn-sm" onclick="guardarPremiosUsuario(\'' + u.telefono + '\')" data-tooltip="Guardar actividades">💾</button>' +
                 '<button class="btn btn-danger btn-sm" onclick="reiniciarUsos(\'' + u.telefono + '\')" data-tooltip="Reiniciar usos a 0">🔄</button>' +
                 '<button class="btn btn-success btn-sm" onclick="agregarSaldo(\'' + u.telefono + '\')" data-tooltip="Agregar saldo">💰</button>' +
                 '<button class="btn btn-danger btn-sm" onclick="quitarSaldo(\'' + u.telefono + '\')" data-tooltip="Quitar saldo">💸</button>' +
@@ -3482,7 +3482,7 @@ async function guardarPremiosUsuario(telefono) {
     var token = localStorage.getItem('apex_token');
     try {
         var activityUserId = user.id || user.telefono;
-        var response = await fetch(API_URL + '/api/admin/user/' + encodeURIComponent(activityUserId) + '/activities', {
+        var response = await fetch(API_URL + '/api/admin/user/' + encodeURIComponent(activityUserId), {
             method: 'PUT', headers: {'Content-Type':'application/json','Authorization':'Bearer '+token},
             body: JSON.stringify({ruleta_usos:usosRuleta, cofres_usos:usosCofre, dados_usos:usosDados, premio_ruleta:premioRuleta, premio_cofre:premioCofre, premio_dados:premioDados})
         });
