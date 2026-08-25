@@ -616,6 +616,14 @@ app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
 app.get('/api/catalogs/config', authenticate, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const r=await pool.query('SELECT catalogos_config FROM configuracion WHERE id=1');const c=(r.rows[0]&&r.rows[0].catalogos_config)||{};res.json({canjes:Array.isArray(c.canjes)?c.canjes:[],logros:Array.isArray(c.logros)?c.logros:[]})}catch(e){res.status(500).json({error:'Error obteniendo catálogos'})}});
 app.put('/api/admin/catalogs/config', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const c={canjes:Array.isArray(req.body.canjes)?req.body.canjes:[],logros:Array.isArray(req.body.logros)?req.body.logros:[]};const r=await pool.query(`INSERT INTO configuracion(id,catalogos_config,updated_at) VALUES(1,$1,NOW()) ON CONFLICT(id) DO UPDATE SET catalogos_config=$1,updated_at=NOW() RETURNING catalogos_config`,[JSON.stringify(c)]);res.json({message:'Catálogos guardados',config:r.rows[0].catalogos_config})}catch(e){console.error(e);res.status(500).json({error:'Error guardando catálogos'})}});
 
+app.post('/api/user/game/prize', authenticate, async (req,res)=>{
+  const game=String(req.body.game||'').toLowerCase(); const amount=Number(req.body.amount||0);
+  const usage={ruleta:'ruleta_usos',cofre:'cofres_usos',dados:'dados_usos'}[game];
+  if(!usage||!Number.isFinite(amount)||amount<0) return res.status(400).json({error:'Premio inválido'});
+  const client=await pool.connect();
+  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const usos=Number(u[usage]||0); if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const item={tipo:'juego',juego:game,monto:amount,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), historial_detallado=$2::jsonb WHERE id=$3 RETURNING *`,[amount,JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); res.json({message:'Premio acreditado',premio:amount,user:out.rows[0]});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
+});
+
 // ============================================================
 // COBRO DIARIO DE TAREAS: UNA SOLA VEZ POR DÍA
 // ============================================================
