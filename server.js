@@ -555,15 +555,18 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
         const owner = await pool.query('SELECT id, telefono, codigo_referido, referidos FROM users WHERE id = $1', [req.userId]);
         if (!owner.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
         const u = owner.rows[0];
+        const stored = u.referidos && typeof u.referidos === 'object' ? u.referidos : { izquierda: null, derecha: null, lista: [] };
+        const storedPhones = (Array.isArray(stored.lista) ? stored.lista : []).map(x => x && x.id ? String(x.id) : null).filter(Boolean);
+        [stored.izquierda, stored.derecha].forEach(x => { if (x) storedPhones.push(String(x)); });
         const result = await pool.query(`
             SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings,
                    cuenta_habilitada, fecha_registro, referido_por
             FROM users
             WHERE referido_por = $1
                OR LOWER(TRIM(COALESCE(referido_por, ''))) = LOWER(TRIM($2))
+               OR telefono = ANY($3::text[])
             ORDER BY fecha_registro ASC NULLS LAST, id ASC
-        `, [u.telefono, u.codigo_referido || '']);
-        const stored = u.referidos && typeof u.referidos === 'object' ? u.referidos : { izquierda: null, derecha: null, lista: [] };
+        `, [u.telefono, u.codigo_referido || '', storedPhones]);
         const byPhone = new Map();
         (Array.isArray(stored.lista) ? stored.lista : []).forEach(x => { if (x && x.id) byPhone.set(String(x.id), x); });
         result.rows.forEach(r => byPhone.set(String(r.telefono), {
@@ -573,7 +576,7 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
             plan: r.plan || 'Sin plan',
             plan_amount: Number(r.plan_amount || 0),
             daily_earnings: Number(r.daily_earnings || 0),
-            tienePlan: Boolean(r.plan && String(r.plan).toLowerCase() !== 'sin plan'),
+            tienePlan: Boolean((r.plan && !['sin plan','null','undefined','ninguno'].includes(String(r.plan).trim().toLowerCase())) || Number(r.plan_amount || 0) > 0 || Number(r.daily_earnings || 0) > 0),
             date: r.fecha_registro,
             referido_por: r.referido_por,
             activo: r.cuenta_habilitada !== false
