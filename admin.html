@@ -4932,39 +4932,12 @@ function autorizarNivel(telefono, autorizar) {
 
 function autorizarNivelDesdeActivos(telefono) {
     var users = getUsers();
-    var user = users.find(function(u) { return u.telefono === telefono; });
-    if (!user) { showAlert('⚠️ Usuario no encontrado', 'danger'); return; }
-
-    var niveles = getNiveles();
-    if (!niveles[telefono]) {
-        niveles[telefono] = { nivelAutorizado: 0 };
-    }
-
-    var planActual = user.plan || 'Sin plan';
-    var indiceActual = getIndicePlan(planActual);
-    var siguienteIndice = indiceActual + 1;
-    var siguientePlan = getPlanByIndex(siguienteIndice);
-
-    if (siguientePlan === 'Sin plan') {
-        showAlert('🏆 ' + user.nombre + ' ya está en el máximo nivel', 'info');
-        return;
-    }
-
-    if (niveles[telefono].nivelAutorizado >= siguienteIndice) {
-        showAlert('⚠️ ' + user.nombre + ' ya tiene autorizado el nivel ' + siguientePlan, 'warning');
-        return;
-    }
-
-    if (!confirm('¿Autorizar a ' + user.nombre + ' para subir al nivel ' + siguientePlan + '?')) return;
-
-    niveles[telefono].nivelAutorizado = siguienteIndice;
-    saveNiveles(niveles);
-    sincronizarUsuarioConBackend(telefono);
-    
-    showAlert('✅ Nivel ' + siguientePlan + ' autorizado para ' + user.nombre, 'success');
-    renderUsuariosActivos();
-    renderNiveles();
-    renderUsuarios();
+    var objetivo = users.find(function(u) { return u.telefono === telefono; });
+    if (!objetivo) { showAlert('⚠️ Usuario no encontrado', 'danger'); return; }
+    var siguiente = getPlanByIndex(getIndicePlan(objetivo.plan || 'Sin plan') + 1);
+    if (siguiente === 'Sin plan') { showAlert('🏆 El usuario ya está en el máximo nivel', 'info'); return; }
+    if (!confirm('¿Autorizar a ' + objetivo.nombre + ' para subir al nivel ' + siguiente + '?')) return;
+    autorizarNivel(telefono, true);
 }
 
 // ============================================================
@@ -6693,7 +6666,20 @@ async function autorizarNivel(telefono, autorizar){
   var lista=getUsers(), u=lista.find(function(x){return x.telefono===telefono;}), token=localStorage.getItem('apex_token');
   if(!u||!u.id||!token){showAlert('⚠️ Usuario o sesión no encontrados','danger');return;}
   var actual=getIndicePlan(u.plan||'Sin plan'), nivel=autorizar?actual+1:actual;
-  try{var r=await fetch(API_URL+'/api/admin/user/'+u.id+'/authorize-plan',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({level:nivel})});var data=await r.json();if(!r.ok||data.error)throw new Error(data.error||'Error del servidor');u.nivel_autorizado=nivel;saveUsers(lista);users=lista;showAlert(autorizar?'✅ Autorización guardada en el servidor':'🔒 Autorización removida','success');renderNiveles();renderUsuarios();renderUsuariosActivos();}catch(e){showAlert('❌ '+e.message,'danger');}
+  if(autorizar && getPlanByIndex(nivel)==='Sin plan'){showAlert('🏆 El usuario ya está en el nivel máximo','info');return;}
+  try{
+    var r=await fetch(API_URL+'/api/admin/user/'+u.id+'/authorize-plan',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({level:nivel})});
+    var data=await r.json();
+    if(!r.ok||data.error)throw new Error(data.error||'Error del servidor');
+    var nivelGuardado=Number(data.user&&data.user.nivel_autorizado!==undefined?data.user.nivel_autorizado:nivel);
+    u.nivel_autorizado=nivelGuardado;
+    var niveles=getNiveles();
+    niveles[telefono]=niveles[telefono]||{};
+    niveles[telefono].nivelAutorizado=nivelGuardado;
+    saveNiveles(niveles); saveUsers(lista); users=lista;
+    showAlert(autorizar?'✅ Nivel '+getPlanByIndex(nivelGuardado)+' autorizado y sincronizado':'🔒 Autorización removida','success');
+    renderNiveles();renderUsuarios();renderUsuariosActivos();
+  }catch(e){showAlert('❌ '+e.message,'danger');}
 }
 </script>
 

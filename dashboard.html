@@ -1908,6 +1908,7 @@ function iniciarVigilante() {
                 if (Number(data.user.balance || 0) !== Number(user.balance || 0)) huboCambios = true;
                 if (Number(data.user.puntos || 0) !== Number(user.puntos || 0)) huboCambios = true;
                 if (data.user.plan !== user.plan) huboCambios = true;
+                if (Number(data.user.nivel_autorizado || 0) !== Number(user.nivel_autorizado || 0)) huboCambios = true;
                 if (data.user.cuenta_habilitada !== user.cuenta_habilitada) huboCambios = true;
                 if (data.user.produccion_pausada !== user.produccion_pausada) huboCambios = true;
                 if (data.user.tareas_completadas_hoy && user.tareas_completadas_hoy) {

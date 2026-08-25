@@ -37,7 +37,8 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS racha_dias INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS cobro_tareas_fecha DATE,
             ADD COLUMN IF NOT EXISTS cobro_tareas_monto NUMERIC DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS plan_activo BOOLEAN DEFAULT TRUE
+            ADD COLUMN IF NOT EXISTS plan_activo BOOLEAN DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS nivel_autorizado INTEGER DEFAULT 0
         `);
         await pool.query(`
             ALTER TABLE configuracion
@@ -1105,6 +1106,7 @@ app.post('/api/admin/user/:id/pause', authenticate, isAdmin, async (req, res) =>
 
 app.post('/api/admin/user/:id/authorize-plan', authenticate, isAdmin, async (req, res) => {
     const level = Number(req.body.level || 0);
+    if (!Number.isInteger(level) || level < 0 || level > 5) return res.status(400).json({ error: 'Nivel de autorización inválido' });
     const result = await pool.query('UPDATE users SET nivel_autorizado = $1 WHERE id = $2 RETURNING *', [level, req.params.id]);
     if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ message: 'Autorización actualizada', user: result.rows[0] });
