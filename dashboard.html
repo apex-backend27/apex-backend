@@ -1136,18 +1136,20 @@ function actualizarEstadoBotonCobro(completadasCount) {
     if (!boton || !info || !user) return;
     var hoy = new Date().toISOString().slice(0, 10);
     var yaCobro = user.cobro_tareas_fecha && String(user.cobro_tareas_fecha).slice(0, 10) === hoy;
-    var porcentaje = Math.round((completadasCount / 5) * 100);
+    var completas = Number(completadasCount || 0);
+    var quintaTerminada = completas >= 5;
     if (yaCobro) {
         boton.style.display = 'block'; boton.disabled = true; boton.textContent = '✅ Cobrado hoy';
         info.textContent = 'Ya recibiste tu recompensa de hoy. Podrás cobrar nuevamente mañana.';
     } else if (tareasPausadasRemoto) {
         boton.style.display = 'block'; boton.disabled = true; boton.textContent = '⏸️ Tareas pausadas';
         info.textContent = 'El administrador pausó las tareas temporalmente.';
-    } else if (completadasCount > 0) {
-        boton.style.display = 'block'; boton.disabled = false; boton.textContent = '💰 Cobrar ' + porcentaje + '% del plan';
-        info.textContent = 'Puedes cobrar una sola vez por las tareas completadas.';
+    } else if (quintaTerminada) {
+        boton.style.display = 'block'; boton.disabled = false; boton.textContent = '💰 Cobrar 100% del plan';
+        info.textContent = 'Completaste las cinco tareas. Ya puedes cobrar tu producción del día.';
     } else {
-        boton.style.display = 'none'; info.textContent = 'Completa al menos una tarea para habilitar el cobro.';
+        boton.style.display = 'block'; boton.disabled = true; boton.textContent = '🔒 Completa la tarea ' + (completas + 1) + ' de 5';
+        info.textContent = 'El cobro se habilita únicamente después de finalizar la tarea número 5.';
     }
 }
 

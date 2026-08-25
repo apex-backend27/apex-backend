@@ -649,11 +649,11 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         }
         const completadas = Array.isArray(u.tareas_completadas_hoy) ? u.tareas_completadas_hoy : [];
         const total = 5;
-        const porcentaje = Math.min(total, completadas.length) / total;
-        if (porcentaje <= 0) {
+        if (completadas.length < total) {
             await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'Debes completar al menos una tarea' });
+            return res.status(400).json({ error: 'Debes completar las 5 tareas antes de cobrar' });
         }
+        const porcentaje = 1;
         const planDaily = { Trader: 6, Analista: 10, Gestor: 17, Master: 27, Elite: 42 };
         const planNormalizado = normalizarPlan(u.plan);
         const diario = Number(u.daily_earnings || (planNormalizado ? planDaily[planNormalizado] : 0) || 0);
