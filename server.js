@@ -168,7 +168,7 @@ var telefonoReferidor = null;
 
 if (codigoInv && codigoInv !== 'Eamb1714') {
   const referidoResult = await pool.query(
-    'SELECT * FROM users WHERE codigo_referido = $1',
+    'SELECT * FROM users WHERE UPPER(TRIM(codigo_referido)) = UPPER(TRIM($1))',
     [codigoInv]
   );
   
@@ -560,23 +560,27 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
                    cuenta_habilitada, fecha_registro, referido_por
             FROM users
             WHERE referido_por = $1
+               OR LOWER(TRIM(COALESCE(referido_por, ''))) = LOWER(TRIM($2))
             ORDER BY fecha_registro ASC NULLS LAST, id ASC
-        `, [u.telefono]);
+        `, [u.telefono, u.codigo_referido || '']);
         const stored = u.referidos && typeof u.referidos === 'object' ? u.referidos : { izquierda: null, derecha: null, lista: [] };
+        const byPhone = new Map();
+        (Array.isArray(stored.lista) ? stored.lista : []).forEach(x => { if (x && x.id) byPhone.set(String(x.id), x); });
+        result.rows.forEach(r => byPhone.set(String(r.telefono), {
+            id: r.telefono,
+            telefono: r.telefono,
+            nombre: [r.nombre, r.apellido].filter(Boolean).join(' '),
+            plan: r.plan || 'Sin plan',
+            plan_amount: Number(r.plan_amount || 0),
+            daily_earnings: Number(r.daily_earnings || 0),
+            tienePlan: Boolean(r.plan && String(r.plan).toLowerCase() !== 'sin plan'),
+            date: r.fecha_registro,
+            referido_por: r.referido_por,
+            activo: r.cuenta_habilitada !== false
+        }));
         res.json({
             codigo_referido: u.codigo_referido || null,
-            referidos: result.rows.map(r => ({
-                id: r.telefono,
-                telefono: r.telefono,
-                nombre: [r.nombre, r.apellido].filter(Boolean).join(' '),
-                plan: r.plan || 'Sin plan',
-                plan_amount: Number(r.plan_amount || 0),
-                daily_earnings: Number(r.daily_earnings || 0),
-                tienePlan: Boolean(r.plan && String(r.plan).toLowerCase() !== 'sin plan'),
-                fecha_registro: r.fecha_registro,
-                referido_por: r.referido_por,
-                activo: r.cuenta_habilitada !== false
-            })),
+            referidos: Array.from(byPhone.values()),
             arbol: stored
         });
     } catch (error) {

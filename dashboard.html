@@ -1021,7 +1021,7 @@ function renderPerfil() {
     document.getElementById('profileName').textContent = user.nombre + ' ' + user.apellido;
     document.getElementById('profilePhone').textContent = '+51 ' + user.telefono;
     document.getElementById('profilePlan').textContent = user.plan || 'Sin plan';
-    document.getElementById('profileReferralCode').textContent = user.codigo_referido || 'APEX000';
+    document.getElementById('profileReferralCode').textContent = String(user.codigo_referido || '').trim().toUpperCase() || 'APEX000';
     document.getElementById('withdrawBalance').textContent = '$' + Number(user.balance || 0).toFixed(2);
     var currentEl = document.getElementById('currentWithdrawAddress');
     if (user.direccion_retiro) {
@@ -1549,10 +1549,11 @@ function renderTree() {
 
     var html = '';
     var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
-    var referralLink = baseUrl + 'ref/' + (user.codigo_referido || 'APEX000');
-    
+        var codigoCanonico = String(user.codigo_referido || '').trim().toUpperCase() || 'APEX000';
+    var referralLink = baseUrl + 'ref/' + encodeURIComponent(codigoCanonico);
     html += '<div style="margin-bottom:16px; background:#f8f9fa; border-radius:12px; padding:14px 16px; border:1px solid #e0e0e0;">';
     html += '<div style="font-size:13px; color:#666; font-weight:600; margin-bottom:6px;">🔗 Tu Link de Referido</div>';
+    html += '<div style="font-size:12px;color:#333;margin-bottom:8px;">Código: <strong id="referralCodeCanonical">' + codigoCanonico + '</strong></div>';
     html += '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">';
     html += '<span style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;">' + referralLink + '</span>';
     html += '<button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>';
@@ -2216,6 +2217,7 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
       user.referidos=Object.assign({},arbol,{lista:Array.isArray(data.referidos)?data.referidos:[]});
       localStorage.setItem('apex_user',JSON.stringify(user));
       sessionStorage.setItem('apex_user',JSON.stringify(user));
+      if(typeof renderPerfil==='function')renderPerfil();
       if(typeof renderTreeOriginal==='function')renderTreeOriginal();
     }catch(e){console.warn('No se pudieron sincronizar referidos',e);}
   };
