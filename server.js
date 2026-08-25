@@ -398,7 +398,7 @@ app.get('/api/verify', authenticate, async (req, res) => {
                 racha_dias: Number(userData.racha_dias || 0),
                 cobro_tareas_fecha: userData.cobro_tareas_fecha || null,
                 cobro_tareas_monto: Number(userData.cobro_tareas_monto || 0),
-                referidos: userData.referidos || { izquierda: null, derecha: null, lista: [] }
+                referidos: { izquierda: null, derecha: null, lista: referidosEnriquecidos }
             }
         });
     } catch (error) {
@@ -512,6 +512,26 @@ app.put('/api/user/update', async (req, res) => {
         
         // ✅ Enviar TODOS los campos del usuario
         const userData = result.rows[0];
+        const referralsVerify = await pool.query(`
+            SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings, fecha_registro, referido_por
+            FROM users
+            WHERE referido_por = $1
+               OR LOWER(TRIM(COALESCE(referido_por, ''))) = LOWER(TRIM($2))
+            ORDER BY fecha_registro ASC NULLS LAST, id ASC
+        `, [userData.telefono, userData.codigo_referido || '']);
+        const referidosEnriquecidos = referralsVerify.rows.map(r => ({
+            id: r.telefono,
+            telefono: r.telefono,
+            nombre: [r.nombre, r.apellido].filter(Boolean).join(' '),
+            plan: r.plan || 'Sin plan',
+            plan_nombre: r.plan || null,
+            plan_actual: r.plan || null,
+            plan_amount: Number(r.plan_amount || 0),
+            daily_earnings: Number(r.daily_earnings || 0),
+            tienePlan: Boolean((r.plan && !['sin plan','sin_plan','null','undefined','ninguno'].includes(String(r.plan).trim().toLowerCase())) || Number(r.plan_amount || 0) > 0 || Number(r.daily_earnings || 0) > 0),
+            date: r.fecha_registro,
+            referido_por: r.referido_por
+        }));
         res.json({ 
             message: 'Usuario actualizado exitosamente', 
             user: {
