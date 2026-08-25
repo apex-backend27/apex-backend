@@ -617,9 +617,9 @@ var PLANS = [
     { name: 'Analista', amount: 500, daily: 10, icon: '📊' },
     { name: 'Gestor', amount: 800, daily: 17, icon: '💼' },
     { name: 'Master', amount: 1200, daily: 27, icon: '🏆' },
-    { name: 'Elite', amount: 1800, daily: 42, icon: '👑' }
+        { name: 'Elite', amount: 1800, daily: 42, icon: '👑' }
 ];
-
+PLANS = PLANS.filter(function(p) { return !/prueba|test|demo|trial|gratis/i.test(String(p.name || '')); });
 var HORARIOS_TAREAS = [
     { hora: 10, minuto: 0, nombre: 'Tarea 1', icono: '🌅' },
     { hora: 12, minuto: 0, nombre: 'Tarea 2', icono: '☀️' },
@@ -855,6 +855,10 @@ function cargarUsuario(dataUser) {
         balance: dataUser.balance || 0,
         puntos: dataUser.puntos || 0,
         plan: dataUser.plan || 'Sin plan',
+        plan_amount: Number(dataUser.plan_amount || 0),
+        plan_activo: dataUser.plan_activo !== false,
+        cobro_tareas_fecha: dataUser.cobro_tareas_fecha || null,
+        cobro_tareas_monto: Number(dataUser.cobro_tareas_monto || 0),
         es_admin: dataUser.es_admin || false,
         codigo_referido: dataUser.codigo_referido || 'APEX000',
         polygon_address: dataUser.polygon_address || generarDireccionPolygon(),

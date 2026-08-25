@@ -642,7 +642,7 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(423).json({ error: 'Las tareas están pausadas por el administrador' });
         }
-        const hoy = new Date().toISOString().slice(0, 10);
+        const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         if (u.cobro_tareas_fecha && String(u.cobro_tareas_fecha).slice(0, 10) === hoy) {
             await client.query('ROLLBACK');
             return res.status(409).json({ error: 'El cobro de hoy ya fue realizado' });
@@ -667,9 +667,13 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
         historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas ${Math.round(porcentaje * 100)}%`, monto: recompensa, fecha: new Date().toISOString(), estado: 'aprobado' });
         const updated = await client.query(
-            `UPDATE users SET balance = COALESCE(balance, 0) + $1, cobro_tareas_fecha = $2, cobro_tareas_monto = $1, historial_detallado = $3 WHERE id = $4 RETURNING *`,
+            `UPDATE users SET balance = COALESCE(balance, 0) + $1, cobro_tareas_fecha = $2, cobro_tareas_monto = $1, historial_detallado = $3 WHERE id = $4 AND (cobro_tareas_fecha IS NULL OR cobro_tareas_fecha <> $2) RETURNING *`,
             [recompensa, hoy, JSON.stringify(historial), req.userId]
         );
+        if (!updated.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'El cobro de hoy ya fue realizado' });
+        }
         await client.query('COMMIT');
         const saved = updated.rows[0];
         res.json({ message: 'Cobro realizado', recompensa, porcentaje: Math.round(porcentaje * 100), user: saved });
