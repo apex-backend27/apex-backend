@@ -1022,27 +1022,27 @@ function renderDashboard() {
     try { renderTareas(); } catch (error) { console.error('Error renderizando tareas:', error); }
 
     if (user.produccion_pausada) {
-        document.getElementById('produccionPausada').style.display = 'block';
-        document.getElementById('cuentaBloqueada').style.display = 'none';
+        if (document.getElementById('produccionPausada')) document.getElementById('produccionPausada').style.display = 'block';
+        if (document.getElementById('cuentaBloqueada')) document.getElementById('cuentaBloqueada').style.display = 'none';
         document.querySelector('.main').style.opacity = '0.5';
         document.querySelector('.main').style.pointerEvents = 'none';
         renderActividades();
         verificarAdmin();
         return;
     } else {
-        document.getElementById('produccionPausada').style.display = 'none';
+        if (document.getElementById('produccionPausada')) document.getElementById('produccionPausada').style.display = 'none';
         document.querySelector('.main').style.opacity = '1';
         document.querySelector('.main').style.pointerEvents = 'auto';
     }
 
     if (user.cuenta_habilitada === false) {
-        document.getElementById('cuentaBloqueada').style.display = 'block';
+        if (document.getElementById('cuentaBloqueada')) document.getElementById('cuentaBloqueada').style.display = 'block';
         document.querySelector('.main').style.opacity = '0.5';
         document.querySelector('.main').style.pointerEvents = 'none';
                 try { renderTareas(); } catch (error) { console.error('Error renderizando tareas:', error); }
         return;
     } else {
-        document.getElementById('cuentaBloqueada').style.display = 'none';
+        if (document.getElementById('cuentaBloqueada')) document.getElementById('cuentaBloqueada').style.display = 'none';
     }
 
     document.getElementById('userName').textContent = user.nombre + ' ' + user.apellido;
@@ -1068,9 +1068,9 @@ function renderDashboard() {
 function verificarAdmin() {
     var adminAccess = document.getElementById('adminAccess');
     if (user && user.es_admin === true) {
-        adminAccess.style.display = 'block';
+        if (adminAccess) adminAccess.style.display = 'block';
     } else {
-        adminAccess.style.display = 'none';
+        if (adminAccess) adminAccess.style.display = 'none';
     }
 }
 
@@ -1653,7 +1653,7 @@ function updateWithdrawAddress() {
     user.direccion_retiro = address;
     saveUserData();
     document.getElementById('currentWithdrawAddress').textContent = address;
-    document.getElementById('currentWithdrawAddress').style.color = '#4db6ac';
+    if (document.getElementById('currentWithdrawAddress')) document.getElementById('currentWithdrawAddress').style.color = '#4db6ac';
     showAlert('✅ Dirección de retiro guardada', 'success');
     input.value = '';
 }
