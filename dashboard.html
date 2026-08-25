@@ -1580,7 +1580,8 @@ function renderTree() {
             
                         var tienePlan = false;
             var planNombre = 'Sin plan';
-            var planValor = ref && typeof ref.plan === 'object' ? (ref.plan.nombre || ref.plan.name || ref.plan.id || '') : (ref.plan || '');
+            var planBase = ref && (ref.plan_nombre || ref.plan_actual || ref.plan);
+            var planValor = planBase && typeof planBase === 'object' ? (planBase.nombre || planBase.name || planBase.id || '') : (planBase || '');
             var planTexto = String(planValor).trim().toLowerCase();
             var planesPorGanancia = { '6':'Trader', '10':'Analista', '17':'Gestor', '27':'Master', '42':'Elite' };
             if (planTexto && ['sin plan','sin_plan','null','undefined','ninguno','0'].indexOf(planTexto) === -1) {

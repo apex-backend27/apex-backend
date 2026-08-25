@@ -574,6 +574,8 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
             telefono: r.telefono,
             nombre: [r.nombre, r.apellido].filter(Boolean).join(' '),
             plan: r.plan || 'Sin plan',
+            plan_nombre: r.plan || null,
+            plan_actual: r.plan || null,
             plan_amount: Number(r.plan_amount || 0),
             daily_earnings: Number(r.daily_earnings || 0),
             tienePlan: Boolean((r.plan && !['sin plan','null','undefined','ninguno'].includes(String(r.plan).trim().toLowerCase())) || Number(r.plan_amount || 0) > 0 || Number(r.daily_earnings || 0) > 0),
