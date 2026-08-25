@@ -548,6 +548,44 @@ app.put('/api/user/update', async (req, res) => {
     }
 });
 // ============================================================
+// REFERIDOS DEL USUARIO AUTENTICADO
+// ============================================================
+app.get('/api/user/referrals', authenticate, async (req, res) => {
+    try {
+        const owner = await pool.query('SELECT id, telefono, codigo_referido, referidos FROM users WHERE id = $1', [req.userId]);
+        if (!owner.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const u = owner.rows[0];
+        const result = await pool.query(`
+            SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings,
+                   cuenta_habilitada, fecha_registro, referido_por
+            FROM users
+            WHERE referido_por = $1
+            ORDER BY fecha_registro ASC NULLS LAST, id ASC
+        `, [u.telefono]);
+        const stored = u.referidos && typeof u.referidos === 'object' ? u.referidos : { izquierda: null, derecha: null, lista: [] };
+        res.json({
+            codigo_referido: u.codigo_referido || null,
+            referidos: result.rows.map(r => ({
+                id: r.telefono,
+                telefono: r.telefono,
+                nombre: [r.nombre, r.apellido].filter(Boolean).join(' '),
+                plan: r.plan || 'Sin plan',
+                plan_amount: Number(r.plan_amount || 0),
+                daily_earnings: Number(r.daily_earnings || 0),
+                tienePlan: Boolean(r.plan && String(r.plan).toLowerCase() !== 'sin plan'),
+                fecha_registro: r.fecha_registro,
+                referido_por: r.referido_por,
+                activo: r.cuenta_habilitada !== false
+            })),
+            arbol: stored
+        });
+    } catch (error) {
+        console.error('Error al cargar referidos:', error);
+        res.status(500).json({ error: 'No se pudieron cargar los referidos' });
+    }
+});
+
+// ============================================================
 // CONFIGURACIÓN CENTRALIZADA DE TAREAS
 // ============================================================
 function normalizarPlan(plan) {

@@ -2201,5 +2201,29 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   };
   window.addEventListener('load',function(){setTimeout(window.sincronizarUsuarioActual,250);});
 })();
+</script><script id="apex-v20-referrals-sync">
+(function(){
+  var renderTreeOriginal=window.renderTree;
+  window.cargarReferidosRemotos=async function(){
+    var token=localStorage.getItem('apex_token');
+    if(!token||!window.user)return;
+    try{
+      var r=await fetch(API_URL+'/api/user/referrals',{headers:{Authorization:'Bearer '+token}});
+      var data=await r.json();
+      if(!r.ok||data.error)throw Error(data.error||'No se pudieron cargar referidos');
+      user.codigo_referido=data.codigo_referido||user.codigo_referido;
+      var arbol=data.arbol||user.referidos||{};
+      user.referidos=Object.assign({},arbol,{lista:Array.isArray(data.referidos)?data.referidos:[]});
+      localStorage.setItem('apex_user',JSON.stringify(user));
+      sessionStorage.setItem('apex_user',JSON.stringify(user));
+      if(typeof renderTreeOriginal==='function')renderTreeOriginal();
+    }catch(e){console.warn('No se pudieron sincronizar referidos',e);}
+  };
+  window.renderTree=function(){
+    if(typeof renderTreeOriginal==='function')renderTreeOriginal();
+    window.cargarReferidosRemotos();
+  };
+  window.addEventListener('load',function(){setTimeout(window.cargarReferidosRemotos,500);});
+})();
 </script></body>
 </html>
