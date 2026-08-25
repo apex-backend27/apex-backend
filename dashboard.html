@@ -146,9 +146,12 @@
         .nivel-info { font-size: 11px; color: #999; text-align: center; padding: 8px; background: #f8f9fa; border-radius: 10px; margin-top: 8px; }
         .nivel-info .desbloqueado { color: #4db6ac; font-weight: 600; }
         .nivel-info .bloqueado { color: #ef5350; font-weight: 600; }
-        
+        .dark-mode-toggle { background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s; }
+        .dark-mode-toggle:hover { background: #f0f0f0; }
+        body.dark-mode .dark-mode-toggle:hover { background: #333; }
+
         /* ============================================================
-           TAREAS DIARIAS - NUEVO
+           TAREAS DIARIAS
            ============================================================ */
         .tareas-grid {
             display: flex;
@@ -348,9 +351,6 @@
         body.dark-mode .card-gold { background: #1a1a0a; border-color: #f7971e; }
         body.dark-mode .card-blue { background: #0a1a2a; border-color: #64b5f6; }
         body.dark-mode .card-green { background: #0a1a1a; border-color: #4db6ac; }
-        .dark-mode-toggle { background: none; border: none; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background 0.2s; }
-        .dark-mode-toggle:hover { background: #f0f0f0; }
-        body.dark-mode .dark-mode-toggle:hover { background: #333; }
 
         @media (max-width: 480px) {
             .ganancias-stats { grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -375,10 +375,10 @@
         <div class="brand"><div><h1>APEX</h1><div class="slogan">CRECE · GANA · TRIUNFA</div></div></div>
         <div class="user">
             <div class="info">
-                <div class="name" id="userName">Juan Pérez</div>
-                <div class="phone" id="userPhone">+51 987654321</div>
+                <div class="name" id="userName">Cargando...</div>
+                <div class="phone" id="userPhone">+51 000000000</div>
             </div>
-            <div class="avatar" id="userAvatar">JP</div>
+            <div class="avatar" id="userAvatar">U</div>
             <button class="logout-btn" onclick="logout()">✕</button>
             <button class="dark-mode-toggle" onclick="toggleDarkMode()">🌙</button>
         </div>
@@ -407,7 +407,7 @@
             <div class="points">⭐ Puntos: <span id="pointsAmount">0</span></div>
         </div>
 
-        <!-- TAREAS DIARIAS - NUEVO -->
+        <!-- TAREAS DIARIAS -->
         <div class="card card-blue" id="tareasCard">
             <div class="label">📋 Tareas de Hoy</div>
             <div class="progreso-container">
@@ -493,8 +493,8 @@
     <div id="tab-perfil" class="tab-content">
         <div class="profile-section">
             <span class="section-label">👤 DATOS PERSONALES</span>
-            <div class="profile-field"><span class="label">NOMBRE</span><span class="value" id="profileName">Juan Pérez</span></div>
-            <div class="profile-field"><span class="label">TELÉFONO</span><span class="value" id="profilePhone">+51 987654321</span></div>
+            <div class="profile-field"><span class="label">NOMBRE</span><span class="value" id="profileName">Cargando...</span></div>
+            <div class="profile-field"><span class="label">TELÉFONO</span><span class="value" id="profilePhone">Cargando...</span></div>
             <div class="profile-field"><span class="label">PLAN</span><span class="value" id="profilePlan">Sin plan</span></div>
             <div class="profile-field"><span class="label">CÓDIGO REFERIDO</span><span class="value" style="font-family:monospace;color:#f7971e;font-weight:600;" id="profileReferralCode">APEX000</span></div>
         </div>
@@ -529,6 +529,40 @@
 </nav>
 
 <script>
+
+// ============================================================
+// INICIALIZAR TAREAS POR DEFECTO
+// ============================================================
+function inicializarTareasPorDefecto() {
+    // Verificar si ya hay tareas configuradas
+    var tareasExistentes = localStorage.getItem(TAREAS_CONFIG_KEY);
+    if (!tareasExistentes) {
+        console.log('📋 No hay tareas configuradas, creando por defecto...');
+        var tareasPorDefecto = [
+            { hora: 10, minuto: 0, nombre: 'Tarea 1', icono: '🌅', activo: true },
+            { hora: 12, minuto: 0, nombre: 'Tarea 2', icono: '☀️', activo: true },
+            { hora: 14, minuto: 0, nombre: 'Tarea 3', icono: '🌤️', activo: true },
+            { hora: 16, minuto: 0, nombre: 'Tarea 4', icono: '🌥️', activo: true },
+            { hora: 18, minuto: 0, nombre: 'Tarea 5', icono: '🌆', activo: true }
+        ];
+        localStorage.setItem(TAREAS_CONFIG_KEY, JSON.stringify({ tareas: tareasPorDefecto }));
+        console.log('✅ Tareas por defecto creadas');
+    }
+
+    // Activar tareas de hoy si no están activadas
+    var hoy = new Date().toDateString();
+    var activacion = JSON.parse(localStorage.getItem(TAREAS_ACTIVACION_KEY) || 'null');
+    if (!activacion || activacion.fecha !== hoy || activacion.activo !== true) {
+        console.log('🔄 Activando tareas para hoy...');
+        localStorage.setItem(TAREAS_ACTIVACION_KEY, JSON.stringify({
+            fecha: hoy,
+            activo: true,
+            horaActivacion: new Date().toISOString()
+        }));
+        console.log('✅ Tareas activadas para hoy');
+    }
+}
+
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
@@ -710,87 +744,131 @@ function logout() {
 }
 
 // ============================================================
-// CHECK SESSION
+// CHECK SESSION - VERSIÓN DEFINITIVA (FUNCIONA CON CUALQUIER USUARIO)
 // ============================================================
 function checkSession() {
     var token = localStorage.getItem('apex_token');
-    if (!token) {
-        window.location.href = 'index.html';
+    var userLocal = JSON.parse(localStorage.getItem('apex_user') || 'null');
+
+inicializarTareasPorDefecto();
+    
+    console.log('🔍 TOKEN:', token ? '✅ Existe' : '❌ No existe');
+    console.log('👤 USUARIO LOCAL:', userLocal ? userLocal.nombre : 'No existe');
+    
+    // Si hay usuario en localStorage, cargarlo primero
+    if (userLocal) {
+        console.log('📥 Cargando usuario desde localStorage:', userLocal.nombre);
+        cargarUsuario(userLocal);
+        // Si hay token, verificar en el backend para actualizar
+        if (token) {
+            verificarToken(token);
+        }
         return;
     }
+    
+    // Si no hay usuario local pero hay token, intentar obtener del backend
+    if (token) {
+        console.log('📡 Obteniendo usuario desde el backend...');
+        verificarToken(token);
+        return;
+    }
+    
+    // Si no hay nada, redirigir al login
+    console.log('❌ No hay token ni usuario, redirigiendo al login');
+    window.location.href = 'index.html';
+}
 
+// ============================================================
+// VERIFICAR TOKEN EN EL BACKEND
+// ============================================================
+function verificarToken(token) {
     fetch(API_URL + '/api/verify', {
         method: 'GET',
         headers: { 'Authorization': 'Bearer ' + token }
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            localStorage.removeItem('apex_token');
-            localStorage.removeItem('apex_user');
-            window.location.href = 'index.html';
-            return;
-        }
-
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(data) {
+        console.log('📦 Respuesta del backend:', data);
+        
         if (data.user) {
-            user = {
-                telefono: data.user.telefono,
-                nombre: data.user.nombre,
-                apellido: data.user.apellido || '',
-                balance: data.user.balance || 0,
-                puntos: data.user.puntos || 0,
-                plan: data.user.plan || 'Sin plan',
-                es_admin: data.user.es_admin || false,
-                codigo_referido: data.user.codigo_referido || 'APEX000',
-                polygon_address: data.user.polygon_address || generarDireccionPolygon(),
-                direccion_retiro: data.user.direccion_retiro || null,
-                password_retiro: data.user.password_retiro || '000000',
-                referidos: data.user.referidos || { izquierda: null, derecha: null, lista: [] },
-                fechas_invito: data.user.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
-                verificado: data.user.verificado || { izquierdaCompleto: false, derechaCompleto: false, puedeUsarCodigo: true },
-                historial: data.user.historial || [],
-                historial_detallado: data.user.historial_detallado || [],
-                cuenta_habilitada: data.user.cuenta_habilitada !== undefined ? data.user.cuenta_habilitada : true,
-                produccion_pausada: data.user.produccion_pausada || false,
-                ruleta_usos: data.user.ruleta_usos || 0,
-                cofres_usos: data.user.cofres_usos || 0,
-                dados_usos: data.user.dados_usos || 0,
-                premio_ruleta: data.user.premio_ruleta || 0,
-                premio_cofre: data.user.premio_cofre || 0,
-                premio_dados: data.user.premio_dados || 0,
-                cofres_abiertos: data.user.cofres_abiertos || [],
-                cupones_asignados: data.user.cupones_asignados || [],
-                logros_asignados: data.user.logros_asignados || [],
-                logros_pendientes_aprobar: data.user.logros_pendientes_aprobar || [],
-                tareas_asignadas: data.user.tareas_asignadas || [],
-                canjes_realizados: data.user.canjes_realizados || [],
-                logros_reclamados: data.user.logros_reclamados || [],
-                referidos_directos: data.user.referidos_directos || { izquierda: null, derecha: null },
-                descuentoRetiroActivo: data.user.descuentoRetiroActivo || null,
-                bonusReferidoActivo: data.user.bonusReferidoActivo || null,
-                fecha_registro: data.user.fecha_registro || new Date().toISOString(),
-                // TAREAS DIARIAS - NUEVO
-                tareas_completadas_hoy: data.user.tareas_completadas_hoy || [],
-                ultima_fecha_tareas: data.user.ultima_fecha_tareas || null,
-                racha_dias: data.user.racha_dias || 0
-            };
-            
-            sessionStorage.setItem('apex_user', JSON.stringify(user));
-            verificarNuevoDia();
-            renderDashboard();
-            iniciarVigilante();
+            console.log('✅ Usuario autenticado:', data.user.nombre);
+            localStorage.setItem('apex_user', JSON.stringify(data.user));
+            cargarUsuario(data.user);
         } else {
-            localStorage.removeItem('apex_token');
-            localStorage.removeItem('apex_user');
-            window.location.href = 'index.html';
+            console.log('⚠️ Token no válido, pero tenemos usuario local');
+            var userLocal = JSON.parse(localStorage.getItem('apex_user') || 'null');
+            if (userLocal) {
+                cargarUsuario(userLocal);
+            } else {
+                window.location.href = 'index.html';
+            }
         }
     })
-    .catch(error => {
-        console.error('Error al verificar sesión:', error);
-        localStorage.removeItem('apex_token');
-        localStorage.removeItem('apex_user');
-        window.location.href = 'index.html';
+    .catch(function(error) {
+        console.error('❌ Error de conexión:', error);
+        var userLocal = JSON.parse(localStorage.getItem('apex_user') || 'null');
+        if (userLocal) {
+            console.log('🔄 Usando usuario local por error de conexión');
+            cargarUsuario(userLocal);
+        } else {
+            window.location.href = 'index.html';
+        }
     });
+}
+
+// ============================================================
+// CARGAR USUARIO
+// ============================================================
+function cargarUsuario(dataUser) {
+    console.log('✅ Cargando usuario:', dataUser.nombre);
+    
+    user = {
+        telefono: dataUser.telefono,
+        nombre: dataUser.nombre,
+        apellido: dataUser.apellido || '',
+        balance: dataUser.balance || 0,
+        puntos: dataUser.puntos || 0,
+        plan: dataUser.plan || 'Sin plan',
+        es_admin: dataUser.es_admin || false,
+        codigo_referido: dataUser.codigo_referido || 'APEX000',
+        polygon_address: dataUser.polygon_address || generarDireccionPolygon(),
+        direccion_retiro: dataUser.direccion_retiro || null,
+        password_retiro: dataUser.password_retiro || '000000',
+        referidos: dataUser.referidos || { izquierda: null, derecha: null, lista: [] },
+        fechas_invito: dataUser.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
+        verificado: dataUser.verificado || { izquierdaCompleto: false, derechaCompleto: false, puedeUsarCodigo: true },
+        historial: dataUser.historial || [],
+        historial_detallado: dataUser.historial_detallado || [],
+        cuenta_habilitada: dataUser.cuenta_habilitada !== undefined ? dataUser.cuenta_habilitada : true,
+        produccion_pausada: dataUser.produccion_pausada || false,
+        ruleta_usos: dataUser.ruleta_usos || 0,
+        cofres_usos: dataUser.cofres_usos || 0,
+        dados_usos: dataUser.dados_usos || 0,
+        premio_ruleta: dataUser.premio_ruleta || 0,
+        premio_cofre: dataUser.premio_cofre || 0,
+        premio_dados: dataUser.premio_dados || 0,
+        cofres_abiertos: dataUser.cofres_abiertos || [],
+        cupones_asignados: dataUser.cupones_asignados || [],
+        logros_asignados: dataUser.logros_asignados || [],
+        logros_pendientes_aprobar: dataUser.logros_pendientes_aprobar || [],
+        tareas_asignadas: dataUser.tareas_asignadas || [],
+        canjes_realizados: dataUser.canjes_realizados || [],
+        logros_reclamados: dataUser.logros_reclamados || [],
+        referidos_directos: dataUser.referidos_directos || { izquierda: null, derecha: null },
+        descuentoRetiroActivo: dataUser.descuentoRetiroActivo || null,
+        bonusReferidoActivo: dataUser.bonusReferidoActivo || null,
+        fecha_registro: dataUser.fecha_registro || new Date().toISOString(),
+        tareas_completadas_hoy: dataUser.tareas_completadas_hoy || [],
+        ultima_fecha_tareas: dataUser.ultima_fecha_tareas || null,
+        racha_dias: dataUser.racha_dias || 0,
+        daily_earnings: dataUser.daily_earnings || 0
+    };
+    
+    sessionStorage.setItem('apex_user', JSON.stringify(user));
+    renderDashboard();
+    iniciarVigilante();
 }
 
 // ============================================================
@@ -865,7 +943,6 @@ function saveUserData() {
             logros_reclamados: user.logros_reclamados || [],
             logros_pendientes_aprobar: user.logros_pendientes_aprobar || [],
             password_retiro: user.password_retiro || '000000',
-            // TAREAS DIARIAS - NUEVO
             tareas_completadas_hoy: user.tareas_completadas_hoy || [],
             ultima_fecha_tareas: user.ultima_fecha_tareas || null,
             racha_dias: user.racha_dias || 0
@@ -929,7 +1006,10 @@ function renderPerfil() {
 // RENDER DASHBOARD
 // ============================================================
 function renderDashboard() {
-    if (!user) return;
+    if (!user) {
+        console.error('❌ user es null, no se puede renderizar');
+        return;
+    }
 
     if (user.produccion_pausada) {
         document.getElementById('produccionPausada').style.display = 'block';
@@ -956,7 +1036,7 @@ function renderDashboard() {
 
     document.getElementById('userName').textContent = user.nombre + ' ' + user.apellido;
     document.getElementById('userPhone').textContent = '+51 ' + user.telefono;
-    document.getElementById('userAvatar').textContent = user.nombre[0] + user.apellido[0];
+    document.getElementById('userAvatar').textContent = user.nombre[0] + (user.apellido ? user.apellido[0] : '');
     document.getElementById('balanceAmount').textContent = '$' + Number(user.balance || 0).toFixed(2);
     document.getElementById('pointsAmount').textContent = user.puntos || 0;
     document.getElementById('walletAddress').textContent = user.polygon_address || generarDireccionPolygon();
@@ -966,7 +1046,7 @@ function renderDashboard() {
     renderTree();
     renderHistory('all');
     calcularGanancias();
-    renderTareas(); // <--- NUEVO
+    renderTareas();
     renderActividades();
     verificarAdmin();
 }
@@ -984,7 +1064,7 @@ function verificarAdmin() {
 }
 
 // ============================================================
-// RENDER TAREAS - NUEVO
+// RENDER TAREAS
 // ============================================================
 function renderTareas() {
     var container = document.getElementById('tareasContainer');
@@ -1077,10 +1157,13 @@ function renderTareas() {
 }
 
 // ============================================================
-// COMPLETAR TAREA DIARIA - NUEVO
+// COMPLETAR TAREA DIARIA
 // ============================================================
 function completarTareaDiaria(index) {
-    if (!user) return;
+    if (!user) {
+        showAlert('⚠️ Usuario no encontrado', 'danger');
+        return;
+    }
     if (user.cuenta_habilitada === false) {
         showAlert('⛔ Cuenta inhabilitada', 'danger');
         return;
@@ -1605,716 +1688,6 @@ function abrirActividad(id) {
 }
 
 // ============================================================
-// MÁQUINA DE BOLAS
-// ============================================================
-function abrirRuleta() {
-    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
-    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
-    var usos = user.ruleta_usos || 0;
-    if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
-    var premioAsignado = user.premio_ruleta || 0;
-    if (premioAsignado <= 0) { showAlert('⚠️ Sin premio asignado', 'danger'); return; }
-
-    var config = getPremiosRuleta();
-    var premios = config.premios || [10, 15, 20, 30, 50, 0];
-
-    var modal = document.createElement('div');
-    modal.id = 'ruletaModal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-    modal.innerHTML = '<div style="background:linear-gradient(145deg,#1a1a2e,#16213e);border-radius:30px;padding:30px 24px 32px;max-width:450px;width:100%;position:relative;border:2px solid #f7971e;">' +
-        '<button onclick="cerrarRuleta()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;color:#999;cursor:pointer;">✕</button>' +
-        '<h2 style="text-align:center;font-size:22px;color:#fff;">🎰 Máquina de Bolas</h2>' +
-        '<div style="text-align:center;color:#fff;font-size:14px;margin:12px 0;">Usos: <strong style="color:#f7971e;">' + usos + '</strong></div>' +
-        '<div style="position:relative;width:100%;height:200px;background:linear-gradient(180deg,#0f3460,#1a1a2e);border-radius:20px;border:2px solid #f7971e;overflow:hidden;margin-bottom:16px;">' +
-            '<div id="tuboBolas" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:60px;height:100%;display:flex;flex-direction:column-reverse;align-items:center;gap:4px;padding-bottom:10px;z-index:2;"></div>' +
-            '<div id="bolaGanadora" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:none;z-index:5;text-align:center;">' +
-                '<div style="font-size:50px;">🎱</div>' +
-                '<div style="color:#f7971e;font-size:24px;font-weight:700;">+$' + premioAsignado + '</div>' +
-            '</div>' +
-            '<div id="maquinaTexto" style="position:absolute;bottom:12px;left:0;right:0;text-align:center;color:#f7971e;font-weight:700;font-size:12px;z-index:3;">PRESIONA "SACAR BOLA"</div>' +
-        '</div>' +
-        '<button id="maquinaBtn" onclick="sacarBola()" style="background:#f7971e;color:#000;border:none;padding:14px 40px;border-radius:30px;font-size:16px;font-weight:700;cursor:pointer;width:100%;">🎱 Sacar Bola</button>' +
-        '<div id="maquinaResultado" style="text-align:center;font-size:16px;font-weight:700;color:#4db6ac;min-height:30px;margin-top:10px;"></div>' +
-    '</div>';
-    document.body.appendChild(modal);
-}
-
-function cerrarRuleta() {
-    var modal = document.getElementById('ruletaModal');
-    if (modal) modal.remove();
-    maquinaGirando = false;
-}
-
-function sacarBola() {
-    if (maquinaGirando) return;
-    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
-    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
-    var usos = user.ruleta_usos || 0;
-    if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
-
-    maquinaGirando = true;
-    var btn = document.getElementById('maquinaBtn');
-    var resultado = document.getElementById('maquinaResultado');
-    var tubo = document.getElementById('tuboBolas');
-    var bolaGanadora = document.getElementById('bolaGanadora');
-    var texto = document.getElementById('maquinaTexto');
-
-    btn.disabled = true;
-    btn.textContent = '🎱 Sacando...';
-    resultado.textContent = '';
-    bolaGanadora.style.display = 'none';
-    tubo.innerHTML = '';
-
-    var premioReal = user.premio_ruleta || 0;
-    var config = getPremiosRuleta();
-    var premiosMostrados = config.premios || [10, 15, 20, 30, 50, 0];
-
-    texto.textContent = '🔄 BOLAS CAYENDO...';
-    texto.style.color = '#4db6ac';
-
-    var bolasMostradas = 10;
-    var bolaIndex = 0;
-
-    function agregarBola() {
-        if (bolaIndex >= bolasMostradas) {
-            texto.textContent = '🎉 ¡BOLA GANADORA!';
-            texto.style.color = '#f7971e';
-            setTimeout(function() {
-                bolaGanadora.style.display = 'block';
-                user.ruleta_usos = (user.ruleta_usos || 0) - 1;
-                user.balance = (user.balance || 0) + premioReal;
-
-                if (!user.historial_detallado) user.historial_detallado = [];
-                user.historial_detallado.push({
-                    tipo: 'produccion',
-                    concepto: '🎰 Máquina de bolas',
-                    monto: premioReal,
-                    fecha: new Date().toISOString(),
-                    estado: 'completado'
-                });
-
-                saveUserData();
-                resultado.innerHTML = '🎉 ¡GANASTE! <span style="color:#f7971e;font-size:24px;">+$' + Number(premioReal).toFixed(2) + '</span>';
-                showAlert('🎉 Ganaste $' + premioReal + ' en la máquina de bolas!', 'success');
-                renderDashboard();
-                maquinaGirando = false;
-                btn.disabled = false;
-                btn.textContent = '🎱 Sacar Bola';
-                if ((user.ruleta_usos || 0) <= 0) {
-                    setTimeout(function() { cerrarRuleta(); }, 2000);
-                }
-            }, 500);
-            return;
-        }
-
-        var bola = document.createElement('div');
-        var premioAleatorio = premiosMostrados[Math.floor(Math.random() * premiosMostrados.length)];
-        var colores = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFEAA7', '#FF8A5C', '#A29BFE', '#FD79A8'];
-        var color = colores[Math.floor(Math.random() * colores.length)];
-        bola.style.cssText = 'width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 30% 30%,' + color + ',' + color + 'dd);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;box-shadow:0 4px 15px rgba(0,0,0,0.3);margin:2px 0;flex-shrink:0;';
-        bola.textContent = '$' + premioAleatorio;
-        tubo.appendChild(bola);
-        if (tubo.children.length > 8) { tubo.removeChild(tubo.children[0]); }
-        bolaIndex++;
-        setTimeout(agregarBola, 200 + Math.random() * 150);
-    }
-    agregarBola();
-}
-
-// ============================================================
-// COFRES
-// ============================================================
-function abrirCofres() {
-    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
-    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
-    var usos = user.cofres_usos || 0;
-    if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
-    var premioReal = user.premio_cofre || 0;
-    if (premioReal <= 0) { showAlert('⚠️ Sin premio asignado', 'danger'); return; }
-
-    user.cofres_abiertos = [];
-    saveUserData();
-
-    var modal = document.createElement('div');
-    modal.id = 'cofresModal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-    modal.innerHTML = '<div style="background:linear-gradient(145deg,#1a1a2e,#16213e);border-radius:30px;padding:30px 24px 32px;max-width:450px;width:100%;position:relative;border:2px solid #4db6ac;">' +
-        '<button onclick="cerrarCofres()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;color:#999;cursor:pointer;">✕</button>' +
-        '<h2 style="text-align:center;font-size:22px;color:#fff;">🎁 9 Cofres</h2>' +
-        '<div style="text-align:center;color:#fff;font-size:14px;margin:12px 0;">Usos: <strong style="color:#4db6ac;">' + usos + '</strong></div>' +
-        '<div class="cofres-grid" id="cofresGrid"></div>' +
-        '<div id="cofreResultado" style="text-align:center;font-size:18px;font-weight:700;color:#f7971e;min-height:40px;margin-top:12px;"></div>' +
-        '<button onclick="cerrarCofres()" style="background:#4db6ac;color:#000;border:none;padding:12px;border-radius:30px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;">Cerrar</button>' +
-    '</div>';
-    document.body.appendChild(modal);
-    renderCofres();
-}
-
-function renderCofres() {
-    var grid = document.getElementById('cofresGrid');
-    if (!grid) return;
-    var config = getPremiosCofres();
-    var premios = config.premios || [5, 8, 10, 12, 15, 20, 25, 30, 50];
-    var abiertos = user.cofres_abiertos || [];
-    var usos = user.cofres_usos || 0;
-    var premioReal = user.premio_cofre || 0;
-
-    var html = '';
-    for (var i = 0; i < premios.length; i++) {
-        var abierto = abiertos.indexOf(i) !== -1;
-        var puedeAbrir = usos > 0 && !abierto;
-        var color = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#FF8A5C','#A29BFE','#FD79A8'][i % 9];
-        html += '<div class="cofre-item ' + (abierto ? 'abierto' : '') + (!puedeAbrir && !abierto ? ' bloqueado' : '') + '" ' +
-                'onclick="' + (puedeAbrir ? 'abrirCofre(' + i + ')' : '') + '" ' +
-                'style="' + (abierto ? '' : 'border-color: ' + color + ';') + '">' +
-            '<span class="icono">' + (abierto ? '✨' : '🎁') + '</span>' +
-            '<span class="numero">Cofre ' + (i+1) + '</span>' +
-            (abierto ? '<div class="cofre-resultado">+$' + premioReal + '</div>' : '') +
-        '</div>';
-    }
-    grid.innerHTML = html;
-}
-
-function abrirCofre(index) {
-    if (abriendoCofre) return;
-    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
-    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
-    var usos = user.cofres_usos || 0;
-    if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
-    var abiertos = user.cofres_abiertos || [];
-    if (abiertos.indexOf(index) !== -1) { showAlert('⚠️ Ya abierto', 'warning'); return; }
-
-    abriendoCofre = true;
-    var premioReal = user.premio_cofre || 0;
-
-    user.cofres_abiertos.push(index);
-    user.cofres_usos = (user.cofres_usos || 0) - 1;
-    user.balance = (user.balance || 0) + premioReal;
-
-    if (!user.historial_detallado) user.historial_detallado = [];
-    user.historial_detallado.push({
-        tipo: 'produccion',
-        concepto: '🎁 Cofre ' + (index+1),
-        monto: premioReal,
-        fecha: new Date().toISOString(),
-        estado: 'completado'
-    });
-
-    saveUserData();
-    showAlert('🎉 Ganaste $' + premioReal + ' del cofre!', 'success');
-    renderCofres();
-    renderDashboard();
-
-    var resultado = document.getElementById('cofreResultado');
-    if (resultado) resultado.innerHTML = '🎉 +$' + premioReal + ' del cofre ' + (index+1) + '!';
-
-    if ((user.cofres_usos || 0) <= 0) {
-        setTimeout(function() { cerrarCofres(); }, 2000);
-    }
-    setTimeout(function() { abriendoCofre = false; }, 1000);
-}
-
-function cerrarCofres() {
-    var modal = document.getElementById('cofresModal');
-    if (modal) modal.remove();
-    abriendoCofre = false;
-}
-
-// ============================================================
-// DADOS
-// ============================================================
-function abrirDados() {
-    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
-    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
-    var usos = user.dados_usos || 0;
-    if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
-    var premioReal = user.premio_dados || 0;
-    if (premioReal <= 0) { showAlert('⚠️ Sin premio asignado', 'danger'); return; }
-
-    var modal = document.createElement('div');
-    modal.id = 'dadosModal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-    modal.innerHTML = '<div style="background:linear-gradient(145deg,#1a1a2e,#16213e);border-radius:30px;padding:30px 24px 32px;max-width:400px;width:100%;text-align:center;position:relative;border:2px solid #f7971e;">' +
-        '<button onclick="cerrarDados()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;color:#999;cursor:pointer;">✕</button>' +
-        '<h2 style="font-size:24px;color:#fff;">🎲 Dados</h2>' +
-        '<div style="color:#fff;font-size:14px;margin:12px 0;">Usos: <strong style="color:#f7971e;">' + usos + '</strong></div>' +
-        '<div id="dadoContainer" style="font-size:80px;margin:20px 0;padding:20px;background:rgba(255,255,255,0.05);border-radius:20px;border:2px solid #333;min-height:120px;display:flex;align-items:center;justify-content:center;">' +
-            '<span id="dadoDisplay" style="font-size:80px;">🎲</span>' +
-        '</div>' +
-        '<button id="lanzarDadoBtn" onclick="lanzarDado()" style="background:#f7971e;color:#000;border:none;padding:14px 40px;border-radius:30px;font-size:16px;font-weight:700;cursor:pointer;width:100%;">🎲 Lanzar Dado</button>' +
-        '<div id="dadoResultado" style="font-size:18px;font-weight:700;color:#4db6ac;min-height:40px;margin-top:12px;"></div>' +
-    '</div>';
-    document.body.appendChild(modal);
-}
-
-function cerrarDados() {
-    var modal = document.getElementById('dadosModal');
-    if (modal) modal.remove();
-    dadosGirando = false;
-}
-
-function lanzarDado() {
-    if (dadosGirando) return;
-    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
-    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
-    var usos = user.dados_usos || 0;
-    if (usos <= 0) { showAlert('⛔ Sin usos', 'danger'); return; }
-
-    var premioReal = user.premio_dados || 0;
-
-    dadosGirando = true;
-    var btn = document.getElementById('lanzarDadoBtn');
-    var display = document.getElementById('dadoDisplay');
-    var resultado = document.getElementById('dadoResultado');
-
-    btn.disabled = true;
-    btn.textContent = '🎲 Girando...';
-    resultado.textContent = '';
-
-    var numeroGanador = Math.min(6, Math.max(1, premioReal));
-    var carasDado = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-    var giros = 0;
-    var maxGiros = 10 + Math.floor(Math.random() * 6);
-
-    var interval = setInterval(function() {
-        var num = Math.floor(Math.random() * 6) + 1;
-        display.textContent = carasDado[num - 1];
-        giros++;
-        if (giros >= maxGiros) {
-            clearInterval(interval);
-            display.textContent = carasDado[numeroGanador - 1];
-
-            user.dados_usos = (user.dados_usos || 0) - 1;
-            user.balance = (user.balance || 0) + premioReal;
-
-            if (!user.historial_detallado) user.historial_detallado = [];
-            user.historial_detallado.push({
-                tipo: 'produccion',
-                concepto: '🎲 Dados',
-                monto: premioReal,
-                fecha: new Date().toISOString(),
-                estado: 'completado'
-            });
-
-            saveUserData();
-            resultado.innerHTML = '🎉 ¡Sacaste <strong style="color:#f7971e;font-size:28px;">' + numeroGanador + '</strong>! +$' + premioReal;
-            showAlert('🎉 Ganaste $' + premioReal + ' en dados!', 'success');
-            renderDashboard();
-
-            if ((user.dados_usos || 0) <= 0) {
-                btn.textContent = '🎲 Sin usos';
-                btn.disabled = true;
-                setTimeout(function() { cerrarDados(); }, 2000);
-            } else {
-                btn.disabled = false;
-                btn.textContent = '🎲 Lanzar Dado';
-            }
-            dadosGirando = false;
-        }
-    }, 150);
-}
-
-// ============================================================
-// CUPONES
-// ============================================================
-function abrirCupones() {
-    var cupones = user.cupones_asignados || [];
-    var disponibles = cupones.filter(function(c) { return !c.usado; });
-
-    if (disponibles.length === 0) {
-        showAlert('⛔ No tienes cupones disponibles.', 'danger');
-        return;
-    }
-
-    var modal = document.createElement('div');
-    modal.id = 'cuponesModal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-    var html = '<div style="background:#ffffff;border-radius:20px;padding:24px;max-width:450px;width:100%;max-height:90vh;overflow-y:auto;position:relative;">' +
-        '<button onclick="cerrarCupones()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:#999;">✕</button>' +
-        '<h2 style="margin-bottom:12px;">🎫 Mis Cupones</h2>' +
-        '<p style="font-size:12px;color:#666;margin-bottom:12px;">Selecciona un cupón para activarlo</p>';
-
-    for (var i = 0; i < cupones.length; i++) {
-        var c = cupones[i];
-        var tipoLabel = c.tipo === 'descuento_retiro' ? '🔽 Descuento Retiro' : c.tipo === 'bonus_referido' ? '👥 Bono Referido' : '💰 Bono Depósito';
-        var usado = c.usado || false;
-        
-        html += '<div class="cupon-modal-item" style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid ' + (usado ? '#e0e0e0' : '#4db6ac') + ';' + (usado ? 'opacity:0.5;' : 'cursor:pointer;') + '" onclick="' + (!usado ? 'activarCupon(' + i + ')' : '') + '">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                '<span style="font-weight:600;">' + (c.titulo || 'Cupón') + '</span>' +
-                '<span style="color:' + (usado ? '#999' : '#4db6ac') + ';font-weight:600;font-size:11px;">' + (usado ? '✅ USADO' : '🔓 ACTIVAR') + '</span>' +
-            '</div>' +
-            '<div style="font-size:12px;color:#666;margin-top:4px;">' + (c.descripcion || '') + '</div>' +
-            '<div style="font-size:11px;color:#999;margin-top:4px;">' + tipoLabel + ' · <strong>' + c.valor + '%</strong></div>' +
-            (usado ? '<div style="font-size:10px;color:#999;margin-top:4px;">Usado: ' + formatDate(c.fechaUso) + '</div>' : '') +
-        '</div>';
-    }
-
-    html += '<button onclick="cerrarCupones()" style="width:100%;padding:12px;background:#000;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;margin-top:8px;">Cerrar</button></div>';
-    modal.innerHTML = html;
-    document.body.appendChild(modal);
-}
-
-function cerrarCupones() {
-    var modal = document.getElementById('cuponesModal');
-    if (modal) modal.remove();
-}
-
-function activarCupon(index) {
-    var cupones = user.cupones_asignados || [];
-    if (index >= cupones.length) return;
-    if (cupones[index].usado) { showAlert('⚠️ Este cupón ya fue usado', 'warning'); return; }
-
-    var cupon = cupones[index];
-    var tipo = cupon.tipo || 'descuento_retiro';
-    var valor = cupon.valor || 0;
-
-    switch (tipo) {
-        case 'descuento_retiro':
-            user.descuentoRetiroActivo = {
-                porcentaje: valor,
-                expiracion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                cuponUsado: cupon.id
-            };
-            showAlert('✅ Descuento del ' + valor + '% en tu próxima comisión de retiro activado. Válido por 7 días.', 'success');
-            break;
-        case 'puntos_extra':
-            user.puntos = (user.puntos || 0) + valor;
-            showAlert('✅ Has recibido ' + valor + ' puntos extra!', 'success');
-            break;
-        case 'usdt_extra':
-            user.balance = (user.balance || 0) + valor;
-            showAlert('✅ Has recibido $' + valor.toFixed(2) + ' USDT extra!', 'success');
-            break;
-        default:
-            showAlert('⚠️ Tipo de cupón no reconocido', 'danger');
-            return;
-    }
-
-    cupon.usado = true;
-    cupon.fechaUso = new Date().toISOString();
-    user.cupones_asignados[index] = cupon;
-    
-    saveUserData();
-    renderDashboard();
-    cerrarCupones();
-}
-
-// ============================================================
-// TAREAS ASIGNADAS (Modal)
-// ============================================================
-function abrirTareasAsignadas() {
-    var tareasAsignadas = user.tareas_asignadas || [];
-
-    var modal = document.createElement('div');
-    modal.id = 'tareasModal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-    var html = '<div style="background:#ffffff;border-radius:20px;padding:24px;max-width:450px;width:100%;max-height:90vh;overflow-y:auto;position:relative;">' +
-        '<button onclick="cerrarTareas()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:#999;">✕</button>' +
-        '<h2 style="margin-bottom:12px;">📋 Mis Tareas</h2>';
-
-    if (tareasAsignadas.length === 0) {
-        html += '<div style="text-align:center;color:#999;padding:20px;">No tienes tareas asignadas</div>';
-    } else {
-        for (var i = 0; i < tareasAsignadas.length; i++) {
-            var t = tareasAsignadas[i];
-            var estadoColor = '#f7971e';
-            var estadoTexto = '⏳ Pendiente';
-            if (t.estado === 'completada') { estadoColor = '#4db6ac'; estadoTexto = '📤 En revisión'; }
-            else if (t.estado === 'aprobada') { estadoColor = '#4db6ac'; estadoTexto = '✅ Aprobada'; }
-            else if (t.estado === 'rechazada') { estadoColor = '#ef5350'; estadoTexto = '❌ Rechazada'; }
-
-            var boton = '';
-            if (t.estado === 'pendiente') {
-                boton = '<button onclick="completarTareaAsignada(' + i + ')" style="margin-top:8px;padding:6px 16px;background:#000;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;">📤 Subir comprobante</button>';
-            }
-
-            html += '<div style="background:#f8f9fa;border-radius:12px;padding:14px;margin-bottom:10px;border-left:4px solid ' + estadoColor + ';">' +
-                '<div style="display:flex;justify-content:space-between;">' +
-                    '<div><strong>' + (t.tareaNombre || 'Tarea') + '</strong><div style="font-size:12px;color:#666;">' + (t.tareaDescripcion || '') + '</div></div>' +
-                    '<div style="color:' + estadoColor + ';font-weight:600;font-size:12px;">' + estadoTexto + '</div>' +
-                '</div>' +
-                (t.comprobante ? '<div style="font-size:11px;color:#4db6ac;margin-top:4px;">📎 Comprobante enviado</div>' : '') +
-                boton +
-            '</div>';
-        }
-    }
-
-    html += '<button onclick="cerrarTareas()" style="width:100%;padding:12px;background:#000;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;margin-top:8px;">Cerrar</button></div>';
-    modal.innerHTML = html;
-    document.body.appendChild(modal);
-}
-
-function cerrarTareas() {
-    var modal = document.getElementById('tareasModal');
-    if (modal) modal.remove();
-}
-
-function completarTareaAsignada(index) {
-    var comprobante = prompt('📤 Sube tu comprobante (enlace o descripción):');
-    if (!comprobante) return;
-    if (!confirm('¿Confirmas que has completado la tarea?')) return;
-
-    var tareas = user.tareas_asignadas || [];
-    if (index >= tareas.length) return;
-    tareas[index].estado = 'completada';
-    tareas[index].comprobante = comprobante;
-    tareas[index].fechaCompletado = new Date().toISOString();
-    user.tareas_asignadas = tareas;
-    saveUserData();
-    cerrarTareas();
-    showAlert('✅ Comprobante enviado. Espera aprobación.', 'success');
-    renderDashboard();
-}
-
-// ============================================================
-// PUNTOS Y CANJES
-// ============================================================
-function abrirPuntos() {
-    var canjes = getCanjes();
-    var canjesActivos = canjes.filter(function(c) { return c.activo === true; });
-
-    var modal = document.createElement('div');
-    modal.id = 'puntosModal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-    var html = '<div style="background:#ffffff;border-radius:20px;padding:24px;max-width:450px;width:100%;max-height:90vh;overflow-y:auto;position:relative;">' +
-        '<button onclick="cerrarPuntos()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:#999;">✕</button>' +
-        '<h2 style="margin-bottom:12px;">⭐ Mis Puntos</h2>' +
-        '<div style="text-align:center;padding:16px 0;border-bottom:1px solid #e0e0e0;margin-bottom:16px;">' +
-            '<div style="font-size:48px;font-weight:700;color:#f7971e;">' + (user.puntos || 0) + '</div>' +
-            '<div style="font-size:14px;color:#666;">Puntos disponibles</div>' +
-        '</div>';
-
-    if (canjesActivos.length === 0) {
-        html += '<div style="text-align:center;color:#999;padding:20px;">No hay canjes disponibles.</div>';
-    } else {
-        for (var i = 0; i < canjesActivos.length; i++) {
-            var c = canjesActivos[i];
-            var puede = (user.puntos || 0) >= c.costoPuntos;
-            html += '<div style="background:#f8f9fa;border-radius:12px;padding:16px;margin-bottom:10px;border:1px solid ' + (puede ? '#4db6ac' : '#e0e0e0') + ';">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;">' +
-                    '<div><div style="font-weight:600;font-size:16px;">💵 ' + c.nombre + '</div>' +
-                    '<div style="font-size:12px;color:#666;">' + c.descripcion + '</div>' +
-                    '<div style="font-size:11px;color:#999;">💰 <strong style="color:#f7971e;">' + c.montoUSDT + ' USDT</strong> · ⭐ <strong>' + c.costoPuntos + ' pts</strong></div></div>' +
-                    '<button ' + (puede ? 'onclick="solicitarCanje(\'' + c.id + '\')"' : 'disabled') + ' style="' + (puede ? 'background:#4db6ac;color:#fff;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-weight:600;' : 'background:#f5f5f5;color:#ccc;border:1px solid #e0e0e0;padding:10px 20px;border-radius:10px;cursor:not-allowed;font-weight:600;') + '">' +
-                        (puede ? '🎯 Canjear' : '🔒 Insuficiente') +
-                    '</button>' +
-                '</div>' +
-            '</div>';
-        }
-    }
-
-    html += '<button onclick="cerrarPuntos()" style="width:100%;padding:12px;background:#000;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:600;margin-top:8px;">Cerrar</button></div>';
-    modal.innerHTML = html;
-    document.body.appendChild(modal);
-}
-
-function cerrarPuntos() {
-    var modal = document.getElementById('puntosModal');
-    if (modal) modal.remove();
-}
-
-function solicitarCanje(canjeId) {
-    if (user.cuenta_habilitada === false) { showAlert('⛔ Cuenta inhabilitada', 'danger'); return; }
-    if (user.produccion_pausada) { showAlert('⛔ Producción pausada', 'danger'); return; }
-    var canjes = getCanjes();
-    var canje = null;
-    for (var i = 0; i < canjes.length; i++) {
-        if (canjes[i].id === canjeId) { canje = canjes[i]; break; }
-    }
-    if (!canje || !canje.activo) { showAlert('⚠️ Canje no disponible', 'danger'); return; }
-    if ((user.puntos || 0) < canje.costoPuntos) { showAlert('⚠️ Puntos insuficientes', 'danger'); return; }
-    if (!user.direccion_retiro) { showAlert('⚠️ Configura dirección de retiro', 'warning'); return; }
-
-    if (!confirm('¿Canjear ' + canje.costoPuntos + ' puntos por $' + canje.montoUSDT + ' USDT?')) return;
-
-    user.puntos = (user.puntos || 0) - canje.costoPuntos;
-    
-    if (!user.canjes_realizados) user.canjes_realizados = [];
-    user.canjes_realizados.push({
-        canjeId: canje.id,
-        nombre: canje.nombre,
-        montoUSDT: canje.montoUSDT,
-        costoPuntos: canje.costoPuntos,
-        estado: 'pendiente',
-        fecha: new Date().toISOString(),
-        direccionRetiro: user.direccion_retiro
-    });
-
-    if (!user.historial_detallado) user.historial_detallado = [];
-    user.historial_detallado.push({
-        tipo: 'canje',
-        concepto: '🔄 Canje de ' + canje.costoPuntos + ' pts → $' + canje.montoUSDT + ' USDT',
-        monto: canje.montoUSDT,
-        puntos: -canje.costoPuntos,
-        fecha: new Date().toISOString(),
-        estado: 'pendiente'
-    });
-
-    saveUserData();
-    cerrarPuntos();
-    renderDashboard();
-    showAlert('✅ Solicitud de canje enviada!', 'success');
-}
-
-// ============================================================
-// LOGROS
-// ============================================================
-function abrirLogros() {
-    var logros = getLogrosSistema();
-    if (logros.length === 0) {
-        showAlert('⚠️ No hay logros disponibles.', 'warning');
-        return;
-    }
-
-    var logrosAsignados = user.logros_asignados || [];
-
-    var modal = document.createElement('div');
-    modal.id = 'logrosModal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;';
-    var html = '<div style="background:linear-gradient(145deg,#1a1a2e,#16213e);border-radius:30px;padding:30px 24px 32px;max-width:450px;width:100%;max-height:90vh;overflow-y:auto;position:relative;border:2px solid #f7971e;">' +
-        '<button onclick="cerrarLogros()" style="position:absolute;top:12px;right:16px;background:none;border:none;font-size:24px;color:#999;cursor:pointer;">✕</button>' +
-        '<h2 style="text-align:center;font-size:22px;color:#fff;">🏆 Mis Logros</h2>';
-
-    var logrosMostrados = 0;
-    for (var i = 0; i < logros.length; i++) {
-        var l = logros[i];
-        var reclamado = user.logros_reclamados && user.logros_reclamados.indexOf(l.id) !== -1;
-        var asignado = logrosAsignados.indexOf(l.id) !== -1;
-
-        if (!asignado && !reclamado) continue;
-
-        logrosMostrados++;
-        var progreso = 0;
-        var total = 0;
-        if (l.tipo === 'referidos') {
-            total = (user.referidos && user.referidos.lista) ? user.referidos.lista.length : 0;
-        } else if (l.tipo === 'ganancias') {
-            var historial = user.historial || [];
-            for (var h = 0; h < historial.length; h++) {
-                if (historial[h].type === 'ganancia' || historial[h].tipo === 'produccion') {
-                    total += historial[h].amount || historial[h].monto || 0;
-                }
-            }
-        } else if (l.tipo === 'depositos') {
-            var historial = user.historial || [];
-            for (var h = 0; h < historial.length; h++) {
-                if (historial[h].type === 'deposito' || historial[h].tipo === 'deposito') {
-                    total += historial[h].amount || historial[h].monto || 0;
-                }
-            }
-        } else if (l.tipo === 'plan') {
-            total = (user.plan && user.plan !== 'Sin plan') ? 1 : 0;
-        } else if (l.tipo === 'ruleta_usos') {
-            total = user.ruleta_usos || 0;
-        } else if (l.tipo === 'cofres_usos') {
-            total = user.cofres_usos || 0;
-        } else if (l.tipo === 'dados_usos') {
-            total = user.dados_usos || 0;
-        }
-        progreso = total;
-
-        var completado = progreso >= l.meta;
-        var porcentaje = Math.min(100, (progreso / l.meta) * 100);
-
-        var pendienteAprobar = false;
-        if (user.logros_pendientes_aprobar) {
-            for (var p = 0; p < user.logros_pendientes_aprobar.length; p++) {
-                if (user.logros_pendientes_aprobar[p].logroId === l.id && user.logros_pendientes_aprobar[p].estado === 'pendiente') {
-                    pendienteAprobar = true;
-                    break;
-                }
-            }
-        }
-
-        var colorBorde = reclamado ? '#4db6ac' : (pendienteAprobar ? '#f7971e' : (completado ? '#f7971e' : '#333'));
-        var estadoTexto = reclamado ? '✅ Reclamado' : (pendienteAprobar ? '⏳ En revisión' : (completado ? '🎯 Reclamar' : '⏳ ' + progreso + '/' + l.meta));
-        var estadoColor = reclamado ? '#4db6ac' : (pendienteAprobar ? '#f7971e' : (completado ? '#f7971e' : '#999'));
-        var recompensaTexto = l.recompensa_tipo === 'usdt' ? '$' + l.recompensa : l.recompensa + ' pts';
-
-        html += '<div style="background:rgba(255,255,255,0.05);border:2px solid ' + colorBorde + ';border-radius:16px;padding:16px;margin-bottom:10px;">' +
-            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                '<div><span style="font-size:16px;font-weight:600;color:#fff;">' + l.nombre + '</span>' +
-                (reclamado ? ' <span style="color:#4db6ac;font-size:11px;">✅ Reclamado</span>' : '') +
-                (pendienteAprobar ? ' <span style="color:#f7971e;font-size:11px;">⏳ En revisión</span>' : '') +
-                '<div style="color:#999;font-size:11px;margin-top:2px;">' + (l.descripcion || '') + '</div>' +
-                '<div style="color:#666;font-size:9px;margin-top:2px;">🎯 Meta: ' + l.meta + ' | 🏆 Recompensa: ' + recompensaTexto + '</div>' +
-                '</div>' +
-                '<div style="text-align:right;"><div style="color:#f7971e;font-weight:700;font-size:16px;">+' + recompensaTexto + '</div>' +
-                '<div style="color:' + estadoColor + ';font-size:11px;font-weight:600;">' + estadoTexto + '</div></div>' +
-            '</div>' +
-            '<div style="width:100%;height:6px;background:#2a2a2a;border-radius:10px;margin-top:8px;overflow:hidden;">' +
-                '<div style="width:' + porcentaje + '%;height:100%;background:' + (reclamado ? '#4db6ac' : (completado ? '#f7971e' : '#4db6ac')) + ';border-radius:10px;"></div>' +
-            '</div>' +
-            (completado && !reclamado && !pendienteAprobar ? '<button onclick="reclamarLogro(\'' + l.id + '\')" style="margin-top:8px;width:100%;padding:8px;background:#f7971e;color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer;">🎯 Reclamar Logro</button>' : '') +
-            (pendienteAprobar ? '<div style="margin-top:8px;font-size:11px;color:#f7971e;text-align:center;">⏳ Esperando aprobación del administrador</div>' : '') +
-        '</div>';
-    }
-
-    if (logrosMostrados === 0) {
-        html += '<div style="text-align:center;color:#999;padding:30px;">No tienes logros asignados.<br>El administrador debe asignarte logros.</div>';
-    }
-
-    html += '<button onclick="cerrarLogros()" style="background:#4db6ac;color:#000;border:none;padding:12px;border-radius:30px;font-size:14px;font-weight:700;cursor:pointer;width:100%;margin-top:8px;">Cerrar</button></div>';
-    modal.innerHTML = html;
-    document.body.appendChild(modal);
-}
-
-function cerrarLogros() {
-    var modal = document.getElementById('logrosModal');
-    if (modal) modal.remove();
-}
-
-function reclamarLogro(logroId) {
-    var logros = getLogrosSistema();
-    var logro = null;
-    for (var i = 0; i < logros.length; i++) {
-        if (logros[i].id === logroId) { logro = logros[i]; break; }
-    }
-    if (!logro) { showAlert('⚠️ Logro no encontrado', 'danger'); return; }
-    
-    if (user.logros_reclamados && user.logros_reclamados.indexOf(logro.id) !== -1) {
-        showAlert('⚠️ Ya reclamado', 'warning');
-        return;
-    }
-    
-    if (!user.logros_asignados || user.logros_asignados.indexOf(logro.id) === -1) {
-        showAlert('⚠️ Este logro no está asignado a tu cuenta', 'warning');
-        return;
-    }
-    
-    if (user.logros_pendientes_aprobar) {
-        for (var p = 0; p < user.logros_pendientes_aprobar.length; p++) {
-            if (user.logros_pendientes_aprobar[p].logroId === logroId && user.logros_pendientes_aprobar[p].estado === 'pendiente') {
-                showAlert('⚠️ Ya enviaste solicitud de aprobación para este logro', 'warning');
-                return;
-            }
-        }
-    }
-
-    var comprobante = prompt('📤 Sube tu comprobante para este logro (enlace o descripción):');
-    if (!comprobante) return;
-
-    if (!confirm('¿Confirmas que has completado el logro "' + logro.nombre + '" y quieres enviar el comprobante?')) return;
-
-    if (!user.logros_pendientes_aprobar) user.logros_pendientes_aprobar = [];
-    user.logros_pendientes_aprobar.push({
-        logroId: logro.id,
-        nombre: logro.nombre,
-        recompensa: logro.recompensa,
-        recompensa_tipo: logro.recompensa_tipo || 'puntos',
-        comprobante: comprobante,
-        estado: 'pendiente',
-        fecha: new Date().toISOString()
-    });
-
-    saveUserData();
-    cerrarLogros();
-    showAlert('✅ Comprobante enviado. Espera aprobación del administrador.', 'success');
-    renderDashboard();
-}
-
-// ============================================================
 // COPY
 // ============================================================
 function copyAddress() {
@@ -2433,7 +1806,7 @@ function iniciarVigilante() {
                 }
             }
         })
-        .catch(error => { console.log('Vigilante:', error.message); });
+        .catch(function(error) { console.log('Vigilante:', error.message); });
     }, 15000);
 }
 
