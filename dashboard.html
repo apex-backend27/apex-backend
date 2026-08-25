@@ -427,6 +427,8 @@
             <div class="tareas-grid" id="tareasContainer">
                 <div style="text-align:center;color:#999;padding:20px;">Cargando tareas...</div>
             </div>
+            <div id="cobroTareasInfo" style="text-align:center;color:#666;font-size:12px;margin-top:10px;"></div>
+            <button id="cobrarTareasBtn" class="btn-withdraw" style="display:none;margin-top:10px;" onclick="cobrarTareasDelDia()">💰 Cobrar tareas del día</button>
         </div>
 
         <div class="card card-green">
@@ -580,6 +582,9 @@ var TAREAS_CONFIG_KEY = 'apex_tareas_config';
 var TAREAS_ACTIVACION_KEY = 'apex_tareas_activacion';
 
 const API_URL = 'https://apex-backend-cj21.onrender.com';
+var tareasConfigRemota = null;
+var tareasPausadasRemoto = false;
+var tareasFechaActivacionRemota = null;
 
 var user = null;
 var maquinaGirando = false;
@@ -868,6 +873,7 @@ function cargarUsuario(dataUser) {
     
     sessionStorage.setItem('apex_user', JSON.stringify(user));
     renderDashboard();
+    cargarConfiguracionTareasRemota();
     iniciarVigilante();
 }
 
@@ -1064,6 +1070,72 @@ function verificarAdmin() {
 }
 
 // ============================================================
+// CONFIGURACIÓN REMOTA DE TAREAS
+// ============================================================
+function cargarConfiguracionTareasRemota() {
+    var token = localStorage.getItem('apex_token');
+    if (!token) return Promise.resolve();
+    return fetch(API_URL + '/api/tasks/config', {
+        headers: { 'Authorization': 'Bearer ' + token }
+    }).then(function(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+    }).then(function(data) {
+        tareasConfigRemota = Array.isArray(data.tareas) ? data.tareas : null;
+        tareasPausadasRemoto = data.pausadas === true;
+        tareasFechaActivacionRemota = data.fecha || null;
+        if (tareasConfigRemota && tareasConfigRemota.length) {
+            HORARIOS_TAREAS = tareasConfigRemota;
+        }
+        renderTareas();
+    }).catch(function(error) {
+        console.warn('No se pudo cargar la configuración remota de tareas:', error.message);
+    });
+}
+
+function actualizarEstadoBotonCobro(completadasCount) {
+    var boton = document.getElementById('cobrarTareasBtn');
+    var info = document.getElementById('cobroTareasInfo');
+    if (!boton || !info || !user) return;
+    var hoy = new Date().toISOString().slice(0, 10);
+    var yaCobro = user.cobro_tareas_fecha && String(user.cobro_tareas_fecha).slice(0, 10) === hoy;
+    var porcentaje = Math.round((completadasCount / 5) * 100);
+    if (yaCobro) {
+        boton.style.display = 'block'; boton.disabled = true; boton.textContent = '✅ Cobrado hoy';
+        info.textContent = 'Ya recibiste tu recompensa de hoy. Podrás cobrar nuevamente mañana.';
+    } else if (tareasPausadasRemoto) {
+        boton.style.display = 'block'; boton.disabled = true; boton.textContent = '⏸️ Tareas pausadas';
+        info.textContent = 'El administrador pausó las tareas temporalmente.';
+    } else if (completadasCount > 0) {
+        boton.style.display = 'block'; boton.disabled = false; boton.textContent = '💰 Cobrar ' + porcentaje + '% del plan';
+        info.textContent = 'Puedes cobrar una sola vez por las tareas completadas.';
+    } else {
+        boton.style.display = 'none'; info.textContent = 'Completa al menos una tarea para habilitar el cobro.';
+    }
+}
+
+async function cobrarTareasDelDia() {
+    var boton = document.getElementById('cobrarTareasBtn');
+    if (boton) boton.disabled = true;
+    try {
+        var token = localStorage.getItem('apex_token');
+        var response = await fetch(API_URL + '/api/user/tasks/claim', {
+            method: 'POST', headers: { 'Authorization': 'Bearer ' + token }
+        });
+        var data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'No se pudo cobrar');
+        if (data.user) {
+            localStorage.setItem('apex_user', JSON.stringify(data.user));
+            cargarUsuario(data.user);
+        }
+        showAlert('✅ Cobro realizado: +' + Number(data.recompensa || 0).toFixed(2) + ' USDT (' + data.porcentaje + '%)', 'success');
+    } catch (error) {
+        if (boton) boton.disabled = false;
+        showAlert('❌ ' + error.message, 'danger');
+    }
+}
+
+// ============================================================
 // RENDER TAREAS
 // ============================================================
 function renderTareas() {
@@ -1080,7 +1152,9 @@ function renderTareas() {
     }
 
     var activacion = JSON.parse(localStorage.getItem(TAREAS_ACTIVACION_KEY) || 'null');
-    var tareasActivas = activacion && activacion.fecha === hoy && activacion.activo === true;
+    var fechaRemota = tareasFechaActivacionRemota ? String(tareasFechaActivacionRemota).slice(0, 10) : null;
+    var tareasActivas = fechaRemota ? fechaRemota === ahora.toISOString().slice(0, 10) : (activacion && activacion.fecha === hoy && activacion.activo === true);
+    if (tareasPausadasRemoto) tareasActivas = false;
 
     var html = '';
     var completadasCount = 0;
@@ -1154,12 +1228,17 @@ function renderTareas() {
     if (porcentajeEl) porcentajeEl.textContent = porcentajePlan + '%';
     if (barraEl) barraEl.style.width = porcentaje + '%';
     if (rachaEl) rachaEl.textContent = user.racha_dias || 0;
+    actualizarEstadoBotonCobro(completadasCount);
 }
 
 // ============================================================
 // COMPLETAR TAREA DIARIA
 // ============================================================
 function completarTareaDiaria(index) {
+    if (tareasPausadasRemoto) {
+        showAlert('⏸️ Las tareas están pausadas por el administrador', 'warning');
+        return;
+    }
     if (!user) {
         showAlert('⚠️ Usuario no encontrado', 'danger');
         return;
