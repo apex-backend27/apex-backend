@@ -467,8 +467,9 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;ba
         <div class="card">
             <div class="label" style="margin-bottom:12px;">👥 Tus Referidos</div>
             <div style="margin-bottom:16px; background:#f8f9fa; border-radius:12px; padding:14px 16px; border:1px solid #e0e0e0;">
-                <div style="font-size:13px; color:#666; font-weight:600; margin-bottom:6px;">🔗 Tu Link de Referido</div>
-                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div style="font-size:13px; color:#26354d; font-weight:700; margin-bottom:6px;">🔗 Tu Link de Referido</div>
+                    <div style="font-size:12px;color:#2f4563;margin-bottom:8px;">Código: <strong id="referralCodeVisible">APEX000</strong></div>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                     <span style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;" id="referralLinkDisplay">https://apex.com/ref/APEX123</span>
                     <button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>
                 </div>
@@ -1553,15 +1554,13 @@ function renderTree() {
     var referralLink = baseUrl + 'ref/' + encodeURIComponent(codigoCanonico);
     var linkDisplay = document.getElementById('referralLinkDisplay');
     if (linkDisplay) linkDisplay.textContent = referralLink;
-    html += '<div style="margin-bottom:16px; background:#f8f9fa; border-radius:12px; padding:14px 16px; border:1px solid #e0e0e0;">';
-    html += '<div style="font-size:13px; color:#666; font-weight:600; margin-bottom:6px;">🔗 Tu Link de Referido</div>';
-    html += '<div style="font-size:12px;color:#333;margin-bottom:8px;">Código: <strong id="referralCodeCanonical">' + codigoCanonico + '</strong></div>';
-    html += '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">';
-    html += '<span style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;">' + referralLink + '</span>';
-    html += '<button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>';
-    html += '</div></div>';
+    var codeDisplay = document.getElementById('referralCodeVisible');
+    if (codeDisplay) codeDisplay.textContent = codigoCanonico;
 
     var totalReferidos = listaReferidos.length;
+    var referidosConPlanCount = listaReferidos.filter(function(x){var p=String((x&&x.plan)||'').trim().toLowerCase();return !!x&&((x.tienePlan===true)|| (p && p!=='sin plan' && p!=='null' && p!=='undefined'));}).length;
+    var planCountEl = document.getElementById('referidosConPlan');
+    if(planCountEl) planCountEl.textContent = referidosConPlanCount;
     
     html += '<div style="display:flex; gap:16px; margin-bottom:12px;">';
     html += '<div style="flex:1; background:#f5f5f5; border-radius:10px; padding:12px; text-align:center; border:1px solid #e0e0e0;">';
@@ -1572,7 +1571,7 @@ function renderTree() {
 
     if (listaReferidos.length > 0) {
         html += '<div style="margin-top:12px;">';
-        html += '<div style="font-size:14px; font-weight:600; color:#333; margin-bottom:10px;">📋 Tus Referidos</div>';
+            html += '<div style="font-size:14px; font-weight:700; color:#243957; margin-bottom:10px;">📋 Tus Referidos</div>';
         html += '<div style="display:flex; flex-direction:column; gap:6px;">';
         
         for (var i = 0; i < listaReferidos.length; i++) {
@@ -1598,21 +1597,19 @@ function renderTree() {
                 }
             }
             
-            var colorFondo = tienePlan ? '#e8f5e9' : '#f8f9fa';
-            var borderColor = tienePlan ? '#4db6ac' : '#e0e0e0';
+                    var colorFondo = tienePlan ? '#e8fff4' : '#f5f7fb';
+            var borderColor = tienePlan ? '#20b486' : '#9aaac0';
             var fechaRegistro = ref.date || new Date().toISOString();
             var fechaFormateada = formatDate(fechaRegistro);
             
             html += '<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; background:' + colorFondo + '; border:1px solid ' + borderColor + '; border-radius:8px; padding:10px 14px; gap:6px;">';
             html += '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">';
             html += '<span style="font-weight:600; color:#333; font-size:13px;">#' + (i + 1) + '</span>';
-            html += '<span style="font-weight:600; color:#333;">' + (ref.nombre || ref.id) + '</span>';
-            html += '<span style="font-size:11px; color:#999;">📱 ' + ref.id + '</span>';
-            html += '<span style="font-size:10px; color:#999;">📅 ' + fechaFormateada + '</span>';
+            html += '<span style="font-weight:700; color:#1a2740;">' + (ref.nombre || ref.id) + '</span>';
+            html += '<span style="font-size:11px; color:#46617f;">📱 ' + ref.id + '</span>';
+            html += '<span style="font-size:10px; color:#59708e;">📅 ' + fechaFormateada + '</span>';
             html += '</div>';
-            if (tienePlan) {
-                html += '<span style="font-size:11px; color:#4db6ac; font-weight:500;">' + planNombre + '</span>';
-            }
+            html += '<span style="font-size:11px; color:' + (tienePlan ? '#087f5b' : '#52637a') + '; font-weight:700; background:' + (tienePlan ? '#c9f7e3' : '#e1e7f0') + '; padding:5px 9px; border-radius:999px;">' + (tienePlan ? '✅ Plan: ' + planNombre : '⚪ Sin plan') + '</span>';
             html += '</div>';
         }
         
