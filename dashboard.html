@@ -566,7 +566,8 @@ function inicializarTareasPorDefecto() {
     // Activar tareas de hoy si no están activadas
     var hoy = new Date().toDateString();
     var activacion = JSON.parse(localStorage.getItem(TAREAS_ACTIVACION_KEY) || 'null');
-    if (!activacion || activacion.fecha !== hoy || activacion.activo !== true) {
+    var activacionRemotaValida = tareasFechaActivacionRemota && String(tareasFechaActivacionRemota).slice(0, 10) === new Date().toISOString().slice(0, 10) && !tareasPausadasRemoto;
+    if (!activacionRemotaValida && (!activacion || activacion.fecha !== hoy || activacion.activo !== true)) {
         console.log('🔄 Activando tareas para hoy...');
         localStorage.setItem(TAREAS_ACTIVACION_KEY, JSON.stringify({
             fecha: hoy,
@@ -744,9 +745,9 @@ function getCostoUpgrade(planName) {
 function getNivelAutorizado() {
     var niveles = getNiveles();
     if (niveles[user.telefono]) {
-        return niveles[user.telefono].nivelAutorizado || 0;
+        return Number(user.nivel_autorizado ?? niveles[user.telefono].nivelAutorizado ?? 0);
     }
-    return 0;
+    return Number(user.nivel_autorizado || 0);
 }
 
 // ============================================================
@@ -2042,5 +2043,41 @@ window.addEventListener('load', function() {
     }, 300);
 });
 </script>
+
+<script>
+// APEX: actividades utilizables y modales de prueba
+function apexModal(title, body) {
+  var old=document.getElementById('apexActionModal'); if(old) old.remove();
+  var el=document.createElement('div'); el.id='apexActionModal'; el.className='modal-overlay show';
+  el.innerHTML='<div class="modal" style="max-width:520px"><button class="modal-close" onclick="document.getElementById(\'apexActionModal\').remove()">×</button><h2 style="margin:0 0 16px">'+title+'</h2><div>'+body+'</div></div>';
+  document.body.appendChild(el); return el;
+}
+function apexPersist(){ if(typeof saveUserData==='function') saveUserData(); if(typeof renderDashboard==='function') renderDashboard(); if(typeof renderActividades==='function') renderActividades(); }
+function premioAleatorio(values){ return Number(values[Math.floor(Math.random()*values.length)]||0); }
+function abrirRuleta(){
+  if(!user || Number(user.ruleta_usos||0)<=0){showAlert('🎰 No tienes usos disponibles','warning');return;}
+  var cfg=getPremiosRuleta(), modal=apexModal('🎰 Máquina de Bolas','<p>Usos disponibles: <strong>'+user.ruleta_usos+'</strong></p><button class="btn-action" id="apexSpin">Girar ruleta</button>');
+  document.getElementById('apexSpin').onclick=function(){var p=premioAleatorio(cfg.premios||[0]);user.ruleta_usos--;user.premio_ruleta=Number(user.premio_ruleta||0)+p;user.balance=Number(user.balance||0)+p;apexPersist();modal.remove();showAlert('🎉 Premio obtenido: $'+p.toFixed(2),'success');};
+}
+function abrirCofres(){
+  if(!user || Number(user.cofres_usos||0)<=0){showAlert('🎁 No tienes usos disponibles','warning');return;}
+  var cfg=getPremiosCofres(), modal=apexModal('🎁 Elige un cofre','<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'+(cfg.premios||[]).map(function(_,i){return '<button class="btn-action apex-chest" data-i="'+i+'">Cofre '+(i+1)+'</button>';}).join('')+'</div>');
+  modal.querySelectorAll('.apex-chest').forEach(function(btn){btn.onclick=function(){var p=Number((cfg.premios||[])[Number(btn.dataset.i)]||0);user.cofres_usos--;user.cofres_abiertos=user.cofres_abiertos||[];user.cofres_abiertos.push(Number(btn.dataset.i));user.premio_cofre=Number(user.premio_cofre||0)+p;user.balance=Number(user.balance||0)+p;apexPersist();modal.remove();showAlert('🎉 Cofre abierto: $'+p.toFixed(2),'success');};});
+}
+function abrirDados(){
+  if(!user || Number(user.dados_usos||0)<=0){showAlert('🎲 No tienes usos disponibles','warning');return;}
+  var cfg=getPremiosDados(), modal=apexModal('🎲 Dados','<p>Lanza el dado para obtener tu premio.</p><button class="btn-action" id="apexDice">Lanzar dado</button>');
+  document.getElementById('apexDice').onclick=function(){var p=premioAleatorio(cfg.premios||[0,0,0,0,0,0]);user.dados_usos--;user.premio_dados=Number(user.premio_dados||0)+p;user.balance=Number(user.balance||0)+p;apexPersist();modal.remove();showAlert('🎉 Resultado: $'+p.toFixed(2),'success');};
+}
+function abrirTareasAsignadas(){
+  var ts=Array.isArray(user.tareas_asignadas)?user.tareas_asignadas:[];
+  var modal=apexModal('📋 Actividades asignadas',ts.length?ts.map(function(t,i){var done=t.estado==='completada'||t.completada;return '<div style="padding:12px;border:1px solid var(--fx-line);border-radius:12px;margin:8px 0"><strong>'+(t.nombre||t.titulo||'Actividad '+(i+1))+'</strong><p>'+(t.descripcion||'')+'</p><button class="btn-action apex-assigned" data-i="'+i+'" '+(done?'disabled':'')+'>'+(done?'✅ Completada':'▶️ Usar actividad')+'</button></div>';}).join(''):'<p>No tienes actividades asignadas.</p>');
+  modal.querySelectorAll('.apex-assigned').forEach(function(btn){btn.onclick=function(){var i=Number(btn.dataset.i);user.tareas_asignadas[i].estado='completada';user.tareas_asignadas[i].completada=true;apexPersist();modal.remove();showAlert('✅ Actividad completada y enviada al admin','success');};});
+}
+function abrirCupones(){var cs=Array.isArray(user.cupones_asignados)?user.cupones_asignados:[];apexModal('🎫 Mis cupones',cs.length?cs.map(function(c){return '<p>🎫 '+(c.nombre||c.codigo||'Cupón')+' — '+(c.usado?'Usado':'Disponible')+'</p>';}).join(''):'<p>No tienes cupones asignados.</p>');}
+function abrirPuntos(){apexModal('⭐ Mis puntos','<p>Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p><p>El canje se procesa desde el módulo de canjes.</p>');}
+function abrirLogros(){var ls=Array.isArray(user.logros_asignados)?user.logros_asignados:[];apexModal('🏆 Mis logros',ls.length?ls.map(function(l){return '<p>🏆 '+(l.nombre||l.titulo||'Logro')+'</p>';}).join(''):'<p>No tienes logros asignados.</p>');}
+</script>
+
 </body>
 </html>

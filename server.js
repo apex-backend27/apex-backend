@@ -358,7 +358,9 @@ app.get('/api/verify', authenticate, async (req, res) => {
                 daily_earnings: Number(userData.daily_earnings || 0),
                 cuenta_habilitada: userData.cuenta_habilitada !== false,
                 produccion_pausada: userData.produccion_pausada || false,
-                password_retiro: userData.password_retiro_hash || '000000',
+                password_retiro: userData.password_retiro || userData.password_retiro_hash || '000000',
+                username: userData.username || null,
+                nivel_autorizado: Number(userData.nivel_autorizado || 0),
                 direccion_retiro: userData.direccion_retiro || null,
                 // ✅ ESTOS SON LOS CAMPOS IMPORTANTES
                 codigos_usados_hoy: Number(userData.codigos_usados_hoy || 0),
@@ -500,6 +502,10 @@ app.put('/api/user/update', async (req, res) => {
                 plan: userData.plan || 'Sin plan',
                 plan_amount: Number(userData.plan_amount || 0),
                 daily_earnings: Number(userData.daily_earnings || 0),
+                username: userData.username || null,
+                password_retiro: userData.password_retiro || userData.password_retiro_hash || '000000',
+                direccion_retiro: userData.direccion_retiro || null,
+                nivel_autorizado: Number(userData.nivel_autorizado || 0),
                 cuenta_habilitada: userData.cuenta_habilitada,
                 produccion_pausada: userData.produccion_pausada || false,
                 
@@ -857,6 +863,7 @@ app.put('/api/admin/user/:id', async (req, res) => {
                 'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
                 'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto', 'historial',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
+                'nombre', 'apellido', 'username', 'password', 'password_retiro', 'plan_amount', 'daily_earnings',
                 'es_admin', 'es_super_admin'];
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
@@ -877,7 +884,8 @@ app.put('/api/admin/user/:id', async (req, res) => {
         const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
         
         const result = await pool.query(query, values);
-        res.json({ message: 'Usuario actualizado', user: result.rows[0] });
+        const savedUser = result.rows[0];
+        res.json({ message: 'Usuario actualizado', user: savedUser });
         
     } catch (error) {
         console.error('Error al actualizar usuario:', error);

@@ -6684,5 +6684,33 @@ async function toggleProduccion(telefono) {
 }
 </script>
 
+
+<script>
+// APEX: autorización de plan persistida en el backend
+async function autorizarNivel(telefono, autorizar){
+  var lista=getUsers(), u=lista.find(function(x){return x.telefono===telefono;}), token=localStorage.getItem('apex_token');
+  if(!u||!u.id||!token){showAlert('⚠️ Usuario o sesión no encontrados','danger');return;}
+  var actual=getIndicePlan(u.plan||'Sin plan'), nivel=autorizar?actual+1:actual;
+  try{var r=await fetch(API_URL+'/api/admin/user/'+u.id+'/authorize-plan',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({level:nivel})});var data=await r.json();if(!r.ok||data.error)throw new Error(data.error||'Error del servidor');u.nivel_autorizado=nivel;saveUsers(lista);users=lista;showAlert(autorizar?'✅ Autorización guardada en el servidor':'🔒 Autorización removida','success');renderNiveles();renderUsuarios();renderUsuariosActivos();}catch(e){showAlert('❌ '+e.message,'danger');}
+}
+</script>
+
+
+<script>
+// APEX: controles manuales para probar tareas sin esperar el horario
+async function guardarConfigTareasRemota(fecha, pausadas){
+  var token=localStorage.getItem('apex_token');
+  var tareas=typeof getTareas==='function'?getTareas():[];
+  var r=await fetch(API_URL+'/api/admin/tasks/config',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({tareas:tareas,fecha:fecha,pausadas:pausadas})});
+  var data=await r.json(); if(!r.ok||data.error)throw new Error(data.error||'No se pudo guardar la configuración'); return data;
+}
+async function activarTareasDiarias(){
+  try{var now=new Date();var iso=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString();await guardarConfigTareasRemota(iso,false);localStorage.setItem('apex_tareas_activacion',JSON.stringify({fecha:now.toDateString(),activo:true}));showAlert('✅ Tareas activadas inmediatamente para pruebas','success');if(typeof actualizarEstadoActivacionTareas==='function')actualizarEstadoActivacionTareas();}catch(e){showAlert('❌ '+e.message,'danger');}
+}
+async function resetearTareasHoy(){
+  try{await guardarConfigTareasRemota(null,true);showAlert('⏸️ Tareas desactivadas/pausadas para todos','warning');if(typeof actualizarEstadoActivacionTareas==='function')actualizarEstadoActivacionTareas();}catch(e){showAlert('❌ '+e.message,'danger');}
+}
+</script>
+
 </body>
 </html>
