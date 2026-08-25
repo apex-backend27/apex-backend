@@ -2172,5 +2172,40 @@ function renderTareas(){var c=document.getElementById('tareasContainer');if(!c)r
 function completarTareaDiaria(index){if(!apexTienePlan()){showAlert('🔒 Primero debes adquirir un plan activo para realizar tareas','warning');return}if(tareasPausadasRemoto){showAlert('⏸️ Las tareas están pausadas por el administrador','warning');return}var tareas=apexConfigTareas(),t=tareas[index]||{};if(t.sin_horario){if(user.tarea_manual_completada_hoy){showAlert('⚠️ Ya completaste esta tarea','warning');return}user.tarea_manual_completada_hoy=true}else{var comp=Array.isArray(user.tareas_completadas_hoy)?user.tareas_completadas_hoy:[];if(comp.indexOf(index)!==-1){showAlert('⚠️ Ya completaste esta tarea','warning');return}comp.push(index);user.tareas_completadas_hoy=comp}user.ultima_fecha_tareas=new Date().toDateString();if(typeof apexPersist==='function')apexPersist();else if(typeof saveUserData==='function')saveUserData();renderTareas();showAlert('✅ Tarea completada','success')}
 </script><script id="apex-v13-remote-task-toggle">
 function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_token');if(!tok)return Promise.resolve();return fetch(API_URL+'/api/tasks/config',{headers:{Authorization:'Bearer '+tok}}).then(function(r){if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(function(data){tareasPausadasRemoto=data.pausadas===true;tareasFechaActivacionRemota=data.fecha||null;var ok=Array.isArray(data.tareas)&&data.tareas.length>0&&data.tareas.every(function(t){return t&&(t.sin_horario===true||(Number.isFinite(Number(t.hora))&&Number.isFinite(Number(t.minuto))))});if(ok){tareasConfigRemota=data.tareas;HORARIOS_TAREAS=data.tareas;localStorage.setItem(TAREAS_CONFIG_KEY,JSON.stringify({tareas:data.tareas}))}if(typeof renderTareas==='function')renderTareas()}).catch(function(e){console.warn('No se pudo cargar tareas remotas',e);if(typeof renderTareas==='function')renderTareas()})}
+</script><script id="apex-v14-plan-validation">
+(function(){
+  function apexPlanValue(u){
+    u=u||{};
+    var p=u.plan;
+    if(p&&typeof p==='object') p=p.nombre||p.name||p.id||p.plan||'';
+    if(!p) p=u.plan_name||u.planNombre||u.membresia||u.nivel_plan||'';
+    return String(p||'').trim();
+  }
+  window.apexTienePlan=function(){
+    var u=window.user||user||{};
+    var p=apexPlanValue(u).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(u.plan_activo===false||u.planActivo===false) return false;
+    if(!p||['sin plan','sin_plan','none','null','undefined','ninguno','0'].indexOf(p)>=0) return false;
+    var diario=Number(u.daily_earnings||u.ingreso_diario||u.ganancia_diaria||0);
+    var monto=Number(u.plan_amount||u.planAmount||u.monto_plan||0);
+    return diario>0||monto>0||['trader','analista','gestor','master','elite','starter','basic','pro'].indexOf(p)>=0;
+  };
+  window.apexPlanDebug=function(){var u=window.user||user||{};return {plan:apexPlanValue(u),plan_amount:u.plan_amount,daily_earnings:u.daily_earnings,activo:u.plan_activo!==false&&u.planActivo!==false,validado:window.apexTienePlan()};};
+  window.sincronizarUsuarioActual=async function(){
+    try{
+      var tok=localStorage.getItem('apex_token');
+      if(!tok) return;
+      var r=await fetch(API_URL+'/api/verify',{headers:{Authorization:'Bearer '+tok}});
+      var x=await r.json();
+      if(!r.ok||!x.user) throw Error(x.error||'No se pudo verificar el usuario');
+      user=Object.assign(user||{},x.user);
+      localStorage.setItem('apex_user',JSON.stringify(user));
+      sessionStorage.setItem('apex_user',JSON.stringify(user));
+      if(typeof renderDashboard==='function') renderDashboard();
+      if(typeof renderTareas==='function') renderTareas();
+    }catch(e){console.warn('No se pudo sincronizar el plan del usuario',e);}
+  };
+  window.addEventListener('load',function(){setTimeout(window.sincronizarUsuarioActual,250);});
+})();
 </script></body>
 </html>

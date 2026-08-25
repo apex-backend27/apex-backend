@@ -326,6 +326,9 @@ app.post('/api/login', async (req, res) => {
         balance: user.balance,
         puntos: user.puntos || 0,
         plan: user.plan || 'Sin plan',
+        plan_amount: Number(user.plan_amount || 0),
+        daily_earnings: Number(user.daily_earnings || 0),
+        plan_activo: user.plan_activo !== false,
         referidos: user.referidos || { izquierda: null, derecha: null, lista: [] }  
     }
 });
