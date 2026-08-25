@@ -1530,7 +1530,7 @@ function buyPlan(planName) {
 // ÁRBOL DE REFERIDOS
 // ============================================================
 function renderTree() {
-    var container = document.getElementById('treeContainer');
+    var container = document.getElementById('treeContainer') || document.getElementById('referidosListaContainer');
     if (!container) return;
 
     var users = getUsers();
@@ -1551,6 +1551,8 @@ function renderTree() {
     var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
         var codigoCanonico = String(user.codigo_referido || '').trim().toUpperCase() || 'APEX000';
     var referralLink = baseUrl + 'ref/' + encodeURIComponent(codigoCanonico);
+    var linkDisplay = document.getElementById('referralLinkDisplay');
+    if (linkDisplay) linkDisplay.textContent = referralLink;
     html += '<div style="margin-bottom:16px; background:#f8f9fa; border-radius:12px; padding:14px 16px; border:1px solid #e0e0e0;">';
     html += '<div style="font-size:13px; color:#666; font-weight:600; margin-bottom:6px;">🔗 Tu Link de Referido</div>';
     html += '<div style="font-size:12px;color:#333;margin-bottom:8px;">Código: <strong id="referralCodeCanonical">' + codigoCanonico + '</strong></div>';
@@ -1620,7 +1622,8 @@ function renderTree() {
     }
 
     container.innerHTML = html;
-    document.getElementById('referralCount').textContent = totalReferidos;
+    var countEl = document.getElementById('referralCount') || document.getElementById('totalReferidos');
+    if (countEl) countEl.textContent = totalReferidos;
 }
 
 // ============================================================
