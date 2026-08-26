@@ -6466,7 +6466,7 @@ function renderTareasResumen() {
 // ============================================================
 function agregarTareaConfig() {
     var tareas = getTareasConfig();
-    tareas.push({ hora: 10, minuto: 0, nombre: 'Nueva Tarea', icono: '📋', activo: true });
+    tareas.push({ hora: 10, minuto: 0, nombre: 'Nueva Tarea', descripcion: '', duracionMinutos: 30, icono: '📋', activo: true });
     saveTareasConfig(tareas);
     renderTareasConfig();
     showAlert('✅ Tarea agregada', 'success');
@@ -6481,7 +6481,7 @@ function eliminarTareaConfig(index) {
     showAlert('✅ Tarea eliminada', 'success');
 }
 
-function guardarTareasConfig() {
+async function guardarTareasConfig() {
     var container = document.getElementById('tareasConfigContainer');
     if (!container) return;
     
@@ -6489,6 +6489,8 @@ function guardarTareasConfig() {
     var horas = container.querySelectorAll('.tarea-config-hora');
     var minutos = container.querySelectorAll('.tarea-config-minuto');
     var iconos = container.querySelectorAll('.tarea-config-icono');
+    var descripciones = container.querySelectorAll('.tarea-config-descripcion');
+    var duraciones = container.querySelectorAll('.tarea-config-duracion');
     var activos = container.querySelectorAll('.tarea-config-activo');
     
     var tareas = [];
@@ -6499,14 +6501,17 @@ function guardarTareasConfig() {
             hora: Math.min(23, Math.max(0, hora)),
             minuto: Math.min(59, Math.max(0, minuto)),
             nombre: nombres[i].value || 'Tarea ' + (i+1),
+            descripcion: descripciones[i].value || '',
+            duracionMinutos: Math.min(10080, Math.max(1, parseInt(duraciones[i].value, 10) || 30)),
             icono: iconos[i].value || '📋',
             activo: activos[i].value === 'true'
         });
     }
     
     saveTareasConfig(tareas);
+    try { if (window.apexGuardarTareasToggle) await window.apexGuardarTareasToggle(tareas); } catch (e) { showAlert('⚠️ Guardado local realizado, pero no se sincronizó con NeonTech: ' + e.message, 'warning'); return; }
     renderTareasConfig();
-    showAlert('✅ ' + tareas.length + ' tareas guardadas', 'success');
+    showAlert('✅ ' + tareas.length + ' tareas guardadas en NeonTech', 'success');
 }
 
 // ============================================================
@@ -6783,7 +6788,7 @@ async function rechazarRetiro(telefono,fecha,index){if(!confirm('¿Rechazar este
 </script>
 <script id="apex-v13-task-toggle-controls">
 async function apexGuardarTareasToggle(ts){saveTareasConfig(ts);var tok=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/admin/tasks/config',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({tareas:ts,fecha:null,pausadas:false})});var x=await r.json();if(!r.ok||x.error)throw Error(x.error||'Error sincronizando tareas')}
-function renderTareasConfig(){var c=document.getElementById('tareasConfigContainer');if(!c)return;var ts=getTareasConfig();var all=ts.length>0&&ts.every(function(t){return t.activo!==false});var html='';if(!ts.length){html+='<p>No hay tareas configuradas.</p>'}for(var i=0;i<ts.length;i++){var t=ts[i]||{},on=t.activo!==false;html+='<div class="apex-task-admin-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;margin:8px 0;border:1px solid #27d3ff66;border-radius:12px;background:#071326"><div><strong>'+(t.icono||'📋')+' '+(t.nombre||'Tarea '+(i+1))+'</strong><br><small>'+ (t.sin_horario?'Sin horario — activación manual':'Tarea diaria')+'</small></div><button class="btn '+(on?'btn-warning':'btn-success')+'" onclick="apexToggleTarea('+i+')">'+(on?'⏸️ Pausar':'▶️ Activar')+'</button></div>'}c.innerHTML=html}
+function renderTareasConfig(){var c=document.getElementById('tareasConfigContainer');if(!c)return;var ts=getTareasConfig(),html='';if(!ts.length){c.innerHTML='<p style="color:#9cc8e5;text-align:center;padding:20px">No hay tareas configuradas.</p>';return}for(var i=0;i<ts.length;i++){var t=ts[i]||{},on=t.activo!==false,dur=Number(t.duracionMinutos||t.duracion||t.duracion_minutos||30);html+='<div class="apex-task-admin-row" style="display:grid;grid-template-columns:minmax(130px,1.1fr) minmax(180px,1.6fr) 82px 74px 74px 78px 92px 42px;align-items:center;gap:8px;padding:12px;margin:8px 0;border:1px solid #27d3ff66;border-radius:14px;background:linear-gradient(145deg,#071326,#0d1e38)">'+ '<input class="tarea-config-nombre" value="'+String(t.nombre||'Tarea '+(i+1)).replace(/"/g,'&quot;')+'" placeholder="Nombre" title="Nombre de la tarea">'+'<input class="tarea-config-descripcion" value="'+String(t.descripcion||t.desc||'').replace(/"/g,'&quot;')+'" placeholder="Descripción" title="Descripción de la tarea">'+'<input type="number" min="0" max="23" class="tarea-config-hora" value="'+(Number.isFinite(Number(t.hora))?Number(t.hora):10)+'" placeholder="Hora" title="Hora de habilitación">'+'<input type="number" min="0" max="59" class="tarea-config-minuto" value="'+(Number.isFinite(Number(t.minuto))?Number(t.minuto):0)+'" placeholder="Min" title="Minuto de habilitación">'+'<input type="number" min="1" max="10080" class="tarea-config-duracion" value="'+Math.max(1,dur)+'" placeholder="Min" title="Duración en minutos">'+'<input class="tarea-config-icono" value="'+String(t.icono||'📋').replace(/"/g,'&quot;')+'" placeholder="Icono" title="Icono">'+'<select class="tarea-config-activo" title="Estado"><option value="true" '+(on?'selected':'')+'>✅ Activa</option><option value="false" '+(!on?'selected':'')+'>⏸️ Pausada</option></select>'+'<button type="button" onclick="eliminarTareaConfig('+i+')" style="background:#ef5350;color:#fff;border:0;border-radius:9px;padding:9px;cursor:pointer" title="Eliminar tarea">🗑️</button>'+'</div>'}c.innerHTML=html}
 async function apexToggleTarea(i){var ts=getTareasConfig();if(!ts[i])return;ts[i].activo=ts[i].activo===false;try{await apexGuardarTareasToggle(ts);renderTareasConfig();showAlert(ts[i].activo?'✅ Tarea activada':'⏸️ Tarea pausada','success')}catch(e){showAlert('❌ '+e.message,'danger')}}
 async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){return Object.assign({},t,{activo:on})});try{await apexGuardarTareasToggle(ts);renderTareasConfig();showAlert(on?'✅ Todas las tareas activadas':'⏸️ Todas las tareas pausadas','success')}catch(e){showAlert('❌ '+e.message,'danger')}}
 </script><script id="apex-task-controls-final-fix">
@@ -6850,5 +6855,5 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
  function childrenOf(ref,all){var ids=[ref&&ref.codigo_referido,ref&&ref.codigo,ref&&ref.telefono,ref&&ref.id].filter(Boolean).map(String);return all.filter(function(u){var p=[u.referido_por,u.referidoPor,u.codigo_referido_padre,u.codigoReferidoPadre].filter(Boolean).map(String);return p.some(function(v){return ids.indexOf(v)!==-1})})}
  function inject(){var c=document.getElementById('detallesContent');if(!c)return;var old=c.querySelector('.apex-admin-ref-tree');if(old)old.remove();var tel=window.usuarioEditandoDetalles||null;var all=typeof getUsers==='function'?getUsers():[],target=all.find(function(u){return String(u.telefono)===String(tel)});if(!target)return;var refs=target.referidos&&Array.isArray(target.referidos.lista)?target.referidos.lista:[],cols=refs.map(function(r){var nested=Array.isArray(r.hijos)?r.hijos:(Array.isArray(r.children)?r.children:childrenOf(r,all));return '<div class="apex-admin-ref-column">'+node(r,1)+(nested.length?nested.map(function(x){return node(x,2)}).join(''):'<div class="apex-admin-ref-empty">Sin invitados de este referido</div>')+'</div>'}).join('');var card=document.createElement('div');card.className='apex-admin-ref-tree';card.innerHTML='<h3>🌳 Árbol de referidos</h3><div class="apex-admin-ref-node apex-admin-ref-root"><span class="apex-admin-ref-avatar">TÚ</span></div>'+(refs.length?'<div class="apex-admin-ref-children">'+cols+'</div>':'<div class="apex-admin-ref-empty">No tiene referidos registrados.</div>')+'<div class="legend"><span>🟣 Nivel 1 · Invitados directos</span><span>🔵 Nivel 2 · Invitados de tus referidos</span></div>';var list=c.querySelector('.referidos-section');c.insertBefore(card,list||null)}
  var baseOpen=window.verDetallesUsuario;window.verDetallesUsuario=function(t){window.usuarioEditandoDetalles=t;if(typeof baseOpen==='function')baseOpen.apply(this,arguments);setTimeout(inject,0)};
-})();</script></body>
+})();</script><style id="apex-task-editor-layout-v1">#tareasConfigContainer{overflow-x:auto!important;padding-bottom:8px!important}#tareasConfigContainer .apex-task-admin-row{min-width:820px!important}#tareasConfigContainer .apex-task-admin-row input,#tareasConfigContainer .apex-task-admin-row select{box-sizing:border-box!important;width:100%!important;min-height:38px!important;padding:7px 8px!important;border:1px solid #27d3ff66!important;border-radius:9px!important;background:#091a30!important;color:#f5fbff!important;font-size:12px!important}#tareasConfigContainer .apex-task-admin-row input:focus{outline:0!important;border-color:#ffd447!important;box-shadow:0 0 10px #ffd44744!important}#tareasConfigContainer .apex-task-admin-row input::placeholder{color:#8baac1!important}#tareasConfigContainer .apex-task-admin-row:before{content:'Nombre · Descripción · Hora · Minuto · Duración (min) · Icono · Estado';position:absolute;transform:translateY(-28px);font-size:10px;color:#9cc8e5;letter-spacing:.3px}@media(max-width:900px){#tareasConfigContainer .apex-task-admin-row{min-width:760px!important}}</style></body>
 </html>
