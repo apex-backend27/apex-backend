@@ -1216,6 +1216,35 @@ app.post('/api/admin/user/:id/authorize-plan', authenticate, isAdmin, async (req
     res.json({ message: 'Autorización actualizada', user: result.rows[0] });
 });
 
+app.post('/api/admin/user/:id/task/assign', authenticate, isAdmin, async (req,res)=>{
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const key = String(req.params.id || '').trim();
+        const q = await client.query('SELECT * FROM users WHERE id::text=$1 OR telefono=$1 LIMIT 1 FOR UPDATE', [key]);
+        if (!q.rows.length) throw new Error('Usuario no encontrado');
+        const u = q.rows[0];
+        const t = req.body && req.body.tarea ? req.body.tarea : req.body;
+        if (!t || !t.tareaId || !t.tareaNombre) throw new Error('Tarea inválida');
+        const ts = Array.isArray(u.tareas_asignadas) ? u.tareas_asignadas : [];
+        if (ts.some(x => String(x.tareaId) === String(t.tareaId) && (x.estado === 'pendiente' || x.estado === 'completada'))) {
+            throw new Error('La tarea ya está asignada a este usuario');
+        }
+        const tarea = {
+            tareaId: String(t.tareaId), tareaNombre: String(t.tareaNombre),
+            tareaDescripcion: String(t.tareaDescripcion || t.descripcion || ''),
+            tipo_recompensa: String(t.tipo_recompensa || 'puntos'), cantidad: Number(t.cantidad || 0),
+            puntos: String(t.tipo_recompensa || 'puntos') === 'puntos' ? Number(t.cantidad || 0) : 0,
+            estado: 'pendiente', fechaAsignacion: new Date().toISOString(),
+            fechaVencimiento: t.fechaVencimiento || null, comprobante: null, fechaCompletado: null
+        };
+        ts.push(tarea);
+        const r = await client.query('UPDATE users SET tareas_asignadas=$1::jsonb WHERE id=$2 RETURNING *', [JSON.stringify(ts), u.id]);
+        await client.query('COMMIT');
+        res.json({message:'Tarea asignada', user:r.rows[0], tarea});
+    } catch (e) { try { await client.query('ROLLBACK'); } catch (_) {} console.error('Error asignando tarea:', e); res.status(400).json({error:e.message}); }
+    finally { client.release(); }
+});
 app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req,res)=>{
  const client=await pool.connect(); try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],i=Number(req.body.index),ts=Array.isArray(u.tareas_asignadas)?u.tareas_asignadas:[],t=ts[i];if(!t)throw new Error('Tarea no encontrada');if(t.estado==='aprobada')throw new Error('Tarea ya aprobada');t.estado='aprobada';t.fechaAprobacion=new Date().toISOString();if(req.body.nota!==undefined)t.notaAdmin=String(req.body.nota);const qty=Number(t.cantidad||0),points=t.tipo_recompensa==='usdt'?0:qty,money=t.tipo_recompensa==='usdt'?qty:0;const h=Array.isArray(u.historial_detallado)?u.historial_detallado:[];h.push({tipo:'tarea',concepto:'Tarea aprobada: '+(t.tareaNombre||t.nombre||'Actividad'),puntos:points,monto:money,nota:t.notaAdmin||null,fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET tareas_asignadas=$1,puntos=COALESCE(puntos,0)+$2,balance=COALESCE(balance,0)+$3,historial_detallado=$4 WHERE id=$5 RETURNING *',[JSON.stringify(ts),points,money,JSON.stringify(h),req.params.id]);await client.query('COMMIT');res.json({message:'Tarea aprobada',user:r.rows[0]});}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}
 });
