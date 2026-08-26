@@ -286,6 +286,34 @@ if (codigoInv && codigoInv !== 'Eamb1714') {
 });
 
 // ============================================================
+// DATOS PÚBLICOS COMPLETOS DEL USUARIO
+// ============================================================
+function publicUserData(row, referidosOverride) {
+    const { password_hash, password_retiro_hash, password, ...safe } = row || {};
+    return {
+        ...safe,
+        balance: Number(safe.balance || 0),
+        puntos: Number(safe.puntos || 0),
+        plan: safe.plan || 'Sin plan',
+        plan_amount: Number(safe.plan_amount || 0),
+        daily_earnings: Number(safe.daily_earnings || 0),
+        plan_activo: safe.plan_activo !== false,
+        cuenta_habilitada: safe.cuenta_habilitada !== false,
+        produccion_pausada: Boolean(safe.produccion_pausada),
+        nivel_autorizado: Number(safe.nivel_autorizado || 0),
+        historial: Array.isArray(safe.historial) ? safe.historial : [],
+        historial_detallado: Array.isArray(safe.historial_detallado) ? safe.historial_detallado : [],
+        tareas_asignadas: Array.isArray(safe.tareas_asignadas) ? safe.tareas_asignadas : [],
+        cupones_asignados: Array.isArray(safe.cupones_asignados) ? safe.cupones_asignados : [],
+        logros_asignados: Array.isArray(safe.logros_asignados) ? safe.logros_asignados : [],
+        logros_pendientes_aprobar: Array.isArray(safe.logros_pendientes_aprobar) ? safe.logros_pendientes_aprobar : [],
+        canjes_realizados: Array.isArray(safe.canjes_realizados) ? safe.canjes_realizados : [],
+        logros_reclamados: Array.isArray(safe.logros_reclamados) ? safe.logros_reclamados : [],
+        tareas_completadas_hoy: Array.isArray(safe.tareas_completadas_hoy) ? safe.tareas_completadas_hoy : [],
+        referidos: referidosOverride || safe.referidos || { izquierda: null, derecha: null, lista: [] }
+    };
+}
+// ============================================================
 // LOGIN
 // ============================================================
 app.post('/api/login', async (req, res) => {
@@ -317,22 +345,7 @@ app.post('/api/login', async (req, res) => {
     res.json({
     message: 'Login exitoso',
     token,
-    user: {
-        id: user.id,
-        telefono: user.telefono,
-        nombre: user.nombre,
-        apellido: user.apellido,
-        es_admin: user.es_admin,
-        codigo_referido: user.codigo_referido,
-        polygon_address: user.polygon_address,
-        balance: user.balance,
-        puntos: user.puntos || 0,
-        plan: user.plan || 'Sin plan',
-        plan_amount: Number(user.plan_amount || 0),
-        daily_earnings: Number(user.daily_earnings || 0),
-        plan_activo: user.plan_activo !== false,
-        referidos: user.referidos || { izquierda: null, derecha: null, lista: [] }  
-    }
+    user: publicUserData(user)
 });
     
   } catch (error) {
@@ -374,51 +387,7 @@ app.get('/api/verify', authenticate, async (req, res) => {
             referido_por: r.referido_por
         }));
         res.json({ 
-            user: {
-                id: userData.id,
-                telefono: userData.telefono,
-                nombre: userData.nombre,
-                apellido: userData.apellido,
-                es_admin: userData.es_admin,
-                es_super_admin: userData.es_super_admin || false,
-                codigo_referido: userData.codigo_referido,
-                polygon_address: userData.polygon_address,
-                balance: Number(userData.balance || 0),
-                puntos: Number(userData.puntos || 0),
-                plan: userData.plan || 'Sin plan',
-                plan_amount: Number(userData.plan_amount || 0),
-                daily_earnings: Number(userData.daily_earnings || 0),
-                plan_activo: userData.plan_activo !== false,
-                cuenta_habilitada: userData.cuenta_habilitada !== false,
-                produccion_pausada: userData.produccion_pausada || false,
-                password_retiro: userData.password_retiro || null,
-                nivel_autorizado: Number(userData.nivel_autorizado || 0),
-                username: userData.username || null,
-                nivel_autorizado: Number(userData.nivel_autorizado || 0),
-                username: userData.username || null,
-                nivel_autorizado: Number(userData.nivel_autorizado || 0),
-                direccion_retiro: userData.direccion_retiro || null,
-                // ✅ ESTOS SON LOS CAMPOS IMPORTANTES
-                codigos_usados_hoy: Number(userData.codigos_usados_hoy || 0),
-                codigos_usados: userData.codigos_usados || [],
-                ultimo_reinicio_codigos: userData.ultimo_reinicio_codigos || null,
-                historial: userData.historial || [],
-                historial_detallado: userData.historial_detallado || [],
-                historial_codigos: userData.historial_codigos || [],
-                ruleta_usos: Number(userData.ruleta_usos || 0),
-                cofres_usos: Number(userData.cofres_usos || 0),
-                dados_usos: Number(userData.dados_usos || 0),
-                premio_ruleta: Number(userData.premio_ruleta || 0),
-                premio_cofre: Number(userData.premio_cofre || 0),
-                premio_dados: Number(userData.premio_dados || 0),
-                tareas_asignadas: userData.tareas_asignadas || [],
-                tareas_completadas_hoy: userData.tareas_completadas_hoy || [],
-                ultima_fecha_tareas: userData.ultima_fecha_tareas || null,
-                racha_dias: Number(userData.racha_dias || 0),
-                cobro_tareas_fecha: userData.cobro_tareas_fecha || null,
-                cobro_tareas_monto: Number(userData.cobro_tareas_monto || 0),
-                referidos: { izquierda: null, derecha: null, lista: referidosEnriquecidos }
-            }
+            user: publicUserData(userData, { izquierda: null, derecha: null, lista: referidosEnriquecidos })
         });
     } catch (error) {
         console.error('Error en /api/verify:', error);
