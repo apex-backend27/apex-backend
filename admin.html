@@ -1553,10 +1553,10 @@ TAB TAREAS (NUEVO)
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-success" onclick="activarTareasDiarias()" id="btnActivarTareas" style="padding:10px 24px; font-size:14px; font-weight:700;">
-                🚀 Activar Tareas de Hoy
+                ▶️ Iniciar día
             </button>
             <button class="btn btn-warning" onclick="resetearTareasHoy()" style="padding:10px 20px; font-size:13px; font-weight:600;">
-                ⏸️ Pausar tareas
+                ⏸️ Pausar día
             </button>
         </div>
     </div>
@@ -6627,7 +6627,7 @@ function actualizarEstadoActivacionTareas() {
         badge.textContent = '⏳ Pendiente (nuevo día)';
         badge.style.background = '#fff8e1';
         badge.style.color = '#e65100';
-        btn.textContent = '🚀 Activar Tareas de Hoy';
+        btn.textContent = '▶️ Iniciar día';
         btn.disabled = false;
         btn.style.opacity = '1';
         btn.style.cursor = 'pointer';
@@ -6635,7 +6635,7 @@ function actualizarEstadoActivacionTareas() {
         badge.textContent = '⏳ Sin activar';
         badge.style.background = '#f5f5f5';
         badge.style.color = '#999';
-        btn.textContent = '🚀 Activar Tareas de Hoy';
+        btn.textContent = '▶️ Iniciar día';
         btn.disabled = false;
         btn.style.opacity = '1';
         btn.style.cursor = 'pointer';
@@ -6843,12 +6843,7 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
   function iniciar(){quitarControlesDuplicados();if(typeof window.renderTareasConfig==='function')window.renderTareasConfig()}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',iniciar);else setTimeout(iniciar,0);
 })();
-</script><style id="apex-temporary-test-mode-admin">#btnActivarTareas,#btnActivarTareas + button{display:none!important}#tareasStatusBadge{background:#173b52!important;color:#61f0b0!important;border:1px solid #27d3ff!important}#tareasFechaDisplay:after{content:' · Modo pruebas';color:#ffd447;font-weight:700}</style><script id="apex-temporary-test-mode-admin-script">
-(function(){
-  function marcar(){var b=document.getElementById('tareasStatusBadge');if(b)b.textContent='🧪 Modo pruebas activo';var d=document.getElementById('tareasFechaDisplay');if(d)d.textContent='Las tareas están disponibles sin autorización diaria';}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',marcar);else setTimeout(marcar,0);
-})();
-</script><style id="apex-coupon-days-visible">#cuponesContainer .cupon-dias{width:78px!important;min-width:78px!important;flex:0 0 78px!important;height:40px!important;padding:6px 8px!important;color:#fff!important;background:#071326!important;border:2px solid #ffd447!important;border-radius:10px!important;text-align:center!important;font-size:15px!important;font-weight:800!important}#cuponesContainer .cupon-dias::placeholder{color:#ffd447!important;opacity:1!important}@media(max-width:760px){#cuponesContainer .cupon-dias{width:100%!important;min-width:0!important;flex:1 1 100%!important}}</style><style id="apex-referral-tree-admin-style">.apex-admin-ref-tree{margin:14px 0;padding:16px;border:1px solid #27d3ff;border-radius:18px;background:linear-gradient(145deg,#071326,#0d1e38);box-shadow:0 0 24px #27d3ff22;color:#eef7ff}.apex-admin-ref-tree h3{margin:0 0 14px;color:#fff;font-size:16px}.apex-admin-ref-tree .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:10px;border-top:1px solid #ffffff18;color:#a9c5dd;font-size:11px}.apex-admin-ref-node{position:relative;display:flex;align-items:center;gap:10px;min-height:44px}.apex-admin-ref-level1{margin:8px 0 0 10px;padding:8px 10px;border-left:2px solid #27d3ff}.apex-admin-ref-level2{margin:4px 0 4px 38px;padding:7px 10px;border-left:2px solid #8b5cf6}.apex-admin-ref-level1:before{content:'';width:18px;border-top:2px solid #27d3ff;position:absolute;left:-20px;top:29px}.apex-admin-ref-level2:before{content:'';width:18px;border-top:2px solid #8b5cf6;position:absolute;left:-20px;top:25px}.apex-admin-ref-avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:0 0 34px;border:2px solid #27d3ff;background:#102b4a;color:#fff;font-weight:800;font-size:10px}.apex-admin-ref-level1 .apex-admin-ref-avatar{border-color:#b36bff;background:#24164a}.apex-admin-ref-name{font-weight:800;color:#fff;font-size:12px}.apex-admin-ref-meta{font-size:10px;color:#a9c5dd;margin-top:2px}.apex-admin-ref-badge{display:inline-block;margin-left:5px;padding:3px 6px;border-radius:8px;background:#123f35;color:#6dffcf;font-size:9px}.apex-admin-ref-root{justify-content:center;margin-bottom:8px}.apex-admin-ref-children{border-top:2px solid #27d3ff;margin:0 10%;padding-top:3px;display:grid;grid-template-columns:1fr 1fr;gap:8px}.apex-admin-ref-column{min-width:0}.apex-admin-ref-empty{color:#9eb3c7;font-size:11px;padding:8px 0}@media(max-width:600px){.apex-admin-ref-children{margin:0 2%;grid-template-columns:1fr}}</style><script id="apex-referral-tree-admin-v1">
+</script><style id="apex-daily-controls-real-mode">#btnActivarTareas,#btnActivarTareas + button{display:inline-flex!important}#tareasStatusBadge{background:#173b52!important;color:#61f0b0!important;border:1px solid #27d3ff!important}</style><style id="apex-coupon-days-visible">#cuponesContainer .cupon-dias{width:78px!important;min-width:78px!important;flex:0 0 78px!important;height:40px!important;padding:6px 8px!important;color:#fff!important;background:#071326!important;border:2px solid #ffd447!important;border-radius:10px!important;text-align:center!important;font-size:15px!important;font-weight:800!important}#cuponesContainer .cupon-dias::placeholder{color:#ffd447!important;opacity:1!important}@media(max-width:760px){#cuponesContainer .cupon-dias{width:100%!important;min-width:0!important;flex:1 1 100%!important}}</style><style id="apex-referral-tree-admin-style">.apex-admin-ref-tree{margin:14px 0;padding:16px;border:1px solid #27d3ff;border-radius:18px;background:linear-gradient(145deg,#071326,#0d1e38);box-shadow:0 0 24px #27d3ff22;color:#eef7ff}.apex-admin-ref-tree h3{margin:0 0 14px;color:#fff;font-size:16px}.apex-admin-ref-tree .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:10px;border-top:1px solid #ffffff18;color:#a9c5dd;font-size:11px}.apex-admin-ref-node{position:relative;display:flex;align-items:center;gap:10px;min-height:44px}.apex-admin-ref-level1{margin:8px 0 0 10px;padding:8px 10px;border-left:2px solid #27d3ff}.apex-admin-ref-level2{margin:4px 0 4px 38px;padding:7px 10px;border-left:2px solid #8b5cf6}.apex-admin-ref-level1:before{content:'';width:18px;border-top:2px solid #27d3ff;position:absolute;left:-20px;top:29px}.apex-admin-ref-level2:before{content:'';width:18px;border-top:2px solid #8b5cf6;position:absolute;left:-20px;top:25px}.apex-admin-ref-avatar{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:0 0 34px;border:2px solid #27d3ff;background:#102b4a;color:#fff;font-weight:800;font-size:10px}.apex-admin-ref-level1 .apex-admin-ref-avatar{border-color:#b36bff;background:#24164a}.apex-admin-ref-name{font-weight:800;color:#fff;font-size:12px}.apex-admin-ref-meta{font-size:10px;color:#a9c5dd;margin-top:2px}.apex-admin-ref-badge{display:inline-block;margin-left:5px;padding:3px 6px;border-radius:8px;background:#123f35;color:#6dffcf;font-size:9px}.apex-admin-ref-root{justify-content:center;margin-bottom:8px}.apex-admin-ref-children{border-top:2px solid #27d3ff;margin:0 10%;padding-top:3px;display:grid;grid-template-columns:1fr 1fr;gap:8px}.apex-admin-ref-column{min-width:0}.apex-admin-ref-empty{color:#9eb3c7;font-size:11px;padding:8px 0}@media(max-width:600px){.apex-admin-ref-children{margin:0 2%;grid-template-columns:1fr}}</style><script id="apex-referral-tree-admin-v1">
 (function(){
  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
  function node(x,level){x=x||{};var n=x.nombre||x.name||x.telefono||x.id||'Sin nombre',phone=x.telefono||x.id||'',plan=x.plan||x.plan_nombre||x.plan_actual||'Sin plan',clean=String(n).replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]/g,'').slice(0,2)||'??';return '<div class="apex-admin-ref-node apex-admin-ref-level'+level+'"><span class="apex-admin-ref-avatar">'+esc(clean.toUpperCase())+'</span><div><div class="apex-admin-ref-name">'+esc(n)+' <span class="apex-admin-ref-badge">'+esc(plan)+'</span></div><div class="apex-admin-ref-meta">'+esc(phone)+'</div></div></div>'}
