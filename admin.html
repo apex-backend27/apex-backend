@@ -4420,6 +4420,7 @@ async function asignarTareaAUsuarioEspecifico(telefono, tareaId, silencioso) {
         tipo_recompensa: tarea.tipo_recompensa,
         cantidad: tarea.cantidad,
         puntos: tarea.tipo_recompensa === 'puntos' ? tarea.cantidad : 0,
+        diasVencimiento: Number(tarea.diasVencimiento || tarea.dias_vencimiento || tarea.dias || 3),
         estado: 'pendiente',
         fechaAsignacion: new Date().toISOString(),
         fechaVencimiento: fechaVencimiento.toISOString(),
