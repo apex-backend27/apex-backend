@@ -5275,6 +5275,7 @@ function eliminarCupon(index) {
     showAlert('✅ Cupón eliminado', 'success');
 }
 
+async function sincronizarCuponesRemotos(cupones) { var tok=localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||''; if(!tok)return; var canjes=[];var logros=[];try{canjes=JSON.parse(localStorage.getItem('apex_canjes_sistema')||'[]')||[];logros=JSON.parse(localStorage.getItem('apex_logros_sistema')||'[]')||[]}catch(e){} var r=await fetch(API_URL+'/api/admin/catalogs/config',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({canjes:canjes,logros:logros,cupones:cupones})});var x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'No se pudo sincronizar cupones');}
 function guardarCupones() {
     var container = document.getElementById('cuponesContainer');
     if (!container) return;
@@ -5297,7 +5298,7 @@ function guardarCupones() {
         });
     }
     saveCuponesSistema(cupones);
-    showAlert('✅ ' + cupones.length + ' cupones guardados', 'success');
+    sincronizarCuponesRemotos(cupones).then(function(){showAlert('✅ '+cupones.length+' cupones guardados y sincronizados','success');}).catch(function(e){showAlert('⚠️ Guardados localmente; no se sincronizaron: '+e.message,'warning');});
     renderCupones();
 }
 
