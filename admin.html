@@ -5017,6 +5017,21 @@ function guardarCanjes() {
 // ============================================================
 // SOLICITUDES DE CANJE
 // ============================================================
+function datosCanjeSolicitud(canje) {
+    canje = canje || {};
+    var catalogo = [];
+    try { catalogo = getCanjes() || []; } catch (e) { catalogo = []; }
+    var encontrado = catalogo.find(function(c) {
+        return (canje.id && c.id && String(canje.id) === String(c.id)) ||
+            (canje.nombre && c.nombre && String(canje.nombre).trim().toLowerCase() === String(c.nombre).trim().toLowerCase());
+    }) || {};
+    return {
+        nombre: canje.nombre || canje.titulo || encontrado.nombre || 'Canje',
+        montoUSDT: Number(canje.montoUSDT ?? canje.monto_usdt ?? canje.monto ?? encontrado.montoUSDT ?? encontrado.monto_usdt ?? encontrado.monto ?? 0) || 0,
+        costoPuntos: Number(canje.costoPuntos ?? canje.costo_puntos ?? canje.costo ?? canje.puntos ?? encontrado.costoPuntos ?? encontrado.costo_puntos ?? encontrado.costo ?? encontrado.puntos ?? 0) || 0,
+        descripcion: canje.descripcion || encontrado.descripcion || ''
+    };
+}
 function renderSolicitudesCanje() {
     var users = getUsers();
     var container = document.getElementById('solicitudesCanjeContainer');
@@ -5047,11 +5062,12 @@ function renderSolicitudesCanje() {
     var html = '';
     for (var i = 0; i < solicitudes.length; i++) {
         var s = solicitudes[i];
+        var datos = datosCanjeSolicitud(s.canje);
         html += '<div class="canjes-pendiente-item" style="background:#f8f9fa;border:2px solid #f7971e;border-radius:12px;padding:14px;margin-bottom:10px;">' +
             '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;align-items:center;">' +
                 '<div><strong>' + s.usuario + '</strong> (' + s.telefono + ')<br>' +
-                '<span style="font-size:12px;color:#666;">' + (s.canje.nombre || 'Canje') + '</span><br>' +
-                '<span style="font-size:11px;color:#999;">$' + s.canje.montoUSDT + ' USDT · ' + s.canje.costoPuntos + ' pts</span>' +
+                '<span style="font-size:12px;color:#666;">' + (datos.nombre || 'Canje') + '</span><br>' +
+                '<span style="font-size:11px;color:#999;">$' + datos.montoUSDT.toFixed(2) + ' USDT · ' + datos.costoPuntos + ' pts</span>' +
                 '</div>' +
                 '<div><button class="btn btn-success btn-sm" onclick="aprobarCanje(\'' + s.telefono + '\', ' + s.index + ')" data-tooltip="Aprobar canje">✅ Aprobar</button> ' +
                 '<button class="btn btn-danger btn-sm" onclick="rechazarCanje(\'' + s.telefono + '\', ' + s.index + ')" data-tooltip="Rechazar canje">❌ Rechazar</button></div>' +
@@ -5069,15 +5085,18 @@ function aprobarCanje(telefono, index) {
     if (!user.canjes_realizados || user.canjes_realizados.length <= index) { showAlert('⚠️ Canje no encontrado', 'danger'); return; }
     var canje = user.canjes_realizados[index];
     if (canje.estado !== 'pendiente') { showAlert('⚠️ Ya procesado', 'warning'); return; }
-
+    var datos = datosCanjeSolicitud(canje);
+    canje.nombre = datos.nombre;
+    canje.montoUSDT = datos.montoUSDT;
+    canje.costoPuntos = datos.costoPuntos;
     canje.estado = 'aprobado';
-    user.balance = (user.balance || 0) + canje.montoUSDT;
+    user.balance = Number(user.balance || 0) + datos.montoUSDT;
 
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
         tipo: 'canje',
         concepto: '🔄 Canje aprobado: ' + canje.nombre,
-        monto: canje.montoUSDT,
+        monto: datos.montoUSDT,
         fecha: new Date().toISOString(),
         estado: 'aprobado'
     });
@@ -5086,7 +5105,7 @@ function aprobarCanje(telefono, index) {
         for (var h = 0; h < user.historial.length; h++) {
             if (user.historial[h].type === 'canje' && 
                 user.historial[h].status === 'pendiente' && 
-                user.historial[h].amount === canje.montoUSDT) {
+                user.historial[h].amount === datos.montoUSDT) {
                 user.historial[h].status = 'aprobado';
                 break; 
             }
@@ -5095,7 +5114,7 @@ function aprobarCanje(telefono, index) {
 
     saveUsers(users);
     sincronizarUsuarioConBackend(telefono);
-    showAlert('✅ Canje aprobado. +$' + canje.montoUSDT + ' a ' + user.nombre, 'success');
+    showAlert('✅ Canje aprobado. +$' + datos.montoUSDT.toFixed(2) + ' a ' + user.nombre, 'success');
     renderSolicitudesCanje();
     renderUsuarios();
     actualizarStats();
@@ -5109,17 +5128,20 @@ function rechazarCanje(telefono, index) {
     if (!user.canjes_realizados || user.canjes_realizados.length <= index) { showAlert('⚠️ Canje no encontrado', 'danger'); return; }
     var canje = user.canjes_realizados[index];
     if (canje.estado !== 'pendiente') { showAlert('⚠️ Ya procesado', 'warning'); return; }
-
+    var datos = datosCanjeSolicitud(canje);
+    canje.nombre = datos.nombre;
+    canje.montoUSDT = datos.montoUSDT;
+    canje.costoPuntos = datos.costoPuntos;
     canje.estado = 'rechazado';
 
-    user.puntos = (user.puntos || 0) + canje.costoPuntos;
+    user.puntos = Number(user.puntos || 0) + datos.costoPuntos;
 
     if (!user.historial_detallado) user.historial_detallado = [];
     user.historial_detallado.push({
         tipo: 'canje',
         concepto: '🔄 Canje rechazado: ' + canje.nombre + ' (Puntos devueltos)',
-        monto: canje.montoUSDT,
-        puntos: canje.costoPuntos,
+        monto: datos.montoUSDT,
+        puntos: datos.costoPuntos,
         fecha: new Date().toISOString(),
         estado: 'rechazado'
     });
