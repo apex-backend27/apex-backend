@@ -6446,20 +6446,16 @@ function renderTareasResumen() {
     var horaStr = String(hoy.getHours()).padStart(2, '0') + ':' + String(hoy.getMinutes()).padStart(2, '0');
     
     container.innerHTML = 
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">' +
-            '<div style="background:#fff;border-radius:8px;padding:8px;text-align:center;border:1px solid #e0e0e0;">' +
-                '<div style="font-size:18px;font-weight:700;color:#000;">' + totalUsuarios + '</div>' +
-                '<div style="font-size:9px;color:#999;">👥 Usuarios</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
+            '<div style="background:linear-gradient(135deg,#0d2139,#111332);border-radius:12px;padding:12px;text-align:center;border:1px solid rgba(39,211,255,.35);box-shadow:0 5px 18px rgba(0,0,0,.2);">' +
+                '<div style="font-size:22px;font-weight:800;color:#f5fbff;">' + totalUsuarios + '</div>' +
+                '<div style="font-size:11px;color:#9cc8e5;font-weight:700;">👥 Usuarios</div>' +
             '</div>' +
-            '<div style="background:#fff;border-radius:8px;padding:8px;text-align:center;border:1px solid #e0e0e0;">' +
+            '<div style="background:linear-gradient(135deg,#0d2139,#111332);border-radius:12px;padding:12px;text-align:center;border:1px solid rgba(39,211,255,.35);box-shadow:0 5px 18px rgba(0,0,0,.2);">' +
                 '<div style="font-size:18px;font-weight:700;color:#4db6ac;">' + promedio + '</div>' +
-                '<div style="font-size:9px;color:#999;">📊 Promedio tareas</div>' +
+                '<div style="font-size:11px;color:#9cc8e5;font-weight:700;">📊 Promedio de tareas</div>' +
             '</div>' +
-            '<div style="background:#fff;border-radius:8px;padding:8px;text-align:center;border:1px solid #e0e0e0;">' +
-                '<div style="font-size:18px;font-weight:700;color:#f7971e;">' + totalRacha + '🔥</div>' +
-                '<div style="font-size:9px;color:#999;">Racha máxima</div>' +
             '</div>' +
-        '</div>' +
         '<div style="font-size:10px;color:#999;text-align:center;margin-top:6px;">🕐 Hora actual: ' + horaStr + '</div>';
 }
 
