@@ -2297,5 +2297,23 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   var completarOriginal=window.completarTareaDiaria;
   if(typeof completarOriginal==='function'){window.completarTareaDiaria=function(i,p){window.tareasPausadasRemoto=false;window.tareasAutorizadasHoyRemoto=true;return completarOriginal.call(this,i,p)};}
 })();
+</script><script id="apex-production-history-fix">
+(function(){
+  function historialCompleto(){
+    var d=Array.isArray(user&&user.historial_detallado)?user.historial_detallado:[];
+    var h=Array.isArray(user&&user.historial)?user.historial:[];
+    var out=d.slice();
+    h.forEach(function(x){var key=String(x.fecha||x.date||'')+'|'+String(x.tipo||x.type||'')+'|'+String(x.monto??x.amount??0)+'|'+String(x.concepto||'');if(!out.some(function(y){return String(y.fecha||y.date||'')+'|'+String(y.tipo||y.type||'')+'|'+String(y.monto??y.amount??0)+'|'+String(y.concepto||'')===key}))out.push(x)});
+    return out;
+  }
+  window.calcularGanancias=function(){
+    if(!user)return;
+    var ahora=new Date(),inicio=new Date(ahora),dia=inicio.getDay();inicio.setDate(inicio.getDate()-(dia===0?6:dia-1));inicio.setHours(0,0,0,0);
+    var semana=0,total=0,lista=historialCompleto();
+    lista.forEach(function(h){var tipo=String(h.tipo||h.type||'').toLowerCase(),estado=String(h.estado||h.status||'').toLowerCase();var esProduccion=tipo==='tareas_cobro'||tipo==='produccion'||tipo==='ganancia'||tipo==='juego'||tipo==='actividad';if(!esProduccion||estado==='rechazado')return;var monto=Number(h.monto??h.amount??0);if(!Number.isFinite(monto)||monto<=0)return;total+=monto;var fecha=new Date(h.fecha||h.date);if(!isNaN(fecha.getTime())&&fecha>=inicio)semana+=monto;});
+    var a=document.getElementById('gananciaSemanal'),b=document.getElementById('gananciaTotal');if(a)a.textContent='$'+semana.toFixed(2);if(b)b.textContent='$'+total.toFixed(2);
+  };
+  window.addEventListener('load',function(){setTimeout(window.calcularGanancias,1200);});
+})();
 </script></body>
 </html>
