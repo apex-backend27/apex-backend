@@ -703,6 +703,27 @@ app.post('/api/user/game/prize', authenticate, async (req,res)=>{
 });
 
 // ============================================================
+// HORA DE COBRO: LECTURA Y GUARDADO INDEPENDIENTES
+// ============================================================
+app.get('/api/tasks/claim-time', authenticate, async (req, res) => {
+    try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
+        const r = await pool.query('SELECT hora_cobro FROM configuracion WHERE id = 1');
+        res.json({ horaCobro: (r.rows[0] && r.rows[0].hora_cobro) || '20:00', hora_cobro: (r.rows[0] && r.rows[0].hora_cobro) || '20:00' });
+    } catch (e) { console.error('Error leyendo hora de cobro:', e); res.status(500).json({ error: 'No se pudo leer la hora de cobro' }); }
+});
+app.put('/api/admin/tasks/claim-time', authenticate, isAdmin, async (req, res) => {
+    try {
+        const hora = String(req.body.horaCobro || req.body.hora_cobro || '').trim();
+        if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(hora)) return res.status(400).json({ error: 'La hora debe tener formato HH:MM' });
+        await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
+        const r = await pool.query(`INSERT INTO configuracion (id, hora_cobro, updated_at) VALUES (1, $1, NOW()) ON CONFLICT (id) DO UPDATE SET hora_cobro = $1, updated_at = NOW() RETURNING hora_cobro`, [hora]);
+        res.json({ message: 'Hora de cobro guardada en NeonTech', horaCobro: r.rows[0].hora_cobro, hora_cobro: r.rows[0].hora_cobro });
+    } catch (e) { console.error('Error guardando hora de cobro:', e); res.status(500).json({ error: 'No se pudo guardar la hora de cobro' }); }
+});
+// ============================================================
 // COBRO DIARIO DE TAREAS: UNA SOLA VEZ POR DÍA
 // ============================================================
 app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
