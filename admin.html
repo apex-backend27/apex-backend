@@ -1556,7 +1556,7 @@ TAB TAREAS (NUEVO)
                 🚀 Activar Tareas de Hoy
             </button>
             <button class="btn btn-warning" onclick="resetearTareasHoy()" style="padding:10px 20px; font-size:13px; font-weight:600;">
-                🔄 Resetear
+                ⏸️ Pausar tareas
             </button>
         </div>
     </div>
@@ -6788,5 +6788,31 @@ async function apexGuardarTareasToggle(ts){saveTareasConfig(ts);var tok=localSto
 function renderTareasConfig(){var c=document.getElementById('tareasConfigContainer');if(!c)return;var ts=getTareasConfig();var all=ts.length>0&&ts.every(function(t){return t.activo!==false});var html='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button class="btn btn-success" onclick="apexToggleTodas(true)">▶️ Activar todas</button><button class="btn btn-danger" onclick="apexToggleTodas(false)">⏸️ Pausar todas</button></div>';if(!ts.length){html+='<p>No hay tareas configuradas.</p>'}for(var i=0;i<ts.length;i++){var t=ts[i]||{},on=t.activo!==false;html+='<div class="apex-task-admin-row" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;margin:8px 0;border:1px solid #27d3ff66;border-radius:12px;background:#071326"><div><strong>'+(t.icono||'📋')+' '+(t.nombre||'Tarea '+(i+1))+'</strong><br><small>'+ (t.sin_horario?'Sin horario — activación manual':'Tarea diaria')+'</small></div><button class="btn '+(on?'btn-warning':'btn-success')+'" onclick="apexToggleTarea('+i+')">'+(on?'⏸️ Pausar':'▶️ Activar')+'</button></div>'}c.innerHTML=html}
 async function apexToggleTarea(i){var ts=getTareasConfig();if(!ts[i])return;ts[i].activo=ts[i].activo===false;try{await apexGuardarTareasToggle(ts);renderTareasConfig();showAlert(ts[i].activo?'✅ Tarea activada':'⏸️ Tarea pausada','success')}catch(e){showAlert('❌ '+e.message,'danger')}}
 async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){return Object.assign({},t,{activo:on})});try{await apexGuardarTareasToggle(ts);renderTareasConfig();showAlert(on?'✅ Todas las tareas activadas':'⏸️ Todas las tareas pausadas','success')}catch(e){showAlert('❌ '+e.message,'danger')}}
+</script><script id="apex-task-controls-final-fix">
+(function(){
+  function apexAdminToken(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||localStorage.getItem('token')||sessionStorage.getItem('token')||'';}
+  async function apexGuardarEstadoTareas(ts,fecha,pausadas){
+    var tok=apexAdminToken();
+    if(!tok){showAlert('⚠️ Sesión de administrador no encontrada. Vuelve a iniciar sesión.','danger');throw new Error('Sesión de administrador no encontrada');}
+    var r=await fetch(API_URL+'/api/admin/tasks/config',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({tareas:ts,fecha:fecha,pausadas:pausadas})});
+    var x={};try{x=await r.json()}catch(e){}
+    if(r.status===401||r.status===403){showAlert('❌ La sesión del administrador expiró. Vuelve a iniciar sesión.','danger');throw new Error('Token inválido o expirado');}
+    if(!r.ok||x.error)throw new Error(x.error||'No se pudo sincronizar tareas');return x;
+  }
+  window.apexGuardarTareasToggle=async function(ts){
+    var activacion=typeof getTareasActivacion==='function'?getTareasActivacion():null;
+    var activaHoy=activacion&&activacion.activo===true&&activacion.fecha===new Date().toDateString();
+    var fecha=activaHoy?new Date().toISOString():null;
+    await apexGuardarEstadoTareas(ts,fecha,false);saveTareasConfig(ts);
+  };
+  window.activarTareasDiarias=async function(){
+    if(!confirm('🚀 ¿Activar las tareas de hoy para todos los usuarios?'))return;
+    try{var ts=typeof getTareasConfig==='function'?getTareasConfig():[];await apexGuardarEstadoTareas(ts,new Date().toISOString(),false);if(typeof saveTareasActivacion==='function')saveTareasActivacion({fecha:new Date().toDateString(),activo:true,horaActivacion:new Date().toISOString()});actualizarEstadoActivacionTareas();renderTareasConfig();showAlert('✅ Tareas activadas para hoy','success')}catch(e){showAlert('❌ '+e.message,'danger')}
+  };
+  window.resetearTareasHoy=async function(){
+    if(!confirm('⏸️ ¿Pausar las tareas para todos los usuarios?'))return;
+    try{var ts=typeof getTareasConfig==='function'?getTareasConfig():[];await apexGuardarEstadoTareas(ts,null,true);if(typeof saveTareasActivacion==='function')saveTareasActivacion({fecha:new Date().toDateString(),activo:false});actualizarEstadoActivacionTareas();renderTareasConfig();showAlert('⏸️ Tareas pausadas para todos','warning')}catch(e){showAlert('❌ '+e.message,'danger')}
+  };
+})();
 </script></body>
 </html>
