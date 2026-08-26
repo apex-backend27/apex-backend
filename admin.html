@@ -5059,22 +5059,34 @@ function renderSolicitudesCanje() {
         return;
     }
 
+    if (!document.getElementById('apex-canjes-admin-style')) {
+        var style = document.createElement('style');
+        style.id = 'apex-canjes-admin-style';
+        style.textContent = '.apex-canje-request{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:18px 20px;margin:12px 0;border:1px solid rgba(39,211,255,.3);border-left:4px solid #f7971e;border-radius:16px;background:linear-gradient(135deg,#101d35,#0a1327);box-shadow:0 8px 24px rgba(0,0,0,.22);color:#eef7ff}.apex-canje-user{font-size:13px;color:#9db4d2;margin-bottom:8px}.apex-canje-name{font-size:17px;font-weight:800;color:#fff;margin-bottom:8px}.apex-canje-meta{display:flex;flex-wrap:wrap;gap:8px}.apex-canje-chip{padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700}.apex-canje-usdt{background:rgba(51,214,145,.14);color:#61f0b0;border:1px solid rgba(97,240,176,.3)}.apex-canje-points{background:rgba(255,212,71,.14);color:#ffd447;border:1px solid rgba(255,212,71,.3)}.apex-canje-actions{display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end}.apex-canje-actions button{min-width:108px;padding:10px 14px;border:0;border-radius:10px;color:#fff;font-weight:800;cursor:pointer;transition:transform .18s,filter .18s}.apex-canje-actions button:hover{transform:translateY(-2px);filter:brightness(1.15)}.apex-canje-approve{background:linear-gradient(135deg,#13b981,#087f62)}.apex-canje-reject{background:linear-gradient(135deg,#ef5350,#a51d3a)}@media(max-width:650px){.apex-canje-request{display:block;padding:15px}.apex-canje-actions{justify-content:stretch;margin-top:15px}.apex-canje-actions button{flex:1}}';
+        document.head.appendChild(style);
+    }
     var html = '';
     for (var i = 0; i < solicitudes.length; i++) {
         var s = solicitudes[i];
         var datos = datosCanjeSolicitud(s.canje);
-        html += '<div class="canjes-pendiente-item" style="background:#f8f9fa;border:2px solid #f7971e;border-radius:12px;padding:14px;margin-bottom:10px;">' +
-            '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;align-items:center;">' +
-                '<div><strong>' + s.usuario + '</strong> (' + s.telefono + ')<br>' +
-                '<span style="font-size:12px;color:#666;">' + (datos.nombre || 'Canje') + '</span><br>' +
-                '<span style="font-size:11px;color:#999;">$' + datos.montoUSDT.toFixed(2) + ' USDT · ' + datos.costoPuntos + ' pts</span>' +
-                '</div>' +
-                '<div><button class="btn btn-success btn-sm" onclick="aprobarCanje(\'' + s.telefono + '\', ' + s.index + ')" data-tooltip="Aprobar canje">✅ Aprobar</button> ' +
-                '<button class="btn btn-danger btn-sm" onclick="rechazarCanje(\'' + s.telefono + '\', ' + s.index + ')" data-tooltip="Rechazar canje">❌ Rechazar</button></div>' +
-            '</div>' +
-        '</div>';
+        html += '<article class="apex-canje-request">' +
+            '<div class="apex-canje-info"><div class="apex-canje-user">👤 ' + s.usuario + ' · ' + s.telefono + '</div>' +
+            '<div class="apex-canje-name">🔄 ' + datos.nombre + '</div>' +
+            '<div class="apex-canje-meta"><span class="apex-canje-chip apex-canje-usdt">💵 $' + datos.montoUSDT.toFixed(2) + ' USDT</span><span class="apex-canje-chip apex-canje-points">⭐ ' + datos.costoPuntos + ' puntos</span></div></div>' +
+            '<div class="apex-canje-actions"><button type="button" class="apex-canje-approve" data-canje-action="aprobar" data-telefono="' + encodeURIComponent(s.telefono) + '" data-index="' + s.index + '">✅ Aprobar</button><button type="button" class="apex-canje-reject" data-canje-action="rechazar" data-telefono="' + encodeURIComponent(s.telefono) + '" data-index="' + s.index + '">✕ Rechazar</button></div>' +
+            '</article>';
     }
     container.innerHTML = html;
+    container.querySelectorAll('[data-canje-action]').forEach(function(button) {
+        button.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var telefono = decodeURIComponent(button.getAttribute('data-telefono') || '');
+            var index = Number(button.getAttribute('data-index'));
+            if (button.getAttribute('data-canje-action') === 'aprobar') aprobarCanje(telefono, index);
+            else rechazarCanje(telefono, index);
+        });
+    });
 }
 
 function aprobarCanje(telefono, index) {
@@ -6112,28 +6124,6 @@ function resetearHistorialActividad(tipo) {
         showAlert('❌ Error al reiniciar.', 'danger');
     }
 }
-
-// ============================================================
-// SOBRESCRIBIR LAS FUNCIONES DE APROBACIÓN PARA QUE GUARDEN EN EL HISTORIAL
-// ============================================================
-function aprobarCanje(telefono, index) {
-    // ... (Tu código original de aprobarCanje) ...
-    // JUSTO ANTES DE saveUsers(users); AGREGA ESTA LÍNEA:
-    guardarHistorialActividad('canjes', { usuario: user.nombre + ' ' + user.apellido, concepto: canje.nombre + ' ($' + canje.montoUSDT + ')', estado: 'aprobado' });
-    // ... (El resto de tu código sigue igual) ...
-}
-
-function rechazarCanje(telefono, index) {
-    // ... (Tu código original de rechazarCanje) ...
-    // JUSTO ANTES DE saveUsers(users); AGREGA ESTA LÍNEA:
-    guardarHistorialActividad('canjes', { usuario: user.nombre + ' ' + user.apellido, concepto: canje.nombre + ' ($' + canje.montoUSDT + ')', estado: 'rechazado' });
-    // ... (El resto de tu código sigue igual) ...
-}
-
-// ============================================================
-// REPITE EL MISMO PROCESO PARA APROBAR/RECHAZAR TAREAS, LOGROS Y CUPONES
-// ============================================================
-// (Dentro de aprobarTarea, rechazarTarea, aprobarLogro, rechazarLogro, y las funciones de Cupones, agrega las llamadas a guardarHistorialActividad('tareas', ...), guardarHistorialActividad('logros', ...), etc.)
 
 // ============================================================
 // FUNCIÓN PARA COPIAR TEXTO AL PORTAPAPELES (Admin)
