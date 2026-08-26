@@ -623,10 +623,16 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_pausadas FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
+        const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        const fechaActivacion = row.tareas_activacion ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(row.tareas_activacion)) : null;
+        const pausadas = row.tareas_pausadas === true;
         res.json({
             tareas: Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto,
             fecha: row.tareas_activacion || null,
-            pausadas: row.tareas_pausadas === true
+            fechaDia: fechaActivacion,
+            hoy: hoyLima,
+            pausadas: pausadas,
+            autorizadasHoy: !pausadas && fechaActivacion === hoyLima
         });
     } catch (error) {
         console.error('Error obteniendo configuración de tareas:', error);
@@ -676,10 +682,12 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const result = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
         if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
         const u = result.rows[0];
-        const cfgResult = await client.query('SELECT tareas_pausadas FROM configuracion WHERE id = 1');
-        if (cfgResult.rows[0]?.tareas_pausadas === true) {
+        const cfgResult = await client.query('SELECT tareas_pausadas, tareas_activacion FROM configuracion WHERE id = 1');
+        const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        const fechaActivacion = cfgResult.rows[0]?.tareas_activacion ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(cfgResult.rows[0].tareas_activacion)) : null;
+        if (cfgResult.rows[0]?.tareas_pausadas === true || fechaActivacion !== hoyLima) {
             await client.query('ROLLBACK');
-            return res.status(423).json({ error: 'Las tareas están pausadas por el administrador' });
+            return res.status(423).json({ error: fechaActivacion !== hoyLima ? 'Las tareas del nuevo día aún no han sido autorizadas por el administrador' : 'Las tareas están pausadas por el administrador' });
         }
         const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         if (u.cobro_tareas_fecha && String(u.cobro_tareas_fecha).slice(0, 10) === hoy) {
@@ -960,6 +968,7 @@ app.put('/api/admin/user/:id', async (req, res) => {
                 'nivel_autorizado', 'nombre', 'apellido', 'username', 'password_hash', 'password_retiro_hash', 'direccion_retiro', 'plan_amount', 'daily_earnings', 'codigos_usados_hoy', 'ultimo_reinicio_codigos',
                 'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
                 'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto', 'historial',
+                'canjes_realizados', 'cupones_asignados', 'logros_reclamados',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
                 'nombre', 'apellido', 'password_hash', 'password_retiro_hash', 'plan_amount', 'daily_earnings',
                 'es_admin', 'es_super_admin'];
