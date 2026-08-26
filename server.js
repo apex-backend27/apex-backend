@@ -673,7 +673,7 @@ app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
         const pausadas = req.body.pausadas !== undefined ? req.body.pausadas === true : previo.tareas_pausadas === true;
         const autorizadas = req.body.autorizadas !== undefined ? req.body.autorizadas === true : (previo.tareas_autorizadas === true || (!pausadas && Boolean(fecha)));
         const horaSolicitada = String(req.body.horaCobro || req.body.hora_cobro || previo.hora_cobro || '20:00');
-        const horaCobro = /^([01]\\d|2[0-3]):[0-5]\\d$/.test(horaSolicitada) ? horaSolicitada : '20:00';
+        const horaCobro = /^([01]\d|2[0-3]):[0-5]\d$/.test(horaSolicitada) ? horaSolicitada : '20:00';
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         const result = await pool.query(
@@ -716,7 +716,7 @@ app.get('/api/tasks/claim-time', authenticate, async (req, res) => {
 app.put('/api/admin/tasks/claim-time', authenticate, isAdmin, async (req, res) => {
     try {
         const hora = String(req.body.horaCobro || req.body.hora_cobro || '').trim();
-        if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(hora)) return res.status(400).json({ error: 'La hora debe tener formato HH:MM' });
+        if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) return res.status(400).json({ error: 'La hora debe tener formato HH:MM' });
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         const r = await pool.query(`INSERT INTO configuracion (id, hora_cobro, updated_at) VALUES (1, $1, NOW()) ON CONFLICT (id) DO UPDATE SET hora_cobro = $1, updated_at = NOW() RETURNING hora_cobro`, [hora]);

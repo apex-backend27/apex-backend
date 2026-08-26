@@ -6862,7 +6862,7 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
     input.insertAdjacentElement('afterend',b);
     b.addEventListener('click',async function(){
       var hora=String(input.value||'').trim();
-      if(!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(hora)){showAlert('⚠️ Selecciona una hora válida','warning');return;}
+      if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)){showAlert('⚠️ Selecciona una hora válida','warning');return;}
       b.disabled=true;b.textContent='⏳ Guardando...';
       try{var r=await fetch(API_URL+'/api/admin/tasks/claim-time',{method:'PUT',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token()},body:JSON.stringify({horaCobro:hora})});var x=await r.json();if(!r.ok||x.error)throw Error(x.error||'No se pudo guardar');localStorage.setItem('apex_hora_cobro',x.horaCobro||hora);input.value=x.horaCobro||hora;showAlert('✅ Hora de cobro guardada: '+(x.horaCobro||hora),'success');}
       catch(e){showAlert('❌ '+e.message,'danger');}
