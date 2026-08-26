@@ -1135,10 +1135,10 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;ba
 @media(max-width:760px){.tarea-item,.logro-item,.cupon-item{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}.tarea-item input,.tarea-item select,.logro-item input,.logro-item select,.cupon-item input,.cupon-item select{width:100%!important;min-width:0!important}.tarea-item .tarea-nombre,.tarea-item .tarea-desc,.cupon-item .cupon-titulo,.cupon-item .cupon-desc{grid-column:1/-1!important}}
 </style>
 <style id="apex-logros-days-layout">
-.logro-item{display:grid!important;grid-template-columns:minmax(135px,1.05fr) minmax(150px,1.15fr) 105px 58px 92px 58px 70px 72px 40px;gap:10px!important;align-items:center!important;overflow:visible!important}
+.tarea-item{display:grid!important;grid-template-columns:minmax(145px,1.05fr) minmax(160px,1.2fr) 102px 72px 76px 88px 42px;gap:10px!important;align-items:center!important;overflow:visible!important}.tarea-item .tarea-nombre,.tarea-item .tarea-desc{min-width:0!important}.tarea-item .tarea-cantidad,.tarea-item .tarea-dias{width:100%!important;box-sizing:border-box!important}.tarea-item .tarea-dias{border-color:#ffd447!important;box-shadow:0 0 0 2px rgba(255,212,71,.12)!important}.logro-item{display:grid!important;grid-template-columns:minmax(135px,1.05fr) minmax(150px,1.15fr) 105px 58px 92px 58px 70px 72px 40px;gap:10px!important;align-items:center!important;overflow:visible!important}
 .logro-item .logro-nombre{min-width:0!important}.logro-item .logro-desc{min-width:0!important}.logro-item .logro-meta,.logro-item .logro-recompensa,.logro-item .logro-dias{width:100%!important;box-sizing:border-box!important}.logro-item .logro-dias{border-color:#ffd447!important;box-shadow:0 0 0 2px rgba(255,212,71,.12)!important}.logro-item .badge{white-space:nowrap!important;text-align:center!important}
 @media(max-width:1100px){.logro-item{grid-template-columns:minmax(120px,1fr) minmax(140px,1.15fr) 100px 58px 92px 58px 68px 70px 40px;overflow-x:auto!important;padding-bottom:20px!important}.logro-item>*{min-width:0!important}}
-@media(max-width:700px){.logro-item{grid-template-columns:1fr 1fr!important;overflow:visible!important}.logro-item .logro-nombre,.logro-item .logro-desc{grid-column:1/-1!important}.logro-item .logro-tipo,.logro-item .logro-recompensa-tipo{width:100%!important}.logro-item .logro-meta,.logro-item .logro-recompensa,.logro-item .logro-dias{width:100%!important}.logro-item .badge{display:none!important}}
+@media(max-width:1100px){.tarea-item{grid-template-columns:minmax(125px,1fr) minmax(140px,1.1fr) 98px 68px 72px 86px 40px;overflow-x:auto!important;padding-bottom:18px!important}}@media(max-width:700px){.tarea-item{grid-template-columns:1fr 1fr!important;overflow:visible!important}.tarea-item .tarea-nombre,.tarea-item .tarea-desc{grid-column:1/-1!important}.tarea-item .tarea-cantidad,.tarea-item .tarea-dias{width:100%!important}.logro-item{grid-template-columns:1fr 1fr!important;overflow:visible!important}.logro-item .logro-nombre,.logro-item .logro-desc{grid-column:1/-1!important}.logro-item .logro-tipo,.logro-item .logro-recompensa-tipo{width:100%!important}.logro-item .logro-meta,.logro-item .logro-recompensa,.logro-item .logro-dias{width:100%!important}.logro-item .badge{display:none!important}}
 </style>
 </head>
 <body>
@@ -4207,7 +4207,7 @@ function renderTareas() {
                 '<option value="usdt" ' + (t.tipo_recompensa === 'usdt' ? 'selected' : '') + '>💰 USDT</option>' +
             '</select>' +
             '<input type="number" class="tarea-cantidad" value="' + (t.cantidad || 10) + '" placeholder="Cantidad" style="width:50px;padding:5px 6px;border:1px solid #e0e0e0;border-radius:6px;font-size:12px;text-align:center;" data-tooltip="Cantidad de Puntos o USDT">' +
-            '<input type="number" class="tarea-dias" value="' + (t.diasVencimiento || 3) + '" placeholder="Días" style="width:40px;padding:5px 6px;border:1px solid #e0e0e0;border-radius:6px;font-size:12px;text-align:center;" data-tooltip="Días para completar la tarea">' +
+            '<input type="number" class="tarea-dias" value="' + (t.diasVencimiento ?? t.dias_vencimiento ?? t.dias ?? 3) + '" placeholder="Días" style="width:40px;padding:5px 6px;border:1px solid #e0e0e0;border-radius:6px;font-size:12px;text-align:center;" data-tooltip="Días para completar la tarea">' +
             '<select class="tarea-activo" style="padding:5px 8px;border:1px solid #e0e0e0;border-radius:6px;font-size:11px;" data-tooltip="Activar o desactivar"><option value="true" ' + (t.activo ? 'selected' : '') + '>✅ Activa</option><option value="false" ' + (!t.activo ? 'selected' : '') + '>❌ Inactiva</option></select>' +
             '<button onclick="eliminarTarea(' + i + ')" style="background:#ef5350;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;" data-tooltip="Eliminar tarea">🗑️</button>' +
         '</div>';
@@ -6123,7 +6123,7 @@ function guardarHistorialActividad(tipo, nuevoRegistro) {
         // Limitar a 50 registros para que no se haga pesado
         if (data[tipo].length > 50) data[tipo] = data[tipo].slice(0, 50);
         localStorage.setItem(HISTORIAL_KEY, JSON.stringify(data));
-        renderHistorialActividad(tipo);
+        if (typeof window.renderHistorialActividad === 'function') window.renderHistorialActividad(tipo); else renderHistorialActividad(tipo);
     } catch (e) {
         console.log("Error guardando historial:", e);
     }
@@ -6157,7 +6157,7 @@ function resetearHistorialActividad(tipo) {
         var data = JSON.parse(localStorage.getItem(HISTORIAL_KEY)) || {};
         data[tipo] = [];
         localStorage.setItem(HISTORIAL_KEY, JSON.stringify(data));
-        renderHistorialActividad(tipo);
+        if (typeof window.renderHistorialActividad === 'function') window.renderHistorialActividad(tipo); else renderHistorialActividad(tipo);
         showAlert('✅ Historial de ' + tipo + ' reiniciado.', 'success');
     } catch (e) {
         showAlert('❌ Error al reiniciar.', 'danger');
@@ -6813,6 +6813,20 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
     if(!confirm('⏸️ ¿Pausar las tareas para todos los usuarios?'))return;
     try{var ts=typeof getTareasConfig==='function'?getTareasConfig():[];await apexGuardarEstadoTareas(ts,null,true);if(typeof saveTareasActivacion==='function')saveTareasActivacion({fecha:new Date().toDateString(),activo:false});actualizarEstadoActivacionTareas();renderTareasConfig();showAlert('⏸️ Tareas pausadas para todos','warning')}catch(e){showAlert('❌ '+e.message,'danger')}
   };
+})();
+</script><style id="apex-history-dropdown-style">
+.apex-history-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;margin:8px 0;padding:10px 13px;border:1px solid rgba(39,211,255,.35);border-radius:10px;background:linear-gradient(135deg,#0d2139,#111332);color:#dff8ff;font-weight:700;cursor:pointer;text-align:left}.apex-history-toggle:hover{border-color:#8b7cff;box-shadow:0 0 16px rgba(39,211,255,.16)}.apex-history-toggle .arrow{color:#ffd447;transition:transform .2s}.apex-history-toggle.open .arrow{transform:rotate(180deg)}.apex-history-panel{display:none!important;background:#071326!important;border:1px solid rgba(39,211,255,.2)!important;border-radius:12px!important;padding:10px!important;max-height:230px!important;overflow:auto!important}.apex-history-panel.open{display:block!important}.apex-history-row{display:flex;justify-content:space-between;gap:12px;padding:9px 4px;border-bottom:1px solid rgba(147,194,230,.15);color:#dbeeff;font-size:12px}.apex-history-row:last-child{border-bottom:0}.apex-history-row small{color:#8faac5;white-space:nowrap}.apex-history-empty{color:#8faac5;text-align:center;padding:10px}
+</style>
+<script id="apex-history-system-final">
+(function(){
+  var tipos=[['tareas','📋 Historial de tareas'],['logros','🏆 Historial de logros'],['canjes','🔄 Historial de canjes'],['cupones','🎫 Historial de cupones'],['actividades','🎮 Historial de actividades']];
+  function escapeHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+  function prepararHistoriales(){tipos.forEach(function(x){var tipo=x[0],c=document.getElementById('historial_'+tipo);if(!c&&tipo==='actividades'){var base=document.getElementById('historial_tareas');if(base){c=document.createElement('div');c.id='historial_actividades';c.innerHTML='<div class="apex-history-empty">Aún no hay acciones registradas</div>';base.parentNode.appendChild(c)}}if(!c||c.dataset.dropdownReady)return;c.dataset.dropdownReady='1';c.classList.add('apex-history-panel');c.style.display='none';var b=document.createElement('button');b.type='button';b.className='apex-history-toggle';b.innerHTML='<span>'+x[1]+'</span><span class="arrow">▼</span>';b.onclick=function(){var open=c.classList.toggle('open');b.classList.toggle('open',open);};c.parentNode.insertBefore(b,c);});}
+  window.renderHistorialActividad=function(tipo){var c=document.getElementById('historial_'+tipo);if(!c)return;var h=typeof getHistorialActividad==='function'?getHistorialActividad(tipo):[];if(!h.length){c.innerHTML='<div class="apex-history-empty">Aún no hay acciones registradas</div>';return}c.innerHTML=h.map(function(a){var color=a.estado==='aprobado'||a.estado==='completado'?'#61f0b0':a.estado==='rechazado'?'#ff8298':'#ffd447';return '<div class="apex-history-row"><span><b>'+escapeHtml(a.usuario||'Sistema')+'</b> · '+escapeHtml(a.concepto||a.accion||'Acción')+'</span><small style="color:'+color+'">'+escapeHtml(a.estado||'pendiente')+' · '+(typeof formatDateTime==='function'?escapeHtml(formatDateTime(a.fecha)):escapeHtml(a.fecha||''))+'</small></div>'}).join('')}
+  function registrar(tipo,usuario,concepto,estado,extra){if(typeof guardarHistorialActividad==='function')guardarHistorialActividad(tipo,Object.assign({usuario:usuario||'Sistema',concepto:concepto||'Acción',estado:estado||'completado'},extra||{}));}
+  function envolver(nombre,tipo,estado){var original=window[nombre];if(typeof original!=='function'||original.__apexHistoryWrapped)return;var wrapped=function(){var args=arguments,telefono=args[0],indice=args[1],resultado=original.apply(this,args),hacer=function(){var usuario=telefono||'Usuario';try{var us=getUsers(),u=us.find(function(z){return String(z.telefono)===String(telefono)});if(u)usuario=(u.nombre||'')+' '+(u.apellido||'')+' ('+u.telefono+')'}catch(e){}var concepto=tipo==='tareas'?'Tarea procesada':tipo==='logros'?'Logro procesado':tipo==='canjes'?'Canje procesado':'Cupón asignado';registrar(tipo,usuario,concepto,estado,{indice:indice})};if(resultado&&typeof resultado.then==='function')return resultado.then(function(v){hacer();return v});hacer();return resultado};wrapped.__apexHistoryWrapped=true;window[nombre]=wrapped;}
+  function instalar(){prepararHistoriales();['tareas','logros','canjes','cupones','actividades'].forEach(function(t){var c=document.getElementById('historial_'+t);if(c)window.renderHistorialActividad(t)});envolver('aprobarTarea','tareas','aprobado');envolver('rechazarTarea','tareas','rechazado');envolver('aprobarLogro','logros','aprobado');envolver('rechazarLogro','logros','rechazado');envolver('aprobarCanje','canjes','aprobado');envolver('rechazarCanje','canjes','rechazado');envolver('asignarCuponAUsuarioEspecifico','cupones','asignado');envolver('asignarCuponAUsuario','cupones','asignado');envolver('asignarCuponATodos','cupones','asignado');envolver('asignarTareaAUsuario','tareas','asignado');envolver('asignarTareaATodos','tareas','asignado');envolver('asignarLogroAUsuarioEspecifico','logros','asignado');}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',instalar);else instalar();
 })();
 </script></body>
 </html>
