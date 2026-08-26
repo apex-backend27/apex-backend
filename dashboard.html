@@ -693,8 +693,24 @@ function getPremiosCofres() {
     return { premios: [5, 8, 10, 12, 15, 20, 25, 30, 50] };
 }
 
+function normalizarCanje(c) {
+    c = c || {};
+    return {
+        id: c.id || ('canje_' + Date.now()),
+        nombre: c.nombre || c.titulo || c.name || 'Canje',
+        descripcion: c.descripcion || c.description || '',
+        montoUSDT: Number(c.montoUSDT ?? c.monto_usdt ?? c.monto ?? c.usdt ?? c.amount ?? 0) || 0,
+        costoPuntos: Number(c.costoPuntos ?? c.costo_puntos ?? c.costo ?? c.puntos ?? c.precioPuntos ?? 0) || 0,
+        activo: c.activo !== false
+    };
+}
 function getCanjes() {
-    try { return JSON.parse(localStorage.getItem(CANJES_KEY)) || []; } catch { return []; }
+    try {
+        if (Array.isArray(window.apexCanjesRemotos)) {
+            return window.apexCanjesRemotos.filter(function(c) { return c && c.activo !== false; }).map(normalizarCanje);
+        }
+        return JSON.parse(localStorage.getItem(CANJES_KEY) || '[]').map(normalizarCanje).filter(function(c) { return c.activo !== false; });
+    } catch { return []; }
 }
 
 function getLogrosSistema() {
@@ -2107,7 +2123,7 @@ async function requestWithdraw(){
  var pass=prompt('🔐 Contraseña de retiro (6 dígitos):');if(!pass)return;if(!confirm('¿Confirmar retiro de $'+amount.toFixed(2)+'?'))return;
  try{var token=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/user/withdraw',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({amount:amount,password:pass,address:user.direccion_retiro})});var data=await r.json();if(!r.ok||data.error)throw new Error(data.error||'Error en el servidor');if(data.user){user.balance=Number(data.user.balance||user.balance);user.historial=data.user.historial||user.historial;user.historial_detallado=data.user.historial_detallado||user.historial_detallado;sessionStorage.setItem('apex_user',JSON.stringify(user));localStorage.setItem('apex_user',JSON.stringify(user));}showAlert('✅ Solicitud de retiro enviada','success');renderDashboard();input.value='';}catch(e){showAlert('❌ '+e.message,'danger');}
 }
-function abrirPuntos(){var cs=getCanjes();var html='<p>Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!cs.length)html+='<p>No hay canjes configurados.</p>';else html+=cs.map(function(c,i){var cost=Number(c.costo||c.puntos||c.precioPuntos||0);return '<div style="padding:12px;border:1px solid #21466a;border-radius:12px;margin:8px 0"><strong>'+(c.nombre||c.titulo||'Canje '+(i+1))+'</strong><p>'+cost+' puntos</p><button class="btn-action apex-redeem" data-i="'+i+'" '+(Number(user.puntos||0)<cost?'disabled':'')+'>Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem').forEach(function(b){b.onclick=function(){var c=cs[Number(b.dataset.i)],cost=Number(c.costo||c.puntos||c.precioPuntos||0);if(Number(user.puntos||0)<cost)return;user.puntos-=cost;user.canjes_realizados=user.canjes_realizados||[];user.canjes_realizados.push({nombre:c.nombre||c.titulo||'Canje',puntos:cost,fecha:new Date().toISOString(),estado:'pendiente'});apexPersist();modal.remove();showAlert('✅ Canje solicitado','success');};});}
+function abrirPuntos(){var cs=getCanjes();var html='<p>Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!cs.length)html+='<p>No hay canjes configurados.</p>';else html+=cs.map(function(c,i){var cost=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||0);return '<div style="padding:12px;border:1px solid #21466a;border-radius:12px;margin:8px 0"><strong>'+(c.nombre||'Canje '+(i+1))+'</strong><p>'+(c.descripcion?c.descripcion+'<br>':'')+'🎁 Recibes: <strong>$'+monto.toFixed(2)+' USDT</strong><br>⭐ Costo: <strong>'+cost+' puntos</strong></p><button class="btn-action apex-redeem" data-i="'+i+'" '+(Number(user.puntos||0)<cost?'disabled':'')+'>Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem').forEach(function(b){b.onclick=function(){var c=cs[Number(b.dataset.i)],cost=Number(c.costoPuntos||0);if(Number(user.puntos||0)<cost)return;user.puntos-=cost;user.canjes_realizados=user.canjes_realizados||[];user.canjes_realizados.push({nombre:c.nombre||c.titulo||'Canje',puntos:cost,fecha:new Date().toISOString(),estado:'pendiente'});apexPersist();modal.remove();showAlert('✅ Canje solicitado','success');};});}
 window.addEventListener('load',function(){setTimeout(cargarJuegosConfigRemota,500);});
 </script>
 
@@ -2123,7 +2139,7 @@ window.addEventListener('load',function(){setTimeout(sincronizarUsuarioActual,70
 <script>
 var apexCatalogos={canjes:[],logros:[]};
 async function cargarCatalogosRemotos(){try{var tok=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/catalogs/config',{headers:{Authorization:'Bearer '+tok}});if(r.ok){apexCatalogos=await r.json();if(apexCatalogos.canjes.length)window.apexCanjesRemotos=apexCatalogos.canjes;if(apexCatalogos.logros.length)window.apexLogrosRemotos=apexCatalogos.logros;}}catch(e){console.warn('Catálogos remotos no disponibles',e)}}
-function getCanjes(){return Array.isArray(window.apexCanjesRemotos)&&window.apexCanjesRemotos.length?window.apexCanjesRemotos:(JSON.parse(localStorage.getItem(CANJES_KEY)||'[]')||[])}
+function getCanjes(){var lista=Array.isArray(window.apexCanjesRemotos)&&window.apexCanjesRemotos.length?window.apexCanjesRemotos:(JSON.parse(localStorage.getItem(CANJES_KEY)||'[]')||[]);return Array.isArray(lista)?lista.filter(function(c){return c&&c.activo!==false}).map(normalizarCanje):[]}
 function getLogrosSistema(){return Array.isArray(window.apexLogrosRemotos)&&window.apexLogrosRemotos.length?window.apexLogrosRemotos:(JSON.parse(localStorage.getItem(LOGROS_KEY)||'[]')||[])}
 window.addEventListener('load',function(){setTimeout(cargarCatalogosRemotos,900)});
 </script>
