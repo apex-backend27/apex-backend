@@ -2110,7 +2110,25 @@ function abrirTareasAsignadas(){
 }
 function abrirCupones(){var cs=Array.isArray(user.cupones_asignados)?user.cupones_asignados:[];apexModal('🎫 Mis cupones',cs.length?cs.map(function(c){return '<p>🎫 '+(c.nombre||c.codigo||'Cupón')+' — '+(c.usado?'Usado':'Disponible')+'</p>';}).join(''):'<p>No tienes cupones asignados.</p>');}
 function abrirPuntos(){apexModal('⭐ Mis puntos','<p>Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p><p>El canje se procesa desde el módulo de canjes.</p>');}
-function abrirLogros(){var ls=Array.isArray(user.logros_asignados)?user.logros_asignados:[];apexModal('🏆 Mis logros',ls.length?ls.map(function(l){return '<p>🏆 '+(l.nombre||l.titulo||'Logro')+'</p>';}).join(''):'<p>No tienes logros asignados.</p>');}
+async function abrirLogros(){
+  var asignados=Array.isArray(user.logros_asignados)?user.logros_asignados:[], catalogo=[];
+  try{var r=await fetch(API_URL+'/api/catalogs/config',{headers:{Authorization:'Bearer '+localStorage.getItem('apex_token')}});if(r.ok){var data=await r.json();catalogo=Array.isArray(data.logros)?data.logros:[];}}catch(e){console.warn('No se pudo cargar el catálogo de logros',e)}
+  var ls=asignados.map(function(item){
+    var id=typeof item==='string'?item:(item&&((item.logroId||item.logro_id||item.id)));
+    var base=(id&&catalogo.find(function(x){return String(x.id)===String(id)}))||{};
+    return Object.assign({},base,typeof item==='object'?item:{id:id});
+  });
+  var html=ls.length?ls.map(function(l,i){
+    var meta=l.meta??l.meta_cantidad??l.metaCantidad??l.objetivo??0;
+    var recompensa=l.recompensa??l.cantidad??l.premio??0;
+    var tipo=String(l.tipo_recompensa||l.tipoRecompensa||l.recompensa_tipo||'puntos').toLowerCase();
+    var dias=l.dias_vigencia??l.diasVigencia??l.dias_vencimiento??l.diasVencimiento??l.dias??0;
+    var estado=l.estado==='completado'||l.completado||l.reclamado?'✅ Completado':'⏳ Pendiente';
+    return '<article class="apex-user-achievement"><div class="apex-achievement-top"><strong>🏆 '+(l.nombre||l.titulo||'Logro '+(i+1))+'</strong><span>'+estado+'</span></div><p class="apex-achievement-description">'+(l.descripcion||'Completa la meta indicada para obtener la recompensa.')+'</p><div class="apex-achievement-data"><span>🎯 Meta: <b>'+meta+'</b></span><span>🎁 Recompensa: <b>'+recompensa+' '+(tipo.indexOf('usdt')!==-1?'USDT':'puntos')+'</b></span><span>⏱️ Plazo: <b>'+dias+' '+(Number(dias)===1?'día':'días')+'</b></span></div></article>';
+  }).join(''):'<p>No tienes logros asignados.</p>';
+  var modal=apexModal('🏆 Mis logros',html);
+  if(!document.getElementById('apex-user-achievements-style')){var s=document.createElement('style');s.id='apex-user-achievements-style';s.textContent='.apex-user-achievement{padding:16px;margin:10px 0;border:1px solid #27d3ff66;border-left:4px solid #27d3ff;border-radius:15px;background:linear-gradient(135deg,#071326,#10233d);color:#eef7ff;box-shadow:0 8px 22px #0005}.apex-achievement-top{display:flex;justify-content:space-between;gap:10px;font-size:16px}.apex-achievement-top span{color:#ffd447;font-size:12px}.apex-achievement-description{margin:10px 0;color:#b9cde2;line-height:1.45}.apex-achievement-data{display:flex;flex-wrap:wrap;gap:8px}.apex-achievement-data span{padding:7px 9px;border-radius:9px;background:#0b1b31;border:1px solid #3a5d7c;color:#b9d4eb;font-size:12px}.apex-achievement-data b{color:#fff}';document.head.appendChild(s)}
+}
 </script>
 
 <script>
