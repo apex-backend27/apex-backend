@@ -637,7 +637,8 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             hoy: hoyLima,
             pausadas: pausadas,
             autorizadasHoy: !pausadas && fechaActivacion === hoyLima,
-            horaCobro: row.hora_cobro || '20:00'
+            horaCobro: row.hora_cobro || '20:00',
+            hora_cobro: row.hora_cobro || '20:00'
         });
     } catch (error) {
         console.error('Error obteniendo configuración de tareas:', error);
@@ -666,10 +667,13 @@ app.post('/api/admin/tasks/pause', authenticate, isAdmin, async (req, res) => {
 app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
     try {
         const tareas = (Array.isArray(req.body.tareas) ? req.body.tareas : tareasPorDefecto).slice(0, 5);
-        const fecha = req.body.fecha || null;
-        const pausadas = req.body.pausadas === true;
-        const autorizadas = req.body.autorizadas !== undefined ? req.body.autorizadas === true : (!pausadas && Boolean(fecha));
-        const horaCobro = /^([01]\\d|2[0-3]):[0-5]\\d$/.test(String(req.body.horaCobro || '')) ? String(req.body.horaCobro) : '20:00';
+        const actual = await pool.query('SELECT tareas_activacion, tareas_pausadas, tareas_autorizadas, hora_cobro FROM configuracion WHERE id = 1');
+        const previo = actual.rows[0] || {};
+        const fecha = req.body.fecha !== undefined && req.body.fecha !== null ? req.body.fecha : (previo.tareas_activacion || null);
+        const pausadas = req.body.pausadas !== undefined ? req.body.pausadas === true : previo.tareas_pausadas === true;
+        const autorizadas = req.body.autorizadas !== undefined ? req.body.autorizadas === true : (previo.tareas_autorizadas === true || (!pausadas && Boolean(fecha)));
+        const horaSolicitada = String(req.body.horaCobro || req.body.hora_cobro || previo.hora_cobro || '20:00');
+        const horaCobro = /^([01]\\d|2[0-3]):[0-5]\\d$/.test(horaSolicitada) ? horaSolicitada : '20:00';
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         const result = await pool.query(
@@ -718,13 +722,13 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const partesHora = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
         const minutoActual = partesHora[0] * 60 + partesHora[1];
         const minutoInicioCobro = hCobro * 60 + mCobro;
-        if (cfgResult.rows[0]?.tareas_pausadas === true || fechaActivacion !== hoyLima) {
-            await client.query('ROLLBACK');
-            return res.status(423).json({ error: fechaActivacion !== hoyLima ? 'Las tareas del nuevo día aún no han sido autorizadas por el administrador' : 'Las tareas están pausadas por el administrador' });
-        }
         if (minutoActual < minutoInicioCobro) {
             await client.query('ROLLBACK');
-            return res.status(423).json({ error: 'El cobro estará disponible desde las ' + horaCobro + ' horas' });
+            return res.status(423).json({ error: 'Aún no es la hora de realizar el cobro. Estará disponible desde las ' + horaCobro + ' horas.' });
+        }
+        if (cfgResult.rows[0]?.tareas_pausadas === true || fechaActivacion !== hoyLima || cfgResult.rows[0]?.tareas_autorizadas !== true) {
+            await client.query('ROLLBACK');
+            return res.status(423).json({ error: cfgResult.rows[0]?.tareas_pausadas === true ? 'Las tareas están pausadas por el administrador' : 'Las tareas del nuevo día aún no han sido autorizadas por el administrador' });
         }
         const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         if (u.cobro_tareas_fecha && String(u.cobro_tareas_fecha).slice(0, 10) === hoy) {
