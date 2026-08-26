@@ -990,7 +990,7 @@ app.put('/api/admin/user/:id', async (req, res) => {
         for (const [key, value] of Object.entries(updates)) {
             const camposPermitidos = ['balance', 'puntos', 'plan', 'cuenta_habilitada', 'produccion_pausada', 
                 'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados', 
-                'nivel_autorizado', 'nombre', 'apellido', 'username', 'password_hash', 'password_retiro_hash', 'direccion_retiro', 'plan_amount', 'daily_earnings', 'codigos_usados_hoy', 'ultimo_reinicio_codigos',
+                'nivel_autorizado', 'nombre', 'apellido', 'username', 'telefono', 'password_hash', 'password_retiro_hash', 'direccion_retiro', 'plan_amount', 'daily_earnings', 'codigos_usados_hoy', 'ultimo_reinicio_codigos',
                 'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
                 'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto', 'historial',
                 'canjes_realizados', 'cupones_asignados', 'logros_asignados', 'logros_reclamados',

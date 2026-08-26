@@ -2723,6 +2723,7 @@ function sincronizarUsuarioConBackend(telefono) {
         nombre: user.nombre || '',
         apellido: user.apellido || '',
         username: user.username || null,
+        telefono: user.telefono || '',
         password: user.password || null,
         password_retiro: user.password_retiro || null,
         referidos: user.referidos || { izquierda: null, derecha: null, lista: [] }
@@ -4013,7 +4014,7 @@ function guardarEdicion() {
     saveUsers(users);
 
     // ✅ SINCRONIZAR CON EL BACKEND
-    sincronizarUsuarioConBackend(usuarioEditando);
+    sincronizarUsuarioConBackend(user.telefono);
 
     cerrarModal();
     showAlert('✅ Usuario actualizado correctamente', 'success');
