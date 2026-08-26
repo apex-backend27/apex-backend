@@ -2116,7 +2116,11 @@ async function abrirLogros(){
   var ls=asignados.map(function(item){
     var id=typeof item==='string'?item:(item&&((item.logroId||item.logro_id||item.id)));
     var base=(id&&catalogo.find(function(x){return String(x.id)===String(id)}))||{};
-    return Object.assign({},base,typeof item==='object'?item:{id:id});
+    var original=typeof item==='object'?item:{};
+    var merged=Object.assign({},base,original,{id:id||base.id});
+    ['meta','recompensa','dias_vigencia'].forEach(function(k){if((original[k]===undefined||original[k]===null||Number(original[k])===0)&&Number(base[k]||0)>0)merged[k]=base[k]});
+    ['nombre','descripcion','tipo','recompensa_tipo'].forEach(function(k){if((!String(original[k]||'').trim()|| (k==='nombre' && /^logro\\s*\\d*$/i.test(String(original[k]).trim())))&&String(base[k]||'').trim())merged[k]=base[k]});
+    return merged;
   });
   var html=ls.length?ls.map(function(l,i){
     var meta=l.meta??l.meta_cantidad??l.metaCantidad??l.objetivo??0;
