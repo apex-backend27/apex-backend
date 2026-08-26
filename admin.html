@@ -1121,6 +1121,19 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;ba
 .alert-success{background:rgba(35,180,130,.16)!important;color:var(--fx-green)!important;border-color:rgba(93,242,189,.35)!important}.alert-danger{background:rgba(240,75,110,.14)!important;color:#ff91a9!important;border-color:rgba(255,100,130,.3)!important}.alert-warning{background:rgba(255,183,77,.14)!important;color:#ffd080!important;border-color:rgba(255,190,90,.3)!important}
 
 </style>
+<style id="apex-admin-futuristic-sections">
+/* Tema futurista consistente para tareas, logros y cupones */
+.tarea-item,.logro-item,.cupon-item{background:linear-gradient(135deg,#101d35,#0a1327)!important;border:1px solid rgba(39,211,255,.34)!important;border-left:4px solid #27d3ff!important;border-radius:16px!important;padding:18px!important;box-shadow:0 8px 24px rgba(0,0,0,.24),inset 0 0 20px rgba(39,211,255,.035)!important;transition:transform .2s,box-shadow .2s,border-color .2s!important}
+.tarea-item:hover,.logro-item:hover,.cupon-item:hover{transform:translateY(-2px);border-color:#8b7cff!important;box-shadow:0 12px 30px rgba(39,211,255,.16),inset 0 0 24px rgba(115,85,255,.08)!important}
+.tarea-item input,.tarea-item select,.logro-item input,.logro-item select,.cupon-item input,.cupon-item select{background:#071326!important;color:#eef7ff!important;border:1px solid rgba(147,194,230,.38)!important;border-radius:10px!important;min-height:38px!important;padding:8px 11px!important;outline:none!important;transition:border-color .18s,box-shadow .18s!important}
+.tarea-item input:focus,.tarea-item select:focus,.logro-item input:focus,.logro-item select:focus,.cupon-item input:focus,.cupon-item select:focus{border-color:#27d3ff!important;box-shadow:0 0 0 3px rgba(39,211,255,.13)!important}
+.tarea-item select,.logro-item select,.cupon-item select{color:#e8f6ff!important;cursor:pointer}
+.tarea-item button[onclick*="eliminar"],.logro-item button[onclick*="eliminar"],.cupon-item button[onclick*="eliminar"]{background:linear-gradient(135deg,#ef5350,#a51d3a)!important;border:0!important;border-radius:10px!important;min-height:38px!important;padding:8px 13px!important;box-shadow:0 5px 14px rgba(239,83,80,.18)!important}
+#tareasContainer,#logrosContainer,#cuponesContainer{padding:4px 2px}
+#tareasPendientesContainer,#logrosPendientesContainer{display:grid;gap:12px}
+.tareas-pendiente-item,.logros-pendiente-item{background:linear-gradient(135deg,#101d35,#0a1327)!important;border:1px solid rgba(247,151,30,.55)!important;border-left:4px solid #f7971e!important;border-radius:16px!important;box-shadow:0 8px 24px rgba(0,0,0,.22)!important;color:#eef7ff!important}
+@media(max-width:760px){.tarea-item,.logro-item,.cupon-item{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}.tarea-item input,.tarea-item select,.logro-item input,.logro-item select,.cupon-item input,.cupon-item select{width:100%!important;min-width:0!important}.tarea-item .tarea-nombre,.tarea-item .tarea-desc,.cupon-item .cupon-titulo,.cupon-item .cupon-desc{grid-column:1/-1!important}}
+</style>
 </head>
 <body>
 
