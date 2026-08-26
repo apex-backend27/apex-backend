@@ -1134,6 +1134,12 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;ba
 .tareas-pendiente-item,.logros-pendiente-item{background:linear-gradient(135deg,#101d35,#0a1327)!important;border:1px solid rgba(247,151,30,.55)!important;border-left:4px solid #f7971e!important;border-radius:16px!important;box-shadow:0 8px 24px rgba(0,0,0,.22)!important;color:#eef7ff!important}
 @media(max-width:760px){.tarea-item,.logro-item,.cupon-item{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}.tarea-item input,.tarea-item select,.logro-item input,.logro-item select,.cupon-item input,.cupon-item select{width:100%!important;min-width:0!important}.tarea-item .tarea-nombre,.tarea-item .tarea-desc,.cupon-item .cupon-titulo,.cupon-item .cupon-desc{grid-column:1/-1!important}}
 </style>
+<style id="apex-logros-days-layout">
+.logro-item{display:grid!important;grid-template-columns:minmax(170px,1.35fr) minmax(190px,1.5fr) minmax(115px,1fr) 76px 112px 76px 76px 92px 44px;gap:10px!important;align-items:center!important;overflow:visible!important}
+.logro-item .logro-nombre{min-width:0!important}.logro-item .logro-desc{min-width:0!important}.logro-item .logro-meta,.logro-item .logro-recompensa,.logro-item .logro-dias{width:100%!important;box-sizing:border-box!important}.logro-item .logro-dias{border-color:#ffd447!important;box-shadow:0 0 0 2px rgba(255,212,71,.12)!important}.logro-item .badge{white-space:nowrap!important;text-align:center!important}
+@media(max-width:1100px){.logro-item{grid-template-columns:minmax(150px,1.4fr) minmax(180px,1.5fr) 110px 70px 105px 70px 70px 88px 42px;overflow-x:auto!important;padding-bottom:20px!important}.logro-item>*{min-width:0!important}}
+@media(max-width:700px){.logro-item{grid-template-columns:1fr 1fr!important;overflow:visible!important}.logro-item .logro-nombre,.logro-item .logro-desc{grid-column:1/-1!important}.logro-item .logro-tipo,.logro-item .logro-recompensa-tipo{width:100%!important}.logro-item .logro-meta,.logro-item .logro-recompensa,.logro-item .logro-dias{width:100%!important}.logro-item .badge{display:none!important}}
+</style>
 </head>
 <body>
 
@@ -4495,7 +4501,7 @@ function renderLogros() {
                 '<option value="usdt" ' + (l.recompensa_tipo === 'usdt' ? 'selected' : '') + '>💰 USDT</option>' +
             '</select>' +
             '<input type="number" class="logro-recompensa" value="' + (l.recompensa || 10) + '" placeholder="Recompensa" style="width:50px;padding:5px 6px;border:1px solid #e0e0e0;border-radius:6px;font-size:12px;text-align:center;" data-tooltip="Cantidad de Puntos o USDT a dar">' +
-            '<input type="number" class="logro-dias" value="' + (l.dias_vigencia || 30) + '" placeholder="Días" style="width:40px;padding:5px 6px;border:1px solid #e0e0e0;border-radius:6px;font-size:12px;text-align:center;" data-tooltip="Días de vigencia del logro">' +
+            '<input type="number" class="logro-dias" value="' + (l.dias_vigencia ?? 30) + '" placeholder="Días" style="width:40px;padding:5px 6px;border:1px solid #e0e0e0;border-radius:6px;font-size:12px;text-align:center;" data-tooltip="Días de vigencia del logro">' +
             '<span class="badge badge-info" style="font-size:8px;">' + recompensaLabel + '</span>' +
             '<button onclick="eliminarLogro(' + i + ')" style="background:#ef5350;color:#fff;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;" data-tooltip="Eliminar logro">🗑️</button>' +
         '</div>';
@@ -4803,13 +4809,28 @@ function asignarLogroAUsuarioEspecifico(telefono, logroId, silencioso) {
 
     if (!user.logros_asignados) user.logros_asignados = [];
     
-    // Verificar si ya tiene este logro asignado
-    if (user.logros_asignados.indexOf(logroId) !== -1) {
+        // Verificar si ya tiene este logro asignado, tanto en formato ID como objeto
+    var yaAsignado = user.logros_asignados.some(function(item) {
+        return String(typeof item === 'object' ? (item.logroId || item.logro_id || item.id) : item) === String(logroId);
+    });
+    if (yaAsignado) {
         if (!silencioso) showAlert('⚠️ Este logro ya está asignado a ' + user.nombre, 'warning');
         return false;
     }
-
-    user.logros_asignados.push(logroId);
+    // Guardar una instantánea completa para que nombre, descripción, meta y días no dependan de localStorage
+    user.logros_asignados.push({
+        id: logro.id,
+        logroId: logro.id,
+        nombre: logro.nombre,
+        descripcion: logro.descripcion || '',
+        tipo: logro.tipo,
+        meta: Number(logro.meta || 0),
+        recompensa_tipo: logro.recompensa_tipo || 'puntos',
+        recompensa: Number(logro.recompensa || 0),
+        dias_vigencia: Number(logro.dias_vigencia ?? logro.diasVigencia ?? logro.dias ?? 30),
+        fechaAsignacion: new Date().toISOString(),
+        estado: 'pendiente'
+    });
     saveUsers(users);
     sincronizarUsuarioConBackend(telefono);
     
