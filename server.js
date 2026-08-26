@@ -1236,6 +1236,7 @@ app.post('/api/admin/user/:id/task/assign', authenticate, isAdmin, async (req,re
             tipo_recompensa: String(t.tipo_recompensa || 'puntos'), cantidad: Number(t.cantidad || 0),
             puntos: String(t.tipo_recompensa || 'puntos') === 'puntos' ? Number(t.cantidad || 0) : 0,
             estado: 'pendiente', fechaAsignacion: new Date().toISOString(),
+            diasVencimiento: Number(t.diasVencimiento || 0),
             fechaVencimiento: t.fechaVencimiento || null, comprobante: null, fechaCompletado: null
         };
         ts.push(tarea);
