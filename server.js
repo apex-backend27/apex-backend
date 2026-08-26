@@ -634,12 +634,30 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             fechaDia: fechaActivacion,
             hoy: hoyLima,
             pausadas: pausadas,
-            autorizadasHoy: !pausadas && fechaActivacion === hoyLima && (autorizacionExplicita || row.tareas_autorizadas === null || row.tareas_autorizadas === undefined)
+            autorizadasHoy: !pausadas && fechaActivacion === hoyLima
         });
     } catch (error) {
         console.error('Error obteniendo configuración de tareas:', error);
         res.status(500).json({ error: 'Error al obtener configuración de tareas' });
     }
+});
+
+app.post('/api/admin/tasks/activate', authenticate, isAdmin, async (req, res) => {
+    try {
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE`);
+        const r = await pool.query(`UPDATE configuracion SET tareas_activacion = NOW(), tareas_pausadas = FALSE, tareas_autorizadas = TRUE, updated_at = NOW() WHERE id = 1 RETURNING tareas_activacion, tareas_pausadas`);
+        if (!r.rows.length) return res.status(404).json({error:'No existe la configuración de tareas'});
+        res.json({message:'Tareas activadas para hoy', config:r.rows[0]});
+    } catch (error) { console.error('Error activando tareas:', error); res.status(500).json({error:'No se pudieron activar las tareas'}); }
+});
+
+app.post('/api/admin/tasks/pause', authenticate, isAdmin, async (req, res) => {
+    try {
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE`);
+        const r = await pool.query(`UPDATE configuracion SET tareas_pausadas = TRUE, tareas_autorizadas = FALSE, updated_at = NOW() WHERE id = 1 RETURNING tareas_activacion, tareas_pausadas`);
+        if (!r.rows.length) return res.status(404).json({error:'No existe la configuración de tareas'});
+        res.json({message:'Tareas pausadas', config:r.rows[0]});
+    } catch (error) { console.error('Error pausando tareas:', error); res.status(500).json({error:'No se pudieron pausar las tareas'}); }
 });
 
 app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
@@ -689,9 +707,9 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         const fechaValor = cfgResult.rows[0]?.tareas_activacion;
         const fechaActivacion = fechaValor ? (String(fechaValor).match(/^\d{4}-\d{2}-\d{2}$/) ? String(fechaValor).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(fechaValor))) : null;
-        if (cfgResult.rows[0]?.tareas_pausadas === true || fechaActivacion !== hoyLima || cfgResult.rows[0]?.tareas_autorizadas !== true) {
+        if (cfgResult.rows[0]?.tareas_pausadas === true || fechaActivacion !== hoyLima) {
             await client.query('ROLLBACK');
-            return res.status(423).json({ error: (fechaActivacion !== hoyLima || cfgResult.rows[0]?.tareas_autorizadas !== true) ? 'Las tareas del nuevo día aún no han sido autorizadas por el administrador' : 'Las tareas están pausadas por el administrador' });
+            return res.status(423).json({ error: fechaActivacion !== hoyLima ? 'Las tareas del nuevo día aún no han sido autorizadas por el administrador' : 'Las tareas están pausadas por el administrador' });
         }
         const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         if (u.cobro_tareas_fecha && String(u.cobro_tareas_fecha).slice(0, 10) === hoy) {

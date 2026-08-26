@@ -6803,11 +6803,11 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
   };
   window.activarTareasDiarias=async function(){
     if(!confirm('🚀 ¿Activar las tareas de hoy para todos los usuarios?'))return;
-    try{var ts=typeof getTareasConfig==='function'?getTareasConfig():[];await apexGuardarEstadoTareas(ts,new Date().toISOString(),false,true);if(typeof saveTareasActivacion==='function')saveTareasActivacion({fecha:new Date().toDateString(),activo:true,horaActivacion:new Date().toISOString()});actualizarEstadoActivacionTareas();renderTareasConfig();showAlert('✅ Tareas activadas para hoy','success')}catch(e){showAlert('❌ '+e.message,'danger')}
+    try{var tok=apexAdminToken();var rr=await fetch(API_URL+'/api/admin/tasks/activate',{method:'POST',cache:'no-store',headers:{Authorization:'Bearer '+tok}});var xx=await rr.json();if(!rr.ok||xx.error)throw new Error(xx.error||'No se pudieron activar');if(typeof saveTareasActivacion==='function')saveTareasActivacion({fecha:new Date().toDateString(),activo:true,horaActivacion:new Date().toISOString()});actualizarEstadoActivacionTareas();renderTareasConfig();showAlert('✅ Tareas activadas para hoy','success')}catch(e){showAlert('❌ '+e.message,'danger')}
   };
   window.resetearTareasHoy=async function(){
     if(!confirm('⏸️ ¿Pausar las tareas para todos los usuarios?'))return;
-    try{var ts=typeof getTareasConfig==='function'?getTareasConfig():[];await apexGuardarEstadoTareas(ts,null,true,false);if(typeof saveTareasActivacion==='function')saveTareasActivacion({fecha:new Date().toDateString(),activo:false});actualizarEstadoActivacionTareas();renderTareasConfig();showAlert('⏸️ Tareas pausadas para todos','warning')}catch(e){showAlert('❌ '+e.message,'danger')}
+    try{var tok=apexAdminToken();var rr=await fetch(API_URL+'/api/admin/tasks/pause',{method:'POST',cache:'no-store',headers:{Authorization:'Bearer '+tok}});var xx=await rr.json();if(!rr.ok||xx.error)throw new Error(xx.error||'No se pudieron pausar');if(typeof saveTareasActivacion==='function')saveTareasActivacion({fecha:new Date().toDateString(),activo:false});actualizarEstadoActivacionTareas();renderTareasConfig();showAlert('⏸️ Tareas pausadas para todos','warning')}catch(e){showAlert('❌ '+e.message,'danger')}
   };
 })();
 </script><style id="apex-history-dropdown-style">
