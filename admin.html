@@ -6836,5 +6836,10 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
   function iniciar(){quitarControlesDuplicados();if(typeof window.renderTareasConfig==='function')window.renderTareasConfig()}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',iniciar);else setTimeout(iniciar,0);
 })();
+</script><style id="apex-temporary-test-mode-admin">#btnActivarTareas,#btnActivarTareas + button{display:none!important}#tareasStatusBadge{background:#173b52!important;color:#61f0b0!important;border:1px solid #27d3ff!important}#tareasFechaDisplay:after{content:' · Modo pruebas';color:#ffd447;font-weight:700}</style><script id="apex-temporary-test-mode-admin-script">
+(function(){
+  function marcar(){var b=document.getElementById('tareasStatusBadge');if(b)b.textContent='🧪 Modo pruebas activo';var d=document.getElementById('tareasFechaDisplay');if(d)d.textContent='Las tareas están disponibles sin autorización diaria';}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',marcar);else setTimeout(marcar,0);
+})();
 </script></body>
 </html>

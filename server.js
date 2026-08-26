@@ -707,7 +707,10 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         const fechaValor = cfgResult.rows[0]?.tareas_activacion;
         const fechaActivacion = fechaValor ? (String(fechaValor).match(/^\d{4}-\d{2}-\d{2}$/) ? String(fechaValor).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(fechaValor))) : null;
-        if (cfgResult.rows[0]?.tareas_pausadas === true || fechaActivacion !== hoyLima) {
+        // MODO PRUEBAS TEMPORAL: no bloquear el cobro por pausa o autorización diaria.
+        // El control diario se volverá a activar después de validar todo el flujo.
+        const modoPruebas = true;
+        if (!modoPruebas && (cfgResult.rows[0]?.tareas_pausadas === true || fechaActivacion !== hoyLima)) {
             await client.query('ROLLBACK');
             return res.status(423).json({ error: fechaActivacion !== hoyLima ? 'Las tareas del nuevo día aún no han sido autorizadas por el administrador' : 'Las tareas están pausadas por el administrador' });
         }
