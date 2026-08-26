@@ -2280,5 +2280,12 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   };
   window.addEventListener('load',function(){setTimeout(window.cargarReferidosRemotos,500);});
 })();
+</script><style id="apex-five-daily-tasks-no-streak">.racha-container{display:none!important}</style><script id="apex-five-daily-tasks-final">
+(function(){
+  var baseConfig=window.apexConfigTareas;
+  window.apexConfigTareas=function(){var x=typeof baseConfig==='function'?baseConfig():[];return Array.isArray(x)?x.slice(0,5):[]};
+  function ocultarRacha(){document.querySelectorAll('.racha-container,#rachaDias').forEach(function(e){var box=e.closest('.racha-container')||e;if(box)box.style.display='none'});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ocultarRacha);else ocultarRacha();
+})();
 </script></body>
 </html>

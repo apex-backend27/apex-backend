@@ -627,7 +627,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         const fechaActivacion = row.tareas_activacion ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(row.tareas_activacion)) : null;
         const pausadas = row.tareas_pausadas === true;
         res.json({
-            tareas: Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto,
+            tareas: (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5),
             fecha: row.tareas_activacion || null,
             fechaDia: fechaActivacion,
             hoy: hoyLima,
@@ -642,7 +642,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
 
 app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
     try {
-        const tareas = Array.isArray(req.body.tareas) ? req.body.tareas : tareasPorDefecto;
+        const tareas = (Array.isArray(req.body.tareas) ? req.body.tareas : tareasPorDefecto).slice(0, 5);
         const fecha = req.body.fecha || null;
         const pausadas = req.body.pausadas === true;
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
