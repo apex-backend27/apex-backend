@@ -1191,9 +1191,9 @@ function apexEstadoDiaAutorizado(data) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(hoy)) {
         hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     }
-    // Solo se permite el respaldo cuando la fecha de activación es la de hoy.
-    // Si el backend envía autorizadas=false explícitamente, prevalece el bloqueo.
-    return Boolean(diaActivacion && hoy === diaActivacion && data.autorizadas !== false);
+    // La fecha de activación de hoy y la ausencia de pausa son la fuente estable.
+    // `autorizadas` es un campo antiguo que puede quedar FALSE después de pausar.
+    return Boolean(diaActivacion && hoy === diaActivacion);
 }
 
 function cargarConfiguracionTareasRemota() {

@@ -1196,7 +1196,10 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             fechaDia: fechaActivacion,
             hoy: hoyLima,
             pausadas: pausadas,
-            autorizadasHoy: !pausadas && autorizacionExplicita && fechaActivacion === hoyLima,
+            // La autorización diaria se determina por la fecha guardada y la pausa.
+            // El booleano antiguo puede quedar FALSE después de una pausa y no debe bloquear
+            // una reactivación válida del mismo día.
+            autorizadasHoy: !pausadas && fechaActivacion === hoyLima,
             autorizadas: autorizacionExplicita,
             horaCobro: row.hora_cobro || '20:00',
             hora_cobro: row.hora_cobro || '20:00',
