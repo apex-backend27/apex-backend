@@ -185,8 +185,10 @@ async function rpcCall(method, params) {
     for (const rpcUrl of urls) {
         try {
             const response = await fetch(rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }) });
-            const body = await response.json();
-            if (!response.ok || body.error) throw new Error(body.error?.message || `HTTP ${response.status}`);
+            const raw = await response.text();
+            let body;
+            try { body = JSON.parse(raw); } catch (_) { body = { error: { message: raw.slice(0, 500) } }; }
+            if (!response.ok || body.error) throw new Error(`${body.error?.message || `HTTP ${response.status}`} [${method}]`);
             activeRpcUrl = rpcUrl;
             return body.result;
         } catch (error) { lastError = error; if (activeRpcUrl === rpcUrl) activeRpcUrl = null; }
@@ -247,6 +249,7 @@ async function obtenerTransferenciasAlchemy(toAddress, fromBlock, toBlock) {
                 maxCount: '0x3e8'
             };
             if (pageKey) params.pageKey = pageKey;
+            console.log(`Monitor Polygon: consultando alchemy_getAssetTransfers ${chunkStart}-${chunkEnd} para ${toAddress}`);
             const result = await rpcCall('alchemy_getAssetTransfers', [params]);
             if (Array.isArray(result?.transfers)) transfers.push(...result.transfers);
             pageKey = result?.pageKey || null;
