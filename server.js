@@ -170,7 +170,7 @@ async function asegurarBilleteraUsuario(userId) {
 // ============================================================
 // MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
 // ============================================================
-const DEPOSIT_MONITOR_VERSION = 'v15-alchemy-transfers-chunked-receipts-idempotent';
+const DEPOSIT_MONITOR_VERSION = 'v16-alchemy-transfers-1k-receipts-idempotent';
 const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
@@ -180,7 +180,8 @@ const POLYGON_RPC_URLS = String(process.env.POLYGON_RPC_URLS || process.env.POLY
 let activeRpcUrl = null;
 let monitorRunning = false;
 async function rpcCall(method, params) {
-    const urls = activeRpcUrl ? [activeRpcUrl, ...POLYGON_RPC_URLS.filter(x => x !== activeRpcUrl)] : POLYGON_RPC_URLS;
+    const configuredUrls = method.startsWith('alchemy_') ? POLYGON_RPC_URLS.filter(x => /alchemy\.com/i.test(x)) : POLYGON_RPC_URLS;
+    const urls = activeRpcUrl && configuredUrls.includes(activeRpcUrl) ? [activeRpcUrl, ...configuredUrls.filter(x => x !== activeRpcUrl)] : configuredUrls;
     let lastError;
     for (const rpcUrl of urls) {
         try {
@@ -188,7 +189,7 @@ async function rpcCall(method, params) {
             const raw = await response.text();
             let body;
             try { body = JSON.parse(raw); } catch (_) { body = { error: { message: raw.slice(0, 500) } }; }
-            if (!response.ok || body.error) throw new Error(`${body.error?.message || `HTTP ${response.status}`} [${method}]`);
+            if (!response.ok || body.error) throw new Error(`${body.error?.message || raw.slice(0, 500) || `HTTP ${response.status}`} [${method}]`);
             activeRpcUrl = rpcUrl;
             return body.result;
         } catch (error) { lastError = error; if (activeRpcUrl === rpcUrl) activeRpcUrl = null; }
@@ -233,7 +234,7 @@ async function acreditarDeposito(deposito) {
 }
 async function obtenerTransferenciasAlchemy(toAddress, fromBlock, toBlock) {
     const transfers = [];
-    const maxRange = 10000;
+    const maxRange = 1000;
     for (let chunkStart = Math.max(0, fromBlock); chunkStart <= toBlock; chunkStart += maxRange) {
         const chunkEnd = Math.min(toBlock, chunkStart + maxRange - 1);
         let pageKey;
