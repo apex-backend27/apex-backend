@@ -2441,5 +2441,20 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
  window.completarTareaDiaria=function(i){open(Number(i))};
 })();
 </script><style id="apex-varied-minigames-style-v1">.apex-varied-icons,.apex-var-pattern{text-align:center;padding:18px;color:#ffd447;font-size:28px;letter-spacing:5px;border:1px solid #ffd44766;border-radius:12px;background:#171633;margin-bottom:14px}.apex-var-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.apex-var-grid button,.apex-var-options button{min-height:48px;border:1px solid #27d3ff55;border-radius:10px;background:#0a2039;color:#fff;font-size:20px;font-weight:800;cursor:pointer}.apex-var-options{display:flex;flex-wrap:wrap;gap:8px}.apex-var-options button{flex:1;min-width:82px;font-size:15px}.apex-var-grid button:hover,.apex-var-options button:hover,.apex-var-grid button.selected,.apex-var-options button.selected{border-color:#6dffcf;background:linear-gradient(135deg,#078fc4,#6745e8)}.apex-var-colors{display:flex;justify-content:center;gap:10px}.apex-var-colors button{width:55px;height:55px;border:3px solid #fff6;border-radius:50%;cursor:pointer}.apex-var-range{width:100%;accent-color:#6dffcf}.apex-chase-stage{display:grid;place-items:center;min-height:130px;border:1px dashed #27d3ff66;border-radius:13px;background:#061a2c}.apex-chase-stage button{padding:16px;border:0;border-radius:50%;background:#6745e8;color:#fff;font-size:28px;cursor:pointer}@media(max-width:520px){.apex-var-options{flex-direction:column}.apex-var-options button{width:100%}}
-</style></body>
+</style><script id="apex-deposit-sync-v1">
+(function(){
+  function token(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||localStorage.getItem('token')||sessionStorage.getItem('token')||'';}
+  async function syncDeposits(){
+    var t=token(); if(!t) return;
+    try{
+      var r=await fetch(API_URL+'/api/me/deposits/sync?t='+Date.now(),{method:'POST',cache:'no-store',headers:{Authorization:'Bearer '+t}});
+      var x=await r.json(); if(!r.ok) throw Error(x.error||'No se pudo sincronizar el depósito');
+      if(typeof sincronizarUsuarioActual==='function') await sincronizarUsuarioActual();
+      else if(typeof cargarUsuario==='function' && user) cargarUsuario(user);
+    }catch(e){ console.warn('Sincronización de depósito:',e.message); }
+  }
+  window.sincronizarDepositos=syncDeposits;
+  window.addEventListener('load',function(){setTimeout(syncDeposits,2500);setInterval(syncDeposits,60000);});
+})();
+</script></body>
 </html>

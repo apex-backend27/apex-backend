@@ -179,7 +179,8 @@ async function monitorDepositosPolygon() {
         const provider = getPolygonProvider(), latest = await provider.getBlockNumber();
         const cfg = await pool.query('SELECT id, deposit_scanned_block FROM configuracion ORDER BY id LIMIT 1');
         const previous = cfg.rows.length ? Number(cfg.rows[0].deposit_scanned_block || 0) : 0;
-        const fromBlock = Math.max(0, previous ? previous + 1 : latest - 2000), toBlock = Math.min(latest, fromBlock + 900);
+        const lookback = Math.max(900, Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000));
+        const fromBlock = Math.max(0, latest - lookback), toBlock = latest;
         const users = await pool.query("SELECT id, LOWER(polygon_address) AS polygon_address FROM users WHERE polygon_address IS NOT NULL AND polygon_address LIKE '0x%'");
         const addressMap = new Map(users.rows.map(u => [String(u.polygon_address).toLowerCase(), u.id]));
         if (fromBlock <= toBlock && addressMap.size) {
@@ -524,6 +525,16 @@ app.get('/api/me/deposits', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Error en /api/me/deposits:', error.message);
     res.status(500).json({ error: 'No se pudo cargar el historial de depósitos' });
+  }
+});
+app.post('/api/me/deposits/sync', authenticate, async (req, res) => {
+  try {
+    await monitorDepositosPolygon();
+    const result = await pool.query('SELECT id, tx_hash, amount, block_number, confirmations, status, created_at, credited_at FROM polygon_deposits WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [req.userId]);
+    res.json({ message: 'Sincronización ejecutada', deposits: result.rows });
+  } catch (error) {
+    console.error('Error sincronizando depósitos:', error.message);
+    res.status(503).json({ error: 'No se pudo sincronizar el depósito' });
   }
 });
 
