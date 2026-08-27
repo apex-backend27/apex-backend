@@ -1368,6 +1368,20 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
 });
 
 // ============================================================
+// CONFIGURACIÓN PÚBLICA PARA USUARIOS AUTENTICADOS
+// ============================================================
+app.get('/api/config/withdrawal', authenticate, async (req, res) => {
+    try {
+        await ensureTaskColumns();
+        const result = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
+        const row = result.rows[0] || {};
+        res.json({ minimo_retiro: Number(row.minimo_retiro ?? 10), comision_retiro_porcentaje: Number(row.comision_retiro_porcentaje ?? 23) });
+    } catch (error) {
+        console.error('Error leyendo configuración de retiro:', error.message);
+        res.status(500).json({ error: 'No se pudo cargar la configuración de retiro' });
+    }
+});
+// ============================================================
 // ADMIN - CONFIGURACIÓN
 // ============================================================
 app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
