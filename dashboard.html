@@ -2477,11 +2477,12 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   async function syncDeposits(){
     var t=token(); if(!t) return;
     try{
-      var r=await fetch(API_URL+'/api/me/deposits/sync?t='+Date.now(),{method:'POST',cache:'no-store',headers:{Authorization:'Bearer '+t}});
-      var x=await r.json(); if(!r.ok) throw Error(x.error||'No se pudo sincronizar el depósito');
+      // El monitor acredita en el backend. Esta llamada auxiliar no debe impedir
+      // que el dashboard recargue el saldo autoritativo desde /api/verify.
+      try{ await fetch(API_URL+'/api/me/deposits/sync?t='+Date.now(),{method:'POST',cache:'no-store',headers:{Authorization:'Bearer '+t}}); }catch(_){ }
       if(typeof sincronizarUsuarioActual==='function') await sincronizarUsuarioActual();
       else if(typeof cargarUsuario==='function' && user) cargarUsuario(user);
-    }catch(e){ console.warn('Sincronización de depósito:',e.message); }
+    }catch(e){ console.warn('Actualización del saldo:',e.message); }
   }
   window.sincronizarDepositos=syncDeposits;
   window.addEventListener('load',function(){setTimeout(syncDeposits,2500);setInterval(syncDeposits,60000);});
