@@ -1180,6 +1180,22 @@ function verificarAdmin() {
 // ============================================================
 // CONFIGURACIÓN REMOTA DE TAREAS
 // ============================================================
+// ESTADO DIARIO: una sola regla para carga inicial y actualizaciones
+// ============================================================
+function apexEstadoDiaAutorizado(data) {
+    data = data || {};
+    if (data.pausadas === true) return false;
+    if (data.autorizadasHoy === true) return true;
+    var hoy = String(data.hoy || '').slice(0, 10);
+    var diaActivacion = String(data.fechaDia || data.fecha || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(hoy)) {
+        hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    }
+    // Solo se permite el respaldo cuando la fecha de activación es la de hoy.
+    // Si el backend envía autorizadas=false explícitamente, prevalece el bloqueo.
+    return Boolean(diaActivacion && hoy === diaActivacion && data.autorizadas !== false);
+}
+
 function cargarConfiguracionTareasRemota() {
     var token = localStorage.getItem('apex_token');
     if (!token) return Promise.resolve();
@@ -1194,7 +1210,7 @@ function cargarConfiguracionTareasRemota() {
         tareasFechaActivacionRemoto = data.fecha || null;
         // El backend es la única fuente de verdad para iniciar el día.
         // No se debe inferir la autorización usando localStorage ni solamente la fecha.
-        tareasAutorizadasHoyRemoto = !tareasPausadasRemoto && data.autorizadasHoy === true && data.autorizadas !== false;
+        tareasAutorizadasHoyRemoto = apexEstadoDiaAutorizado(data);
         var remotasValidas = Array.isArray(data.tareas) && data.tareas.length > 0 && data.tareas.every(function(t) {
             return t && Number.isFinite(Number(t.hora)) && Number.isFinite(Number(t.minuto));
         });
@@ -2344,7 +2360,7 @@ var _oldDaily=window.completarTareaDiaria;window.completarTareaDiaria=function(i
 var _oldClaim=window.cobrarTareasDelDia;window.cobrarTareasDelDia=async function(){if(!apexTienePlan()){showAlert('🔒 Primero debes adquirir un plan activo para cobrar','warning');return}if(tareasPausadasRemoto||!tareasAutorizadasHoyRemoto){showAlert('⏳ El día de tareas aún no ha sido iniciado por el administrador.','warning');return}return _oldClaim.apply(this,arguments)};
 </script><script id="apex-v13-remote-task-toggle">
 function apexDiaLima(v){if(!v)return null;var s=String(v);if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);var d=new Date(v);if(isNaN(d.getTime()))return null;var p=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d),o={};p.forEach(function(x){if(x.type!=='literal')o[x.type]=x.value});return o.year+'-'+o.month+'-'+o.day}
-function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_token');if(!tok)return Promise.resolve();return fetch(API_URL+'/api/tasks/config?t='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+tok}}).then(function(r){if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(function(data){tareasPausadasRemoto=data.pausadas===true;tareasFechaActivacionRemota=data.fecha||null;window.horaCobroRemota=data.horaCobro||data.hora_cobro||data.config&&data.config.hora_cobro||'20:00';var diaHoy=apexDiaLima(data.hoy||new Date()),diaActivacion=apexDiaLima(data.fechaDia||data.fecha);tareasAutorizadasHoyRemoto=!tareasPausadasRemoto&&data.autorizadasHoy===true&&data.autorizadas!==false;var ok=Array.isArray(data.tareas)&&data.tareas.length>0&&data.tareas.every(function(t){return t&&(t.sin_horario===true||(Number.isFinite(Number(t.hora))&&Number.isFinite(Number(t.minuto))))});if(ok){tareasConfigRemota=data.tareas;HORARIOS_TAREAS=data.tareas;localStorage.setItem(TAREAS_CONFIG_KEY,JSON.stringify({tareas:data.tareas}))}if(typeof renderTareas==='function')renderTareas()}).catch(function(e){console.warn('No se pudo cargar tareas remotas',e);if(typeof renderTareas==='function')renderTareas()})}
+function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_token');if(!tok)return Promise.resolve();return fetch(API_URL+'/api/tasks/config?t='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+tok}}).then(function(r){if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(function(data){tareasPausadasRemoto=data.pausadas===true;tareasFechaActivacionRemota=data.fecha||null;window.horaCobroRemota=data.horaCobro||data.hora_cobro||data.config&&data.config.hora_cobro||'20:00';var diaHoy=apexDiaLima(data.hoy||new Date()),diaActivacion=apexDiaLima(data.fechaDia||data.fecha);tareasAutorizadasHoyRemoto=apexEstadoDiaAutorizado(data);var ok=Array.isArray(data.tareas)&&data.tareas.length>0&&data.tareas.every(function(t){return t&&(t.sin_horario===true||(Number.isFinite(Number(t.hora))&&Number.isFinite(Number(t.minuto))))});if(ok){tareasConfigRemota=data.tareas;HORARIOS_TAREAS=data.tareas;localStorage.setItem(TAREAS_CONFIG_KEY,JSON.stringify({tareas:data.tareas}))}if(typeof renderTareas==='function')renderTareas()}).catch(function(e){console.warn('No se pudo cargar tareas remotas',e);if(typeof renderTareas==='function')renderTareas()})}
 </script><script id="apex-v14-plan-validation">
 (function(){
   function apexPlanValue(u){
