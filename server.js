@@ -47,6 +47,7 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP,
             ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE,
             ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE,
             ADD COLUMN IF NOT EXISTS juegos_config JSONB DEFAULT '{}'::jsonb,
             ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb,
             ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00',
@@ -1147,10 +1148,11 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);
-        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_pausadas, tareas_autorizadas, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE`);
+        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
         const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
-        const fechaActivacion = row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}$/) ? String(row.tareas_activacion).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(row.tareas_activacion))) : null;
+        const fechaActivacion = row.tareas_activacion_dia ? String(row.tareas_activacion_dia).slice(0, 10) : (row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}/) ? String(row.tareas_activacion).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(row.tareas_activacion))) : null);
         const pausadas = row.tareas_pausadas === true;
         const autorizacionExplicita = row.tareas_autorizadas === true;
         const paqueteActivo = row.minijuegos_activo && row.minijuegos_activo.activo === true && row.minijuegos_activo.fecha === hoyLima;
@@ -1184,24 +1186,24 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
 
 app.post('/api/admin/tasks/activate', authenticate, isAdmin, async (req, res) => {
     try {
-        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE`);
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE`);
         const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
-        const previo = await pool.query('SELECT tareas_activacion FROM configuracion WHERE id = 1');
+        const previo = await pool.query('SELECT tareas_activacion, tareas_activacion_dia FROM configuracion WHERE id = 1');
         const valorPrevio = previo.rows[0]?.tareas_activacion;
-        const fechaPrevia = valorPrevio ? (String(valorPrevio).match(/^\d{4}-\d{2}-\d{2}$/) ? String(valorPrevio).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(valorPrevio))) : null;
-        const r = await pool.query(`UPDATE configuracion SET tareas_activacion = NOW(), tareas_pausadas = FALSE, tareas_autorizadas = TRUE, updated_at = NOW() WHERE id = 1 RETURNING tareas_activacion, tareas_pausadas`);
+        const fechaPrevia = previo.rows[0]?.tareas_activacion_dia ? String(previo.rows[0].tareas_activacion_dia).slice(0, 10) : (valorPrevio ? (String(valorPrevio).match(/^\d{4}-\d{2}-\d{2}/) ? String(valorPrevio).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(valorPrevio))) : null);
+        const r = await pool.query(`UPDATE configuracion SET tareas_activacion = NOW(), tareas_activacion_dia = $1::date, tareas_pausadas = FALSE, tareas_autorizadas = TRUE, updated_at = NOW() WHERE id = 1 RETURNING tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas`, [hoyLima]);
         if (fechaPrevia !== hoyLima) {
             await pool.query(`UPDATE users SET tareas_completadas_hoy = '[]'::jsonb, ultima_fecha_tareas = $1, cobro_tareas_fecha = NULL, cobro_tareas_monto = 0`, [hoyLima]);
         }
         if (!r.rows.length) return res.status(404).json({error:'No existe la configuración de tareas'});
-        res.json({message:'Tareas activadas para hoy', config:r.rows[0]});
+        res.json({message:'Tareas activadas para hoy', autorizadasHoy:true, fechaDia:hoyLima, config:r.rows[0]});
     } catch (error) { console.error('Error activando tareas:', error); res.status(500).json({error:'No se pudieron activar las tareas'}); }
 });
 
 app.post('/api/admin/tasks/pause', authenticate, isAdmin, async (req, res) => {
     try {
-        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE`);
-        const r = await pool.query(`UPDATE configuracion SET tareas_pausadas = TRUE, tareas_autorizadas = FALSE, updated_at = NOW() WHERE id = 1 RETURNING tareas_activacion, tareas_pausadas`);
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE`);
+        const r = await pool.query(`UPDATE configuracion SET tareas_pausadas = TRUE, tareas_autorizadas = FALSE, updated_at = NOW() WHERE id = 1 RETURNING tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas`);
         if (!r.rows.length) return res.status(404).json({error:'No existe la configuración de tareas'});
         res.json({message:'Tareas pausadas', config:r.rows[0]});
     } catch (error) { console.error('Error pausando tareas:', error); res.status(500).json({error:'No se pudieron pausar las tareas'}); }

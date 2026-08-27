@@ -1183,14 +1183,18 @@ function verificarAdmin() {
 function cargarConfiguracionTareasRemota() {
     var token = localStorage.getItem('apex_token');
     if (!token) return Promise.resolve();
-    return fetch(API_URL + '/api/tasks/config', {
+    return fetch(API_URL + '/api/tasks/config?t=' + Date.now(), {
+        cache: 'no-store',
         headers: { 'Authorization': 'Bearer ' + token }
     }).then(function(response) {
         if (!response.ok) throw new Error('HTTP ' + response.status);
         return response.json();
     }).then(function(data) {
         tareasPausadasRemoto = data.pausadas === true;
-        tareasFechaActivacionRemota = data.fecha || null;
+        tareasFechaActivacionRemoto = data.fecha || null;
+        // El backend es la única fuente de verdad para iniciar el día.
+        // No se debe inferir la autorización usando localStorage ni solamente la fecha.
+        tareasAutorizadasHoyRemoto = !tareasPausadasRemoto && data.autorizadasHoy === true && data.autorizadas !== false;
         var remotasValidas = Array.isArray(data.tareas) && data.tareas.length > 0 && data.tareas.every(function(t) {
             return t && Number.isFinite(Number(t.hora)) && Number.isFinite(Number(t.minuto));
         });
