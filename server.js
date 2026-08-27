@@ -74,6 +74,7 @@ async function ensureTaskColumns() {
         `);
         await pool.query('CREATE INDEX IF NOT EXISTS idx_polygon_deposits_user ON polygon_deposits(user_id)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_polygon_deposits_status ON polygon_deposits(status)');
+        await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_polygon_deposits_tx_log ON polygon_deposits(tx_hash, log_index)');
     } catch (error) {
         console.error('Error preparando columnas de tareas:', error.message);
     }
@@ -144,20 +145,31 @@ async function asegurarBilleteraUsuario(userId) {
 // ============================================================
 // MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
 // ============================================================
-const DEPOSIT_MONITOR_VERSION = 'v12-render-raw-rpc';
+const DEPOSIT_MONITOR_VERSION = 'v13-rpc-failover-idempotent';
 const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
 const DEPOSIT_CONFIRMATIONS = Math.max(1, Number(process.env.DEPOSIT_CONFIRMATIONS || 10));
 const DEPOSIT_SCAN_INTERVAL_MS = Math.max(30000, Number(process.env.DEPOSIT_SCAN_INTERVAL_MS || 60000));
-let polygonProvider = null;
-function getPolygonProvider() {
-    if (!polygonProvider) polygonProvider = new JsonRpcProvider(process.env.POLYGON_RPC_URL || 'https://polygon.drpc.org');
-    return polygonProvider;
+const POLYGON_RPC_URLS = String(process.env.POLYGON_RPC_URLS || process.env.POLYGON_RPC_URL || 'https://rpc.ankr.com/polygon,https://polygon.publicnode.com,https://polygon.drpc.org').split(',').map(x => x.trim()).filter(Boolean);
+let activeRpcUrl = null;
+let monitorRunning = false;
+async function rpcCall(method, params) {
+    const urls = activeRpcUrl ? [activeRpcUrl, ...POLYGON_RPC_URLS.filter(x => x !== activeRpcUrl)] : POLYGON_RPC_URLS;
+    let lastError;
+    for (const rpcUrl of urls) {
+        try {
+            const response = await fetch(rpcUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params }) });
+            const body = await response.json();
+            if (!response.ok || body.error) throw new Error(body.error?.message || `HTTP ${response.status}`);
+            activeRpcUrl = rpcUrl;
+            return body.result;
+        } catch (error) { lastError = error; if (activeRpcUrl === rpcUrl) activeRpcUrl = null; }
+    }
+    throw new Error(`${method}: ${lastError?.message || 'sin RPC disponible'}`);
 }
 function topicAddress(topic) { return getAddress('0x' + String(topic).slice(-40)).toLowerCase(); }
 async function rpcGetLogs(filter) {
-    const rpcUrl = process.env.POLYGON_RPC_URL || 'https://polygon.drpc.org';
     const payload = {
         jsonrpc: '2.0',
         id: Date.now() + Math.floor(Math.random() * 1000),
@@ -169,17 +181,8 @@ async function rpcGetLogs(filter) {
             toBlock: '0x' + Number(filter.toBlock).toString(16)
         }]
     };
-    const response = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-    const body = await response.json();
-    if (!response.ok || body.error) {
-        const message = body.error?.message || `HTTP ${response.status}`;
-        throw new Error(`RPC eth_getLogs: ${message}`);
-    }
-    return Array.isArray(body.result) ? body.result : [];
+    const result = await rpcCall(payload.method, payload.params);
+    return Array.isArray(result) ? result : [];
 }
 async function acreditarDeposito(deposito) {
     const client = await pool.connect();
@@ -201,12 +204,13 @@ async function acreditarDeposito(deposito) {
     finally { client.release(); }
 }
 async function monitorDepositosPolygon() {
-    if (!process.env.APEX_DEPOSIT_MNEMONIC) { console.warn('Monitor Polygon detenido: falta APEX_DEPOSIT_MNEMONIC'); return; }
+    if (monitorRunning) return;
+    monitorRunning = true;
+    if (!process.env.APEX_DEPOSIT_MNEMONIC) { monitorRunning = false; console.warn('Monitor Polygon detenido: falta APEX_DEPOSIT_MNEMONIC'); return; }
     try {
         await ensureTaskColumns();
-        const provider = getPolygonProvider(), latest = await provider.getBlockNumber();
+        const latest = parseInt(await rpcCall('eth_blockNumber', []), 16);
         const cfg = await pool.query('SELECT id, deposit_scanned_block FROM configuracion ORDER BY id LIMIT 1');
-        const previous = cfg.rows.length ? Number(cfg.rows[0].deposit_scanned_block || 0) : 0;
         const configuredLookback = Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000);
         const lookback = Math.min(9000, Math.max(900, Number.isFinite(configuredLookback) ? configuredLookback : 2000));
         const fromBlock = Math.max(0, latest - lookback), toBlock = latest;
@@ -244,8 +248,9 @@ async function monitorDepositosPolygon() {
             if (confirmations >= DEPOSIT_CONFIRMATIONS) await acreditarDeposito(d);
         }
     } catch (error) { console.error('Monitor Polygon:', error.message); }
+    finally { monitorRunning = false; }
 }
-setTimeout(function(){ console.log(`Monitor Polygon ${DEPOSIT_MONITOR_VERSION}: JSON-RPC directo eth_getLogs, lotes de 500 bloques, contrato ${POLYGON_TOKEN_CONTRACT}`); monitorDepositosPolygon(); setInterval(monitorDepositosPolygon, DEPOSIT_SCAN_INTERVAL_MS); }, 12000);
+setTimeout(function(){ console.log(`Monitor Polygon ${DEPOSIT_MONITOR_VERSION}: RPC con failover, eth_getLogs directo, lotes de 500 bloques, contrato ${POLYGON_TOKEN_CONTRACT}`); monitorDepositosPolygon(); setInterval(monitorDepositosPolygon, DEPOSIT_SCAN_INTERVAL_MS); }, 12000);
 
 // ============================================================
 // RUTAS PÚBLICAS
@@ -255,7 +260,7 @@ app.get('/', (req, res) => {
   res.send('Servidor funcionando correctamente');
 });
 app.get('/api/deposit-monitor-status', (req, res) => {
-  res.json({ version: DEPOSIT_MONITOR_VERSION, rpc_mode: 'direct-eth_getLogs', batch_size: 500, lookback_blocks: Math.min(9000, Math.max(900, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000) : 2000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
+  res.json({ version: DEPOSIT_MONITOR_VERSION, rpc_mode: 'direct-eth_getLogs_with_failover', rpc_endpoints: POLYGON_RPC_URLS.map(x => { try { return new URL(x).host; } catch (_) { return 'invalid'; } }), batch_size: 500, lookback_blocks: Math.min(9000, Math.max(900, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000) : 2000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
 });
 
 app.get('/test', (req, res) => {
