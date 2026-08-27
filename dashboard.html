@@ -558,9 +558,9 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;ba
         </div>
         <div class="profile-section">
             <span class="section-label">💸 SOLICITAR RETIRO</span>
-            <div class="withdraw-info">Mínimo: <strong>$30.00</strong> · Comisión: <strong>23%</strong> · Saldo: <strong style="color:#f7971e;font-size:16px;" id="withdrawBalance">$0.00</strong></div>
+            <div class="withdraw-info">Mínimo: <strong id="withdrawMinimum">$10.00</strong> · Comisión: <strong id="withdrawCommission">23%</strong> · Saldo: <strong style="color:#f7971e;font-size:16px;" id="withdrawBalance">$0.00</strong></div>
             <div class="profile-input-group" style="margin-bottom:6px;">
-                <input type="number" id="withdrawAmount" placeholder="Monto a retirar" min="30" step="1">
+                <input type="number" id="withdrawAmount" placeholder="Monto a retirar" min="10" step="0.01">
                 <button class="btn-action" onclick="requestWithdraw()" style="background:#000000;color:#ffffff;font-weight:700;">Solicitar</button>
             </div>
             <div class="withdraw-hint">⏳ Los retiros se procesan en <strong>72 horas</strong></div>
@@ -1740,10 +1740,11 @@ function updateWithdrawAddress() {
     input.value = '';
 }
 
-function requestWithdraw() {
+function requestWithdrawLegacy() {
     var input = document.getElementById('withdrawAmount');
     var amount = parseFloat(input.value);
-    if (!amount || amount < 30) { showAlert('⚠️ Mínimo $30', 'danger'); return; }
+    var minimum = Number(window.apexWithdrawalConfig && window.apexWithdrawalConfig.minimo_retiro || 10);
+    if (!amount || amount < minimum) { showAlert('⚠️ El mínimo de retiro es $' + minimum.toFixed(2), 'danger'); return; }
     if (amount > (user.balance || 0)) { showAlert('⚠️ Saldo insuficiente', 'danger'); return; }
     if (!user.direccion_retiro) { showAlert('⚠️ Configura dirección de retiro', 'danger'); return; }
 
@@ -1763,10 +1764,11 @@ function requestWithdraw() {
         return;
     }
 
-    var commission = amount * 0.23;
+    var commissionRate = Number(window.apexWithdrawalConfig && window.apexWithdrawalConfig.comision_retiro_porcentaje || 23) / 100;
+    var commission = amount * commissionRate;
     var netAmount = amount - commission;
 
-    if (!confirm('¿Confirmar retiro de $' + amount.toFixed(2) + '?\nComisión (23%): $' + commission.toFixed(2) + '\nNeto: $' + Number(netAmount).toFixed(2))) {
+    if (!confirm('¿Confirmar retiro de $' + amount.toFixed(2) + '?\nComisión (' + (commissionRate * 100).toFixed(2).replace(/\.00$/, '') + '%): $' + commission.toFixed(2) + '\nNeto: $' + Number(netAmount).toFixed(2))) {
         return;
     }
 
@@ -2182,7 +2184,7 @@ function getPremiosRuleta(){return apexGameConfig.ruleta||{premios:[10,15,20,30,
 function getPremiosCofres(){return apexGameConfig.cofres||{premios:[5,8,10,12,15,20,25,30,50]};}
 function getPremiosDados(){return apexGameConfig.dados||{premios:[5,10,15,20,25,30]};}
 async function requestWithdraw(){
- var input=document.getElementById('withdrawAmount'), amount=Number(input&&input.value||0); if(!amount||amount<30){showAlert('⚠️ Mínimo $30','danger');return;} if(!user.direccion_retiro){showAlert('⚠️ Configura dirección de retiro','danger');return;}
+ var input=document.getElementById('withdrawAmount'), amount=Number(input&&input.value||0), minimum=Number(window.apexWithdrawalConfig&&window.apexWithdrawalConfig.minimo_retiro||10); if(!amount||amount<minimum){showAlert('⚠️ El mínimo de retiro es $'+minimum.toFixed(2),'danger');return;} if(!user.direccion_retiro){showAlert('⚠️ Configura dirección de retiro','danger');return;}
  var pass=prompt('🔐 Contraseña de retiro (6 dígitos):');if(!pass)return;if(!confirm('¿Confirmar retiro de $'+amount.toFixed(2)+'?'))return;
  try{var token=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/user/withdraw',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({amount:amount,password:pass,address:user.direccion_retiro})});var data=await r.json();if(!r.ok||data.error)throw new Error(data.error||'Error en el servidor');if(data.user){user.balance=Number(data.user.balance||user.balance);user.historial=data.user.historial||user.historial;user.historial_detallado=data.user.historial_detallado||user.historial_detallado;sessionStorage.setItem('apex_user',JSON.stringify(user));localStorage.setItem('apex_user',JSON.stringify(user));}showAlert('✅ Solicitud de retiro enviada','success');renderDashboard();input.value='';}catch(e){showAlert('❌ '+e.message,'danger');}
 }
@@ -2494,6 +2496,23 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   function apply(h){if(!valid(h))return;window.horaCobroRemota=String(h);var info=document.getElementById('cobroTareasInfo');if(info){var old=info.textContent||'';var completed=old.match(/Has completado[^.]+\./i);info.textContent='Horario de cobro: desde las '+h+' hasta medianoche.'+(completed?' '+completed[0]:'');}}
   async function sync(){var t=token();if(!t)return;try{var r=await fetch(API_URL+'/api/tasks/claim-time?authority=1&t='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+t}});var x=await r.json();if(r.ok)apply(x.horaCobro||x.hora_cobro);}catch(e){console.warn('No se pudo sincronizar la hora de cobro:',e.message);}}
   window.addEventListener('load',function(){sync();setInterval(sync,5000);});
+})();
+</script><script id="apex-withdrawal-config-sync-v1">
+(function(){
+  window.apexWithdrawalConfig={minimo_retiro:10,comision_retiro_porcentaje:23};
+  function token(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';}
+  function apply(config){
+    var minimum=Number(config.minimo_retiro); var commission=Number(config.comision_retiro_porcentaje);
+    if(!Number.isFinite(minimum)||minimum<0)minimum=10;
+    if(!Number.isFinite(commission)||commission<0||commission>100)commission=23;
+    window.apexWithdrawalConfig={minimo_retiro:minimum,comision_retiro_porcentaje:commission};
+    var minEl=document.getElementById('withdrawMinimum'), commissionEl=document.getElementById('withdrawCommission'), input=document.getElementById('withdrawAmount');
+    if(minEl)minEl.textContent='$'+minimum.toFixed(2);
+    if(commissionEl)commissionEl.textContent=commission.toFixed(2).replace(/\.00$/,'')+'%';
+    if(input)input.min=String(minimum);
+  }
+  async function sync(){var t=token();if(!t)return;try{var verify=await fetch(API_URL+'/api/verify?t='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+t}});var verifyData=await verify.json();if(verify.ok&&verifyData.withdrawal_config){apply(verifyData.withdrawal_config);return;}var r=await fetch(API_URL+'/api/config/withdrawal?t='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+t}});var data=await r.json();if(r.ok)apply(data);}catch(e){console.warn('No se pudo sincronizar mínimo/comisión:',e.message);}}
+  window.addEventListener('load',function(){sync();setInterval(sync,30000);});
 })();
 </script></body>
 </html>

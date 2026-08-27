@@ -768,6 +768,12 @@ app.get('/api/verify', authenticate, async (req, res) => {
         }
         
                 const userData = result.rows[0];
+        const withdrawalConfigResult = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
+        const withdrawalConfigRow = withdrawalConfigResult.rows[0] || {};
+        const withdrawalConfig = {
+            minimo_retiro: Number(withdrawalConfigRow.minimo_retiro ?? 10),
+            comision_retiro_porcentaje: Number(withdrawalConfigRow.comision_retiro_porcentaje ?? 23)
+        };
         const referralsVerify = await pool.query(`
             SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings, fecha_registro, referido_por
             FROM users
@@ -789,7 +795,8 @@ app.get('/api/verify', authenticate, async (req, res) => {
             referido_por: r.referido_por
         }));
         res.json({ 
-            user: publicUserData(userData, { izquierda: null, derecha: null, lista: referidosEnriquecidos })
+            user: publicUserData(userData, { izquierda: null, derecha: null, lista: referidosEnriquecidos }),
+            withdrawal_config: withdrawalConfig
         });
     } catch (error) {
         console.error('Error en /api/verify:', error);
@@ -1448,7 +1455,7 @@ app.put('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
             [tiempoFinal, puntosFinal, minimoFinal, comisionFinal]
         );
         
-        res.json({ message: 'Configuración actualizada' });
+        res.json({ message: 'Configuración actualizada', minimo_retiro: minimoFinal, comision_retiro_porcentaje: comisionFinal });
     } catch (error) {
         console.error('Error al guardar configuración:', error);
         res.status(500).json({ error: 'Error en el servidor' });

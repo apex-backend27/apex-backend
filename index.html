@@ -267,7 +267,7 @@ function registerUser(event) {
         btn.innerHTML = 'Crear Cuenta';
 
         setTimeout(function() {
-            window.location.href = new URL(data.user.es_admin ? '/admin.html' : '/dashboard.html', window.location.origin).href;
+            window.location.href = new URL(data.user.es_admin ? '/admin.html?v=20260827-2' : '/dashboard.html?v=20260827-2', window.location.origin).href;
         }, 1500);
     })
     .catch(error => {
@@ -327,7 +327,7 @@ function loginUser(event) {
         btn.innerHTML = 'Iniciar Sesión';
 
         setTimeout(function() {
-            window.location.href = new URL(data.user.es_admin ? '/admin.html' : '/dashboard.html', window.location.origin).href;
+            window.location.href = new URL(data.user.es_admin ? '/admin.html?v=20260827-2' : '/dashboard.html?v=20260827-2', window.location.origin).href;
         }, 1000);
     })
     .catch(error => {
@@ -370,7 +370,7 @@ function loginUser(event) {
         .then(data => {
             if (data.user) {
                 localStorage.setItem('apex_user', JSON.stringify(data.user));
-                window.location.href = new URL(data.user.es_admin ? '/admin.html' : '/dashboard.html', window.location.origin).href;
+                window.location.href = new URL(data.user.es_admin ? '/admin.html?v=20260827-2' : '/dashboard.html?v=20260827-2', window.location.origin).href;
             } else {
                 localStorage.removeItem('apex_token');
                 localStorage.removeItem('apex_user');
