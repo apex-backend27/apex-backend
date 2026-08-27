@@ -385,42 +385,35 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;ba
 #apexActionModal .modal-close{position:absolute;right:14px;top:10px;background:transparent;color:#fff;border:0;font-size:28px;cursor:pointer}
 #apexActionModal .btn-action{background:linear-gradient(135deg,#0ad9ff,#8b5cf6);color:#fff;border:0;border-radius:12px;padding:11px 16px;cursor:pointer;font-weight:700;margin:6px 0}
 </style>
-<style>#apexActionModal{position:fixed!important;inset:0!important;z-index:999999!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:20px 20px 96px!important;overflow:auto!important}#apexActionModal .modal{max-height:calc(100vh - 130px)!important;overflow:auto!important}</style><style id="apex-plans-contrast-v1">
-#tab-planes{padding:8px 0 32px!important}
-#planesContainer{display:grid!important;gap:14px!important;width:100%!important}
-#planesContainer .plan-card{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(190px,270px)!important;align-items:center!important;gap:22px!important;min-height:126px!important;margin:0!important;padding:20px 22px!important;border:1px solid rgba(87,230,255,.28)!important;border-radius:20px!important;background:linear-gradient(135deg,rgba(11,27,52,.96),rgba(9,16,35,.98))!important;box-shadow:0 12px 28px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.06)!important;opacity:1!important;color:#eef6ff!important;overflow:hidden!important}
-#planesContainer .plan-card:before{content:"";position:absolute;pointer-events:none}
-#planesContainer .plan-card.active-plan{border-color:#ffd34d!important;background:linear-gradient(135deg,rgba(76,56,15,.72),rgba(14,27,42,.98))!important}
-#planesContainer .plan-card.locked{border-color:rgba(255,117,145,.36)!important;background:linear-gradient(135deg,rgba(38,21,48,.78),rgba(12,18,38,.98))!important}
-#planesContainer .plan-card.superado{border-color:rgba(93,242,189,.34)!important;background:linear-gradient(135deg,rgba(12,54,60,.78),rgba(9,22,38,.98))!important}
-#planesContainer .plan-card .info{display:flex!important;align-items:flex-start!important;gap:16px!important;min-width:0!important}
+<style>#apexActionModal{position:fixed!important;inset:0!important;z-index:999999!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:20px 20px 96px!important;overflow:auto!important}#apexActionModal .modal{max-height:calc(100vh - 130px)!important;overflow:auto!important}</style><style id="apex-plans-readable-v2">
+#tab-planes{padding-bottom:28px!important}
+#planesContainer .plan-card{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:18px!important;min-height:0!important;margin-bottom:12px!important;padding:16px 18px!important;border:1px solid var(--fx-line)!important;border-radius:14px!important;background:var(--fx-surface)!important;box-shadow:var(--fx-shadow)!important;opacity:1!important;color:var(--fx-text)!important}
+#planesContainer .plan-card.active-plan{border-color:#ffd447!important;background:linear-gradient(135deg,rgba(76,56,15,.55),rgba(13,24,48,.9))!important}
+#planesContainer .plan-card.locked{border-color:rgba(255,117,145,.35)!important;background:linear-gradient(135deg,rgba(38,21,48,.55),rgba(13,24,48,.9))!important}
+#planesContainer .plan-card.superado{border-color:rgba(93,242,189,.3)!important;background:linear-gradient(135deg,rgba(12,54,60,.5),rgba(13,24,48,.9))!important}
+#planesContainer .plan-card .info{display:flex!important;align-items:center!important;gap:14px!important;flex:1 1 auto!important;min-width:0!important}
 #planesContainer .plan-card .info>div{min-width:0!important}
-#planesContainer .plan-card .info .icon{flex:0 0 48px!important;width:48px!important;height:48px!important;display:grid!important;place-items:center!important;font-size:30px!important;border-radius:14px!important;background:rgba(87,230,255,.12)!important;border:1px solid rgba(87,230,255,.3)!important}
-#planesContainer .plan-card .info .name{font-size:19px!important;line-height:1.25!important;font-weight:900!important;color:#f5fbff!important;letter-spacing:.1px!important;word-break:break-word!important}
-#planesContainer .plan-card .info .name .badge,#planesContainer .plan-card .info .name .lock-icon{font-size:11px!important;margin-left:6px!important;color:#6dffcf!important;vertical-align:middle!important}
-#planesContainer .plan-card .info .name .badge-superado{color:#6dffcf!important}
-#planesContainer .plan-card .details{margin-top:7px!important;font-size:14px!important;line-height:1.5!important;color:#b9cde2!important;white-space:normal!important}
-#planesContainer .plan-card .details strong{color:#ffffff!important;font-weight:900!important}
-#planesContainer .plan-card .upgrade-info,#planesContainer .plan-card .locked-info,#planesContainer .plan-card .superado-info{display:block!important;margin-top:8px!important;font-size:13px!important;line-height:1.4!important;font-weight:700!important}
-#planesContainer .plan-card .upgrade-info{color:#ffd36b!important}
-#planesContainer .plan-card .locked-info{color:#ff9caf!important}
-#planesContainer .plan-card .superado-info{color:#6dffcf!important}
-#planesContainer .plan-card .action{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:4px!important;min-width:0!important;text-align:right!important;padding-left:18px!important;border-left:1px solid rgba(255,255,255,.12)!important}
-#planesContainer .plan-card .action .price{font-size:28px!important;line-height:1.1!important;font-weight:950!important;color:#ffffff!important;text-shadow:0 0 18px rgba(87,230,255,.2)!important}
-#planesContainer .plan-card .action .sub{font-size:13px!important;color:#a9c5dd!important;font-weight:700!important}
-#planesContainer .plan-card .action .buy-btn{width:100%!important;min-height:46px!important;margin-top:10px!important;padding:10px 14px!important;border:1px solid rgba(255,255,255,.18)!important;border-radius:12px!important;background:linear-gradient(135deg,#198ec0,#744ee8)!important;color:#ffffff!important;font-size:13px!important;line-height:1.25!important;font-weight:900!important;white-space:normal!important;cursor:pointer!important;box-shadow:0 8px 18px rgba(63,91,220,.24)!important}
-#planesContainer .plan-card .action .buy-btn:disabled{opacity:1!important;color:#d6e4f2!important;background:linear-gradient(135deg,rgba(71,90,128,.7),rgba(52,42,104,.7))!important;border-color:rgba(255,255,255,.16)!important;cursor:not-allowed!important;box-shadow:none!important}
-#planesContainer .plan-card .action .active-tag,#planesContainer .plan-card .action .superado-tag{display:inline-flex!important;justify-content:center!important;align-items:center!important;min-height:44px!important;padding:10px 14px!important;border-radius:12px!important;font-size:14px!important;font-weight:900!important;color:#071c28!important;background:#6dffcf!important}
-#planesContainer .plan-card.locked .action .buy-btn{color:#ffd5df!important;background:rgba(123,53,92,.72)!important}
-@media(max-width:680px){
-  #planesContainer .plan-card{grid-template-columns:1fr!important;gap:16px!important;padding:18px!important}
-  #planesContainer .plan-card .info .icon{flex-basis:42px!important;width:42px!important;height:42px!important;font-size:25px!important}
-  #planesContainer .plan-card .info .name{font-size:18px!important}
-  #planesContainer .plan-card .details{font-size:13px!important}
-  #planesContainer .plan-card .action{display:grid!important;grid-template-columns:1fr auto!important;align-items:center!important;padding:14px 0 0!important;border-left:0!important;border-top:1px solid rgba(255,255,255,.12)!important;text-align:left!important}
-  #planesContainer .plan-card .action .price{font-size:24px!important}
-  #planesContainer .plan-card .action .sub{text-align:right!important}
-  #planesContainer .plan-card .action .buy-btn,#planesContainer .plan-card .action .active-tag,#planesContainer .plan-card .action .superado-tag{grid-column:1/-1!important;width:100%!important}
+#planesContainer .plan-card .info .icon{flex:0 0 auto!important;font-size:28px!important}
+#planesContainer .plan-card .info .name{font-size:15px!important;line-height:1.3!important;font-weight:800!important;color:#f4f8ff!important;word-break:normal!important;overflow-wrap:break-word!important}
+#planesContainer .plan-card .info .name .badge,#planesContainer .plan-card .info .name .lock-icon{font-size:10px!important;margin-left:4px!important;color:#6dffcf!important}
+#planesContainer .plan-card .info .details{margin-top:3px!important;font-size:12px!important;line-height:1.45!important;color:#b7c9dc!important}
+#planesContainer .plan-card .info .details strong{color:#ffffff!important;font-weight:800!important}
+#planesContainer .plan-card .info .upgrade-info,#planesContainer .plan-card .info .locked-info,#planesContainer .plan-card .info .superado-info{margin-top:4px!important;font-size:11px!important;line-height:1.35!important;font-weight:700!important}
+#planesContainer .plan-card .info .upgrade-info{color:#ffd36b!important}
+#planesContainer .plan-card .info .locked-info{color:#ff9caf!important}
+#planesContainer .plan-card .info .superado-info{color:#6dffcf!important}
+#planesContainer .plan-card .action{flex:0 0 245px!important;min-width:0!important;text-align:right!important}
+#planesContainer .plan-card .action .price{font-size:24px!important;line-height:1.15!important;font-weight:900!important;color:#ffffff!important;text-shadow:0 0 14px rgba(87,230,255,.22)!important}
+#planesContainer .plan-card .action .sub{font-size:11px!important;color:#b7c9dc!important;font-weight:700!important}
+#planesContainer .plan-card .action .buy-btn{width:100%!important;min-height:44px!important;margin-top:6px!important;padding:8px 12px!important;border:1px solid rgba(255,255,255,.18)!important;border-radius:10px!important;background:linear-gradient(135deg,#1768a5,#744ee8)!important;color:#ffffff!important;font-size:12px!important;line-height:1.25!important;font-weight:800!important;white-space:normal!important;cursor:pointer!important}
+#planesContainer .plan-card .action .buy-btn:disabled{opacity:.92!important;color:#e0ebf5!important;background:linear-gradient(135deg,rgba(71,90,128,.72),rgba(52,42,104,.78))!important;cursor:not-allowed!important}
+#planesContainer .plan-card .action .active-tag,#planesContainer .plan-card .action .superado-tag{display:inline-block!important;padding:8px 14px!important;border-radius:10px!important;font-size:12px!important;font-weight:800!important;color:#071c28!important;background:#6dffcf!important}
+@media(max-width:560px){
+  #planesContainer .plan-card{align-items:flex-start!important;gap:12px!important;padding:15px!important}
+  #planesContainer .plan-card .info{min-width:0!important}
+  #planesContainer .plan-card .action{flex:0 0 190px!important}
+  #planesContainer .plan-card .action .price{font-size:21px!important}
+  #planesContainer .plan-card .action .buy-btn{font-size:11px!important;padding:8px!important}
 }
 </style></head>
 <body>
