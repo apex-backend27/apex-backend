@@ -649,6 +649,8 @@ var tareasConfigRemota = null;
 var tareasPausadasRemoto = false;
 var tareasFechaActivacionRemota = null;
 var tareasAutorizadasHoyRemoto = false;
+var tareasDiasActivosRemoto = [1, 2, 3, 4, 5];
+var tareaDiaSemanaActualRemoto = null;
 
 var user = null;
 var maquinaGirando = false;
@@ -1185,6 +1187,8 @@ function verificarAdmin() {
 function apexEstadoDiaAutorizado(data) {
     data = data || {};
     if (data.pausadas === true) return false;
+    if (data.diaHabilitadoHoy === true) return true;
+    if (data.diaHabilitadoHoy === false) return false;
     if (data.autorizadasHoy === true) return true;
     var hoy = String(data.hoy || '').slice(0, 10);
     var diaActivacion = String(data.fechaDia || data.fecha || '').slice(0, 10);
@@ -1193,9 +1197,12 @@ function apexEstadoDiaAutorizado(data) {
     }
     // La fecha de activación de hoy y la ausencia de pausa son la fuente estable.
     // `autorizadas` es un campo antiguo que puede quedar FALSE después de pausar.
-    return Boolean(diaActivacion && hoy === diaActivacion);
+        return Boolean(diaActivacion && hoy === diaActivacion);
 }
-
+function apexMensajeBloqueoTareas() {
+    if (tareasPausadasRemoto) return '⏸️ Las tareas están pausadas temporalmente.';
+    return '📅 Las tareas no están habilitadas hoy según el calendario semanal.';
+}
 function cargarConfiguracionTareasRemota() {
     var token = localStorage.getItem('apex_token');
     if (!token) return Promise.resolve();
@@ -1208,6 +1215,8 @@ function cargarConfiguracionTareasRemota() {
     }).then(function(data) {
         tareasPausadasRemoto = data.pausadas === true;
         tareasFechaActivacionRemoto = data.fecha || null;
+        tareasDiasActivosRemoto = Array.isArray(data.diasActivos) ? data.diasActivos.map(Number).filter(function(n){return Number.isInteger(n)&&n>=0&&n<=6;}) : [1,2,3,4,5];
+        tareaDiaSemanaActualRemoto = Number.isInteger(Number(data.diaSemanaActual)) ? Number(data.diaSemanaActual) : null;
         // El backend es la única fuente de verdad para iniciar el día.
         // No se debe inferir la autorización usando localStorage ni solamente la fecha.
         tareasAutorizadasHoyRemoto = apexEstadoDiaAutorizado(data);
@@ -1245,7 +1254,10 @@ function actualizarEstadoBotonCobro(completadasCount) {
         info.textContent = 'Ya recibiste tu recompensa de hoy. Podrás cobrar nuevamente mañana.';
     } else if (tareasPausadasRemoto) {
         boton.style.display = 'block'; boton.disabled = true; boton.textContent = '⏸️ Tareas pausadas';
-        info.textContent = 'El administrador pausó las tareas temporalmente.';
+        info.textContent = 'Las tareas están pausadas temporalmente.';
+    } else if (!tareasAutorizadasHoyRemoto) {
+        boton.style.display = 'block'; boton.disabled = true; boton.textContent = '📅 No habilitado hoy';
+        info.textContent = 'El cobro no está disponible hoy según el calendario semanal.';
     } else if (quintaTerminada) {
         boton.style.display = 'block'; boton.disabled = false; boton.textContent = '💰 Cobrar 100% del plan';
         info.textContent = 'Completaste las cinco tareas. Ya puedes cobrar tu producción del día.';
@@ -2286,8 +2298,8 @@ window.addEventListener('load',function(){setTimeout(cargarCatalogosRemotos,900)
 // APEX v7: datos remotos se vuelven visibles inmediatamente
 async function cargarCatalogosRemotos(){try{var tok=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/catalogs/config',{headers:{Authorization:'Bearer '+tok}});if(r.ok){var x=await r.json();window.apexCanjesRemotos=Array.isArray(x.canjes)?x.canjes:[];window.apexLogrosRemotos=Array.isArray(x.logros)?x.logros:[];window.apexCuponesRemotos=Array.isArray(x.cupones)?x.cupones:[];localStorage.setItem(CUPONES_KEY,JSON.stringify(window.apexCuponesRemotos));if(typeof renderActividades==='function')renderActividades();if(typeof renderLogros==='function')renderLogros();}}catch(e){console.warn(e)}}
 function abrirTareasAsignadas(){var ts=Array.isArray(user.tareas_asignadas)?user.tareas_asignadas:[];var body=ts.length?ts.map(function(t,i){var raw=String(t.estado||'').toLowerCase(),approved=raw==='aprobada'||raw==='aprobado',rejected=raw==='rechazada'||raw==='rechazado',submitted=raw==='completada'||raw==='completado'||t.completada===true,done=approved||rejected||submitted;var desc=t.descripcion||t.tareaDescripcion||t.descripcion_tarea||'Sin descripción';var tipo=String(t.tipo_recompensa||'puntos').toLowerCase();var cantidad=Number(t.cantidad??t.puntos??0);var recompensa=tipo==='usdt'?'💵 $'+cantidad.toFixed(2)+' USDT':'⭐ '+cantidad+' puntos';var dias=t.diasVencimiento!=null&&t.diasVencimiento!==''?Number(t.diasVencimiento):null;if((dias===null||!Number.isFinite(dias)||dias<=0)&&t.fechaVencimiento&&t.fechaAsignacion){dias=Math.max(1,Math.round((new Date(t.fechaVencimiento).getTime()-new Date(t.fechaAsignacion).getTime())/86400000));}if(dias===null||!Number.isFinite(dias)||dias<=0)dias=3;var plazo=!approved&&!rejected?'<span style="color:#a9dfff">⏳ Plazo asignado: '+dias+' día'+(dias===1?'':'s')+'</span>':'';var action=approved?'<div style="display:inline-block;padding:7px 12px;border-radius:9px;background:#075b45;color:#a8ffe2;font-weight:800">✅ Aprobada</div>':rejected?'<div style="display:inline-block;padding:7px 12px;border-radius:9px;background:#681c2a;color:#ffd2d8;font-weight:800">❌ Rechazada</div>':submitted?'<div style="display:inline-block;padding:7px 12px;border-radius:9px;background:#5a4211;color:#ffed9b;font-weight:800">⏳ Enviada · Pendiente de aprobación</div>':'<button class="btn-action apex-use-task" data-i="'+i+'">▶️ Completar con comprobante</button>';return '<div style="padding:14px;border:1px solid #27d3ff;border-radius:14px;margin:9px 0;background:rgba(10,20,40,.7)"><strong>'+(t.tareaNombre||t.nombre||t.titulo||'Actividad '+(i+1))+'</strong><p style="opacity:.85;margin:8px 0">'+desc+'</p><div style="display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;color:#ffd447;font-weight:700"><span>'+recompensa+'</span>'+plazo+'</div>'+(t.nota?'<small>Tu comprobante: '+t.nota+'</small><br>':'')+(t.notaAdmin?'<small style="color:#ffd447">📝 Respuesta del administrador: '+t.notaAdmin+'</small><br>':'')+action+'</div>';}).join(''):'<p>No tienes actividades asignadas.</p>';var modal=apexModal('📋 Actividades asignadas',body);modal.querySelectorAll('.apex-use-task').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.i),nota=prompt('📝 Escribe el comprobante o nota de la actividad:');if(nota===null||!nota.trim()){showAlert('⚠️ Debes escribir un comprobante','warning');return;}user.tareas_asignadas[i].estado='completada';user.tareas_asignadas[i].completada=true;user.tareas_asignadas[i].nota=nota.trim();apexPersist();modal.remove();showAlert('✅ Actividad enviada con comprobante','success');};});}
-function actualizarEstadoBotonCobro(completadasCount){var b=document.getElementById('cobrarTareasBtn'),info=document.getElementById('cobroTareasInfo');if(!b||!info||!user)return;var hoy=new Date().toISOString().slice(0,10),ya=user.cobro_tareas_fecha&&String(user.cobro_tareas_fecha).slice(0,10)===hoy,completas=Number(completadasCount||0);if(ya){b.style.display='block';b.disabled=true;b.textContent='✅ Cobrado hoy';info.textContent='Ya cobraste hoy.'}else if(tareasPausadasRemoto){b.style.display='block';b.disabled=true;b.textContent='⏸️ Tareas pausadas';info.textContent='El administrador pausó las tareas temporalmente.'}else if(completas>0){b.style.display='block';b.disabled=false;b.textContent='💰 Cobrar '+Math.round((completas/5)*100)+'%';info.textContent='Horario de cobro: desde las '+(window.horaCobroRemota||'20:00')+' hasta medianoche. Has completado '+completas+' de 5 tareas.'}else{b.style.display='block';b.disabled=true;b.textContent='🔒 Completa al menos una tarea';info.textContent='Horario de cobro: desde las '+(window.horaCobroRemota||'20:00')+' hasta medianoche.'}}
-var _completarTareaDiariaOriginal=window.completarTareaDiaria;window.completarTareaDiaria=function(index){if(tareasPausadasRemoto||!tareasAutorizadasHoyRemoto){showAlert('⏳ Las tareas aún no han sido iniciadas por el administrador para hoy.','warning');return}return _completarTareaDiariaOriginal.apply(this,arguments)};
+function actualizarEstadoBotonCobro(completadasCount){var b=document.getElementById('cobrarTareasBtn'),info=document.getElementById('cobroTareasInfo');if(!b||!info||!user)return;var hoy=new Date().toISOString().slice(0,10),ya=user.cobro_tareas_fecha&&String(user.cobro_tareas_fecha).slice(0,10)===hoy,completas=Number(completadasCount||0);if(ya){b.style.display='block';b.disabled=true;b.textContent='✅ Cobrado hoy';info.textContent='Ya cobraste hoy.'}else if(tareasPausadasRemoto){b.style.display='block';b.disabled=true;b.textContent='⏸️ Tareas pausadas';info.textContent='Las tareas están pausadas temporalmente.'}else if(!tareasAutorizadasHoyRemoto){b.style.display='block';b.disabled=true;b.textContent='📅 No habilitado hoy';info.textContent='El cobro no está disponible hoy según el calendario semanal.'}else if(completas>0){b.style.display='block';b.disabled=false;b.textContent='💰 Cobrar '+Math.round((completas/5)*100)+'%';info.textContent='Horario de cobro: desde las '+(window.horaCobroRemota||'20:00')+' hasta medianoche. Has completado '+completas+' de 5 tareas.'}else{b.style.display='block';b.disabled=true;b.textContent='🔒 Completa al menos una tarea';info.textContent='Horario de cobro: desde las '+(window.horaCobroRemota||'20:00')+' hasta medianoche.'}}
+var _completarTareaDiariaOriginal=window.completarTareaDiaria;window.completarTareaDiaria=function(index){if(tareasPausadasRemoto||!tareasAutorizadasHoyRemoto){showAlert(apexMensajeBloqueoTareas(),'warning');return}return _completarTareaDiariaOriginal.apply(this,arguments)};
 </script>
 <style id="apex-visual-games-css">
 .apex-game-modal{max-width:760px!important;width:calc(100% - 28px)!important;background:linear-gradient(145deg,#071326,#101f3d)!important;border:1px solid #27d3ff!important;box-shadow:0 0 40px rgba(39,211,255,.28),inset 0 0 30px rgba(110,70,255,.08)!important;color:#eef7ff!important;z-index:99999!important}
@@ -2338,7 +2350,7 @@ function renderTareas(){
   var disabled=done||!available;
   var h=Number(t.hora||0), m=Number(t.minuto||0), dur=Math.max(1,Number(t.duracionMinutos||t.duracion||t.duracion_minutos||30));
   var horaTexto=manual?'Activación manual':String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+' hrs';
-  var estado=done?'✅ Completada':!apexTienePlan()?'🔒 Necesitas un plan activo':!active?'⏸️ Desactivada':tareasPausadasRemoto?'⏸️ Pausada':!tareasAutorizadasHoyRemoto?'⏳ Esperando inicio del administrador':!apexHoraDisponible(t)?'⏳ '+apexProximaHora(t):'▶️ Disponible';
+  var estado=done?'✅ Completada':!apexTienePlan()?'🔒 Necesitas un plan activo':!active?'⏸️ Desactivada':tareasPausadasRemoto?'⏸️ Pausada':!tareasAutorizadasHoyRemoto?'📅 No habilitada hoy':!apexHoraDisponible(t)?'⏳ '+apexProximaHora(t):'▶️ Disponible';
   html+='<article class="tarea-card '+(disabled?'apex-task-disabled':'')+'" style="position:relative;padding:15px;margin:10px 0;border:1px solid #27d3ff66;border-radius:15px;background:linear-gradient(135deg,#071326,#10233d)">';
   html+='<div style="display:flex;justify-content:space-between;gap:10px"><strong>'+(t.icono||'📋')+' '+nombreVisible+'</strong><span>'+estado+'</span></div>';
   html+='<div class="apex-task-schedule">🕒 Horario: <b>'+horaTexto+'</b> · ⏱️ Duración: <b>'+dur+' min</b></div>';
@@ -2356,7 +2368,7 @@ function renderTareas(){
  if(resumenBarra) resumenBarra.style.width=resumenPorcentaje+'%';
  actualizarEstadoBotonCobro(doneCount);
 }
-var _oldDaily=window.completarTareaDiaria;window.completarTareaDiaria=function(index){if(!apexTienePlan()){showAlert('🔒 Primero debes adquirir un plan activo para realizar tareas','warning');return}if(tareasPausadasRemoto||!tareasAutorizadasHoyRemoto){showAlert('⏳ Las tareas aún no han sido iniciadas por el administrador para hoy.','warning');return}if(typeof _oldDaily==='function')return _oldDaily.call(this,index)};
+var _oldDaily=window.completarTareaDiaria;window.completarTareaDiaria=function(index){if(!apexTienePlan()){showAlert('🔒 Primero debes adquirir un plan activo para realizar tareas','warning');return}if(tareasPausadasRemoto||!tareasAutorizadasHoyRemoto){showAlert(apexMensajeBloqueoTareas(),'warning');return}if(typeof _oldDaily==='function')return _oldDaily.call(this,index)};
 var _oldClaim=window.cobrarTareasDelDia;window.cobrarTareasDelDia=async function(){if(!apexTienePlan()){showAlert('🔒 Primero debes adquirir un plan activo para cobrar','warning');return}if(tareasPausadasRemoto||!tareasAutorizadasHoyRemoto){showAlert('⏳ El día de tareas aún no ha sido iniciado por el administrador.','warning');return}return _oldClaim.apply(this,arguments)};
 </script><script id="apex-v13-remote-task-toggle">
 function apexDiaLima(v){if(!v)return null;var s=String(v);if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);var d=new Date(v);if(isNaN(d.getTime()))return null;var p=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d),o={};p.forEach(function(x){if(x.type!=='literal')o[x.type]=x.value});return o.year+'-'+o.month+'-'+o.day}

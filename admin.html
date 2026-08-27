@@ -1508,30 +1508,28 @@ TAB TAREAS (NUEVO)
 ============================================================ -->
 <div id="tab-tareas" class="tab-content">
     
-    <!-- PANEL DE ACTIVACIÓN DIARIA -->
-    <div class="config-bar" style="background:#f8f9fa; border:2px solid #e0e0e0; border-radius:12px; padding:14px 18px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px;">
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-            <span style="font-size:14px; font-weight:700;">📋 Tareas de Hoy</span>
-            <span id="tareasStatusBadge" style="background:#f5f5f5; color:#999; padding:4px 14px; border-radius:20px; font-size:12px; font-weight:600;">⏳ Sin activar</span>
-            <span id="tareasFechaDisplay" style="font-size:12px; color:#999;">Fecha: --/--/----</span>
+        <!-- CALENDARIO SEMANAL DE TAREAS -->
+    <div class="config-bar" style="background:#f8f9fa; border:2px solid #e0e0e0; border-radius:12px; padding:16px 18px; margin-bottom:16px;">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;">
+            <div>
+                <div style="font-size:14px;font-weight:800;">📅 Días habilitados para las tareas</div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">Selecciona los días en que los usuarios podrán completar y cobrar sus tareas. El servidor aplica esta regla automáticamente.</div>
+            </div>
+            <span id="tareasDiasResumen" style="background:#e8f5e9;color:#2e7d32;padding:6px 12px;border-radius:18px;font-size:12px;font-weight:800;">Lunes a viernes</span>
         </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn btn-success" onclick="apexActivarDiaDefinitivo()" id="btnActivarTareas" style="padding:10px 24px; font-size:14px; font-weight:700;">
-                ▶️ Iniciar día
-            </button>
-            <button class="btn btn-warning" onclick="apexPausarDiaDefinitivo()" style="padding:10px 20px; font-size:13px; font-weight:600;">
-                ⏸️ Pausar día
-            </button>
+        <div id="tareasDiasActivosAdmin" style="display:grid;grid-template-columns:repeat(7,minmax(78px,1fr));gap:8px;margin-top:14px;"></div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;">
+            <button class="btn btn-primary" type="button" onclick="guardarDiasActivosTareas()" style="padding:10px 18px;font-size:13px;font-weight:800;">💾 Guardar días activos</button>
+            <span id="tareasDiasGuardado" style="font-size:12px;color:#666;"></span>
         </div>
     </div>
-
     <!-- CONFIGURAR TAREAS -->
     <div class="card">
         <div class="card-title">📋 Configurar Tareas</div>
         <p style="font-size:12px;color:#666;margin-bottom:12px;">
-            Las tareas se activan diariamente a las <strong>10:00, 12:00, 14:00, 16:00 y 18:00</strong> hrs.
+            Las tareas solo estarán disponibles en los días seleccionados arriba y respetarán el horario configurado en cada tarea.
             Los usuarios deben completarlas para ganar su plan diario.
-            <strong>Activa/desactiva</strong> cada tarea según quieras que esté disponible.
+            Puedes activar o desactivar cada tarea individualmente.
         </p>
         
         <!-- Resumen -->
@@ -7051,6 +7049,19 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
   }
   window.apexActivarDiaDefinitivo=function(){if(confirm('🚀 ¿Activar las tareas de hoy para todos los usuarios?'))call('/api/admin/tasks/activate',true).catch(function(e){showAlert('❌ '+e.message,'danger');});};
   window.apexPausarDiaDefinitivo=function(){if(confirm('⏸️ ¿Pausar las tareas para todos los usuarios?'))call('/api/admin/tasks/pause',false).catch(function(e){showAlert('❌ '+e.message,'danger');});};
+})();
+</script><script id="apex-weekly-schedule-v1">
+(function(){
+  var DIAS=[{v:1,n:'Lunes'},{v:2,n:'Martes'},{v:3,n:'Miércoles'},{v:4,n:'Jueves'},{v:5,n:'Viernes'},{v:6,n:'Sábado'},{v:0,n:'Domingo'}];
+  var DEFAULT=[1,2,3,4,5];
+  function token(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';}
+  function normalizar(value){var a=Array.isArray(value)?value:DEFAULT;var out=[];a.forEach(function(x){var n=Number(x);if(Number.isInteger(n)&&n>=0&&n<=6&&out.indexOf(n)<0)out.push(n)});return out.length?out.sort(function(a,b){return a-b}):DEFAULT.slice();}
+  function resumen(days){var selected=DIAS.filter(function(d){return days.indexOf(d.v)>=0}).map(function(d){return d.n});var el=document.getElementById('tareasDiasResumen');if(el)el.textContent=selected.length===5&&DEFAULT.every(function(x){return days.indexOf(x)>=0})?'Lunes a viernes':(selected.length?selected.join(', '):'Sin días seleccionados');}
+  function render(days){days=normalizar(days);var root=document.getElementById('tareasDiasActivosAdmin');if(!root)return;root.innerHTML=DIAS.map(function(d){var on=days.indexOf(d.v)>=0;return '<label style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 6px;border:1px solid '+(on?'#2e7d32':'#d0d0d0')+';border-radius:9px;background:'+(on?'#e8f5e9':'#fff')+';color:'+(on?'#1b5e20':'#777')+';font-size:12px;font-weight:700;cursor:pointer"><input type="checkbox" class="tarea-dia-check" value="'+d.v+'" '+(on?'checked':'')+' style="accent-color:#2e7d32">'+d.n+'</label>'}).join('');root.querySelectorAll('.tarea-dia-check').forEach(function(c){c.addEventListener('change',function(){var selected=[].slice.call(root.querySelectorAll('.tarea-dia-check:checked')).map(function(x){return Number(x.value)});resumen(selected);})});resumen(days);}
+  async function cargar(){var t=token();if(!t)return;try{var r=await fetch(API_URL+'/api/tasks/config?weekly=1&t='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+t}});var x=await r.json();if(!r.ok||x.error)throw Error(x.error||'No se pudo cargar el calendario');render(x.diasActivos);}catch(e){render(DEFAULT);var m=document.getElementById('tareasDiasGuardado');if(m)m.textContent='No se pudo cargar; se muestra lunes a viernes.';}}
+  window.guardarDiasActivosTareas=async function(){var root=document.getElementById('tareasDiasActivosAdmin'),btn=document.querySelector('#tareasDiasActivosAdmin')&&document.querySelector('#tareasDiasActivosAdmin').parentNode.querySelector('button');if(!root)return;var days=[].slice.call(root.querySelectorAll('.tarea-dia-check:checked')).map(function(x){return Number(x.value)});if(!days.length){showAlert('Selecciona al menos un día activo.','warning');return;}var t=token();if(!t){showAlert('Sesión de administrador no encontrada.','danger');return;}if(btn)btn.disabled=true;try{var r=await fetch(API_URL+'/api/admin/tasks/schedule',{method:'PUT',cache:'no-store',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({diasActivos:days})});var x=await r.json();if(!r.ok||x.error)throw Error(x.error||'No se pudieron guardar los días');render(x.diasActivos||days);var m=document.getElementById('tareasDiasGuardado');if(m)m.textContent='Guardado correctamente: '+new Date().toLocaleTimeString();showAlert('Días activos guardados.','success');}catch(e){showAlert('No se pudieron guardar los días: '+e.message,'danger');}finally{if(btn)btn.disabled=false;}};
+  function start(){render(DEFAULT);cargar();}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
 </script></body>
 </html>

@@ -28,6 +28,20 @@ function normalizarEnlaceTelegram(value) {
     return parsed.toString();
 }
 
+const DIAS_ACTIVOS_DEFAULT = [1, 2, 3, 4, 5];
+function normalizarDiasActivos(value) {
+    let lista = value;
+    if (typeof lista === 'string') {
+        try { lista = JSON.parse(lista); } catch (_) { lista = lista.split(','); }
+    }
+    if (!Array.isArray(lista)) return DIAS_ACTIVOS_DEFAULT.slice();
+    const salida = [...new Set(lista.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 6))].sort((a, b) => a - b);
+    return salida.length ? salida : DIAS_ACTIVOS_DEFAULT.slice();
+}
+function obtenerDiaSemanaLima(date = new Date()) {
+    const nombre = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Lima', weekday: 'short' }).format(date);
+    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(nombre);
+}
 async function ensureTaskColumns() {
     try {
         await pool.query(`
@@ -48,6 +62,7 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE,
             ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE,
             ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE,
+            ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb,
             ADD COLUMN IF NOT EXISTS juegos_config JSONB DEFAULT '{}'::jsonb,
             ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb,
             ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00',
@@ -789,6 +804,8 @@ app.post('/api/login', async (req, res) => {
 // ============================================================
 app.get('/api/verify', authenticate, async (req, res) => {
     try {
+        const hoyTareasLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        await pool.query(`UPDATE users SET tareas_completadas_hoy = '[]'::jsonb, ultima_fecha_tareas = $1, cobro_tareas_fecha = NULL, cobro_tareas_monto = 0 WHERE id = $2 AND (ultima_fecha_tareas IS NULL OR ultima_fecha_tareas <> $1)`, [hoyTareasLima, req.userId]);
         const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
         
         if (result.rows.length === 0) {
@@ -929,12 +946,12 @@ app.put('/api/user/update', async (req, res) => {
         const updates = { ...req.body };
         const solicitaProgresoDiario = Object.prototype.hasOwnProperty.call(updates, 'tareas_completadas_hoy') || Object.prototype.hasOwnProperty.call(updates, 'ultima_fecha_tareas') || Object.prototype.hasOwnProperty.call(updates, 'cobro_tareas_fecha');
         if (solicitaProgresoDiario) {
-            const cfg = await pool.query('SELECT tareas_activacion, tareas_pausadas, tareas_autorizadas FROM configuracion WHERE id = 1');
+            const cfg = await pool.query('SELECT tareas_activacion, tareas_pausadas, tareas_autorizadas, tareas_dias_activos FROM configuracion WHERE id = 1');
             const cfgRow = cfg.rows[0] || {};
             const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
             const valorActivacion = cfgRow.tareas_activacion;
             const fechaActivacion = valorActivacion ? (String(valorActivacion).match(/^\\d{4}-\\d{2}-\\d{2}$/) ? String(valorActivacion).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(valorActivacion))) : null;
-            const diaAutorizado = cfgRow.tareas_autorizadas === true && cfgRow.tareas_pausadas !== true && fechaActivacion === hoyLima;
+            const diaAutorizado = cfgRow.tareas_pausadas !== true && normalizarDiasActivos(cfgRow.tareas_dias_activos).includes(obtenerDiaSemanaLima());
             if (!diaAutorizado) {
                 delete updates.tareas_completadas_hoy;
                 delete updates.ultima_fecha_tareas;
@@ -1172,13 +1189,16 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);
-        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE`);
-        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE, ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
+        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, tareas_dias_activos, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
         const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         const fechaActivacion = row.tareas_activacion_dia ? String(row.tareas_activacion_dia).slice(0, 10) : (row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}/) ? String(row.tareas_activacion).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(row.tareas_activacion))) : null);
         const pausadas = row.tareas_pausadas === true;
         const autorizacionExplicita = row.tareas_autorizadas === true;
+        const diasActivos = normalizarDiasActivos(row.tareas_dias_activos);
+        const diaSemanaActual = obtenerDiaSemanaLima();
+        const diaHabilitadoHoy = diasActivos.includes(diaSemanaActual);
         const paqueteActivo = row.minijuegos_activo && row.minijuegos_activo.activo === true && row.minijuegos_activo.fecha === hoyLima;
         const tareasBase = (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5);
         const tareasConfiguradas = paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length
@@ -1199,8 +1219,11 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             // La autorización diaria se determina por la fecha guardada y la pausa.
             // El booleano antiguo puede quedar FALSE después de una pausa y no debe bloquear
             // una reactivación válida del mismo día.
-            autorizadasHoy: !pausadas && fechaActivacion === hoyLima,
+            autorizadasHoy: !pausadas && diaHabilitadoHoy,
             autorizadas: autorizacionExplicita,
+            diasActivos,
+            diaSemanaActual,
+            diaHabilitadoHoy,
             horaCobro: row.hora_cobro || '20:00',
             hora_cobro: row.hora_cobro || '20:00',
             paqueteMiniJuegos: paqueteActivo ? row.minijuegos_activo.paqueteId : null
@@ -1267,6 +1290,17 @@ app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
     }
 });
 
+app.put('/api/admin/tasks/schedule', authenticate, isAdmin, async (req, res) => {
+    try {
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
+        const diasActivos = normalizarDiasActivos(req.body && (req.body.diasActivos ?? req.body.dias_activos));
+        const r = await pool.query(`INSERT INTO configuracion (id, tareas_dias_activos, updated_at) VALUES (1, $1::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET tareas_dias_activos = $1::jsonb, updated_at = NOW() RETURNING tareas_dias_activos`, [JSON.stringify(diasActivos)]);
+        res.json({ message: 'Días activos guardados', diasActivos: normalizarDiasActivos(r.rows[0].tareas_dias_activos) });
+    } catch (error) {
+        console.error('Error guardando días activos:', error.message);
+        res.status(500).json({ error: 'No se pudieron guardar los días activos' });
+    }
+});
 app.get('/api/catalogs/config', authenticate, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const r=await pool.query('SELECT catalogos_config FROM configuracion WHERE id=1');const c=(r.rows[0]&&r.rows[0].catalogos_config)||{};res.json({canjes:Array.isArray(c.canjes)?c.canjes:[],logros:Array.isArray(c.logros)?c.logros:[],cupones:Array.isArray(c.cupones)?c.cupones:[]})}catch(e){res.status(500).json({error:'Error obteniendo catálogos'})}});
 app.put('/api/admin/catalogs/config', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const c={canjes:Array.isArray(req.body.canjes)?req.body.canjes:[],logros:Array.isArray(req.body.logros)?req.body.logros:[],cupones:Array.isArray(req.body.cupones)?req.body.cupones:[]};const r=await pool.query(`INSERT INTO configuracion(id,catalogos_config,updated_at) VALUES(1,$1,NOW()) ON CONFLICT(id) DO UPDATE SET catalogos_config=$1,updated_at=NOW() RETURNING catalogos_config`,[JSON.stringify(c)]);res.json({message:'Catálogos guardados',config:r.rows[0].catalogos_config})}catch(e){console.error(e);res.status(500).json({error:'Error guardando catálogos'})}});
 
@@ -1310,8 +1344,8 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const result = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
         if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
         const u = result.rows[0];
-        await client.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
-        const cfgResult = await client.query('SELECT tareas_pausadas, tareas_activacion, tareas_autorizadas, hora_cobro FROM configuracion WHERE id = 1');
+        await client.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00', ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
+        const cfgResult = await client.query('SELECT tareas_pausadas, tareas_activacion, tareas_activacion_dia, tareas_autorizadas, tareas_dias_activos, hora_cobro FROM configuracion WHERE id = 1');
         const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         const fechaValor = cfgResult.rows[0]?.tareas_activacion;
         const fechaActivacion = fechaValor ? (String(fechaValor).match(/^\d{4}-\d{2}-\d{2}$/) ? String(fechaValor).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(fechaValor))) : null;
@@ -1324,10 +1358,10 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(423).json({ error: 'Aún no es la hora de realizar el cobro. Estará disponible desde las ' + horaCobro + ' horas.' });
         }
-        const diaActivoHoy = fechaActivacion === hoyLima;
-        if (cfgResult.rows[0]?.tareas_pausadas === true || !diaActivoHoy) {
+        const diaActivoHoy = cfgResult.rows[0]?.tareas_pausadas !== true && normalizarDiasActivos(cfgResult.rows[0]?.tareas_dias_activos).includes(obtenerDiaSemanaLima());
+        if (!diaActivoHoy) {
             await client.query('ROLLBACK');
-            return res.status(423).json({ error: cfgResult.rows[0]?.tareas_pausadas === true ? 'Las tareas están pausadas por el administrador' : 'Las tareas del nuevo día aún no han sido autorizadas por el administrador' });
+            return res.status(423).json({ error: cfgResult.rows[0]?.tareas_pausadas === true ? 'Las tareas están pausadas por el administrador' : 'Las tareas no están habilitadas hoy según el calendario' });
         }
         const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         if (u.cobro_tareas_fecha && String(u.cobro_tareas_fecha).slice(0, 10) === hoy) {
