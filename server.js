@@ -620,25 +620,72 @@ app.put('/api/admin/games/config', authenticate, isAdmin, async (req, res) => {
     } catch (e) { console.error('Error guardando premios:', e); res.status(500).json({error:'Error guardando premios'}); }
 });
 
+// ============================================================
+// BIBLIOTECA DE 500 MINI JUEGOS / 100 PAQUETES DIARIOS
+// ============================================================
+const MINI_GAME_TYPES = ['captcha','sequence','target','reaction','pair'];
+const MINI_GAME_ICONS = ['🚀','💎','⚡','🌟','🎯','🪙','🧠','🏆','🔷','🛡️'];
+function construirBibliotecaMiniJuegos(){
+    const lista=[];
+    for(let i=1;i<=500;i++){
+        const tipo=MINI_GAME_TYPES[(i-1)%MINI_GAME_TYPES.length];
+        const variante=Math.floor((i-1)/MINI_GAME_TYPES.length)+1;
+        const nombres={captcha:'Código de acceso',sequence:'Secuencia relámpago',target:'Objetivo oculto',reaction:'Pulso de reflejos',pair:'Parejas de memoria'};
+        lista.push({id:i,nombre:nombres[tipo]+' #'+variante,descripcion:'Reto interactivo '+i+' de la biblioteca APEX',icono:MINI_GAME_ICONS[(i-1)%MINI_GAME_ICONS.length],tipo_interactivo:tipo,variante:variante});
+    }
+    return lista;
+}
+function construirPaquetesMiniJuegos(){
+    const biblioteca=construirBibliotecaMiniJuegos(),paquetes=[];
+    for(let p=1;p<=100;p++) paquetes.push({id:p,nombre:'Paquete '+p,juegos:biblioteca.slice((p-1)*5,p*5)});
+    return paquetes;
+}
+
+app.get('/api/admin/minigames/library', authenticate, isAdmin, async (req,res)=>{
+    try{const paquetes=construirPaquetesMiniJuegos();const r=await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);const q=await pool.query('SELECT minijuegos_activo FROM configuracion WHERE id=1');const activo=q.rows[0]&&q.rows[0].minijuegos_activo||{};res.json({total:500,totalPaquetes:100,paquetes,activo});}
+    catch(e){console.error('Error biblioteca mini juegos:',e);res.status(500).json({error:'No se pudo cargar la biblioteca'});}
+});
+app.get('/api/tasks/minigames', authenticate, async (req,res)=>{
+    try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);const q=await pool.query('SELECT minijuegos_activo FROM configuracion WHERE id=1');const activo=q.rows[0]&&q.rows[0].minijuegos_activo||{};res.json({activo:activo.activo===true,paqueteId:activo.paqueteId||null,fecha:activo.fecha||null,tareas:Array.isArray(activo.tareas)?activo.tareas:[]});}
+    catch(e){console.error('Error leyendo mini juegos activos:',e);res.status(500).json({error:'No se pudieron cargar los mini juegos'});}
+});
+app.put('/api/admin/minigames/activate', authenticate, isAdmin, async (req,res)=>{
+    try{
+        const paqueteId=Math.max(1,Math.min(100,Number(req.body.paqueteId||0)));if(!Number.isInteger(paqueteId))return res.status(400).json({error:'Paquete inválido'});
+        const paquetes=construirPaquetesMiniJuegos(),paquete=paquetes[paqueteId-1];
+        await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE`);
+        const q=await pool.query('SELECT tareas_config FROM configuracion WHERE id=1');const base=Array.isArray(q.rows[0]&&q.rows[0].tareas_config)?q.rows[0].tareas_config:[];
+        const tareas=paquete.juegos.map((j,i)=>Object.assign({},base[i]||{},j,{id:'tarea_'+(i+1),nombre:j.nombre,descripcion:j.descripcion,tipo_interactivo:j.tipo_interactivo,icono:j.icono,activo:true}));
+        const fecha=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima'}).format(new Date());const payload={activo:true,paqueteId,fecha,tareas};
+        const r=await pool.query(`INSERT INTO configuracion(id,minijuegos_activo,tareas_config,tareas_activacion,tareas_pausadas,tareas_autorizadas,updated_at) VALUES(1,$1,$2,NOW(),FALSE,TRUE,NOW()) ON CONFLICT(id) DO UPDATE SET minijuegos_activo=$1,tareas_config=$2,tareas_activacion=NOW(),tareas_pausadas=FALSE,tareas_autorizadas=TRUE,updated_at=NOW() RETURNING minijuegos_activo,tareas_config,tareas_activacion`,[JSON.stringify(payload),JSON.stringify(tareas)]);
+        res.json({message:'Paquete '+paqueteId+' activado para hoy',paqueteId,activo:r.rows[0].minijuegos_activo,tareas:r.rows[0].tareas_config});
+    }catch(e){console.error('Error activando paquete:',e);res.status(500).json({error:'No se pudo activar el paquete'});}
+});
+
 app.get('/api/tasks/config', authenticate, async (req, res) => {
     try {
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
-        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_pausadas, tareas_autorizadas, hora_cobro FROM configuracion WHERE id = 1');
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);
+        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_pausadas, tareas_autorizadas, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
         const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
         const fechaActivacion = row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}$/) ? String(row.tareas_activacion).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(row.tareas_activacion))) : null;
         const pausadas = row.tareas_pausadas === true;
         const autorizacionExplicita = row.tareas_autorizadas === true;
+        const paqueteActivo = row.minijuegos_activo && row.minijuegos_activo.activo === true && row.minijuegos_activo.fecha === hoyLima;
+        const tareasConfiguradas = paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length ? row.minijuegos_activo.tareas : ((Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5));
         res.json({
-            tareas: (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5),
+            tareas: tareasConfiguradas,
             fecha: row.tareas_activacion || null,
             fechaDia: fechaActivacion,
             hoy: hoyLima,
             pausadas: pausadas,
             autorizadasHoy: !pausadas && fechaActivacion === hoyLima,
             horaCobro: row.hora_cobro || '20:00',
-            hora_cobro: row.hora_cobro || '20:00'
+            hora_cobro: row.hora_cobro || '20:00',
+            paqueteMiniJuegos: paqueteActivo ? row.minijuegos_activo.paqueteId : null
         });
     } catch (error) {
         console.error('Error obteniendo configuración de tareas:', error);
