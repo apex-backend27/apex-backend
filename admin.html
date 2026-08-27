@@ -1257,50 +1257,7 @@ PANEL DE ACTIVACIÓN DIARIA (REEMPLAZA CONFIG-BAR)
             <button class="sub-tab" onclick="switchSubTab('actividades','cupones')">🎫 Cupones</button>
         </div>
 
-<!-- TAB SUPER ADMIN -->
-<div id="tab-superadmin" class="tab-content">
-    <div class="card">
-        <div class="card-title">👑 SUPER ADMIN</div>
-        <p style="font-size:13px;color:#666;margin-bottom:12px;">Aquí puedes editar tus datos de acceso. Solo el SUPER ADMIN puede ver esta sección.</p>
-                
-        <div class="form-group">
-            <label>📱 Teléfono actual</label>
-            <input type="text" id="superAdminTelefono" readonly style="background:#f0f0f0;padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;width:100%;font-size:14px;">
-        </div>
-        
-        <div class="form-group">
-            <label>👤 Nuevo nombre de usuario</label>
-            <input type="text" id="superAdminUsername" placeholder="Ej: admin1714" style="padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;width:100%;font-size:14px;">
-            <div style="font-size:11px;color:#999;margin-top:4px;">Este será tu nuevo usuario para iniciar sesión</div>
-        </div>
-        
-        <div class="form-group">
-            <label>📱 Nuevo teléfono (opcional)</label>
-            <input type="text" id="superAdminNewTelefono" placeholder="Ej: 987654321" style="padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;width:100%;font-size:14px;">
-            <div style="font-size:11px;color:#999;margin-top:4px;">Dejar vacío para mantener el actual</div>
-        </div>
-        
-        <div class="form-group">
-            <label>🔑 Nueva contraseña (opcional)</label>
-            <input type="password" id="superAdminNewPassword" placeholder="Nueva contraseña" style="padding:10px 14px;border:1px solid #e0e0e0;border-radius:10px;width:100%;font-size:14px;">
-            <div style="font-size:11px;color:#999;margin-top:4px;">Dejar vacío para mantener la actual</div>
-        </div>
-        
-        <button class="btn btn-primary" onclick="guardarSuperAdmin()" style="padding:12px 32px;font-size:15px;font-weight:700;">💾 Guardar Cambios</button>
-
-        <div style="margin:16px 0;padding:16px;background:#fff3e0;border-radius:10px;border:2px solid #f7971e;">
-            <p style="font-size:14px;font-weight:600;color:#e65100;">🔑 ¿No eres SUPER ADMIN?</p>
-            <p style="font-size:12px;color:#666;margin-bottom:10px;">Haz clic en el botón para convertirte en SUPER ADMIN (solo tú puedes hacer esto).</p>
-            <button class="btn btn-warning" onclick="convertirEnSuperAdmin()" style="padding:12px 32px;font-size:15px;font-weight:700;background:#f7971e;color:#fff;border:none;border-radius:10px;cursor:pointer;">👑 Convertirme en SUPER ADMIN</button>
-        </div>
-        
-        <div style="margin-top:16px;padding:12px;background:#fff8e1;border-radius:10px;border:1px solid #f7971e;">
-            <p style="font-size:12px;color:#e65100;">⚠️ <strong>Importante:</strong> Después de guardar, tendrás que iniciar sesión con tu nuevo usuario o teléfono.</p>
-        </div>
-    </div>
-</div>
-
-        <!-- SUB-TAB PREMIOS: ASIGNACIÓN INDIVIDUAL -->
+<!-- SUB-TAB PREMIOS: ASIGNACIÓN INDIVIDUAL -->
         <div id="actividades-premios" class="sub-tab-content active">
             <div class="card" style="border:1px solid #27d3ff66;background:linear-gradient(135deg,#071326,#10233d);">
                 <div class="card-title" style="color:#27d3ff;">🎮 Actividades por usuario con plan activo</div>
