@@ -1516,10 +1516,10 @@ TAB TAREAS (NUEVO)
             <span id="tareasFechaDisplay" style="font-size:12px; color:#999;">Fecha: --/--/----</span>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn btn-success" onclick="activarTareasDiarias()" id="btnActivarTareas" style="padding:10px 24px; font-size:14px; font-weight:700;">
+            <button class="btn btn-success" onclick="apexActivarDiaDefinitivo()" id="btnActivarTareas" style="padding:10px 24px; font-size:14px; font-weight:700;">
                 ▶️ Iniciar día
             </button>
-            <button class="btn btn-warning" onclick="resetearTareasHoy()" style="padding:10px 20px; font-size:13px; font-weight:600;">
+            <button class="btn btn-warning" onclick="apexPausarDiaDefinitivo()" style="padding:10px 20px; font-size:13px; font-weight:600;">
                 ⏸️ Pausar día
             </button>
         </div>
@@ -7086,6 +7086,29 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
   window.addEventListener('load',function(){sync();setInterval(sync,15000);});
   window.marcarTodasLeidasNotif=async function(){var t=tok();try{var r=await fetch(API_URL+'/api/admin/notifications/read-all',{method:'POST',headers:{Authorization:'Bearer '+t}});if(!r.ok)throw Error('No se pudieron marcar');await sync();showAlert('✅ Todas las notificaciones marcadas como leídas','success');}catch(e){showAlert('❌ '+e.message,'danger');}};
   window.limpiarTodasNotificaciones=async function(){if(!confirm('⚠️ ¿Eliminar TODAS las notificaciones?'))return;if(!confirm('⚠️ Esta acción no se puede deshacer. ¿Estás seguro?'))return;var t=tok();try{var r=await fetch(API_URL+'/api/admin/notifications',{method:'DELETE',headers:{Authorization:'Bearer '+t}});if(!r.ok)throw Error('No se pudieron eliminar');await sync();showAlert('✅ Todas las notificaciones eliminadas','success');}catch(e){showAlert('❌ '+e.message,'danger');}};
+})();
+</script><script id="apex-day-controls-definitive-v1">
+(function(){
+  function token(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';}
+  function paint(active){
+    var badge=document.getElementById('tareasStatusBadge'),btn=document.getElementById('btnActivarTareas');
+    if(badge){badge.textContent=active?'✅ Activas hoy':'⏸️ Pausadas';badge.style.color=active?'#61f0b0':'#ffd447';}
+    if(btn){btn.disabled=active;btn.textContent=active?'✅ Ya activadas':'▶️ Iniciar día';}
+  }
+  async function call(path,active){
+    var t=token();if(!t){showAlert('❌ La sesión del administrador expiró','danger');return;}
+    var r=await fetch(API_URL+path,{method:'POST',cache:'no-store',headers:{Authorization:'Bearer '+t}});
+    var x={};try{x=await r.json();}catch(e){}
+    if(!r.ok||x.error)throw Error(x.error||'No se pudo actualizar el estado diario');
+    localStorage.setItem('apex_tareas_activacion',JSON.stringify({fecha:new Date().toDateString(),activo:active,horaActivacion:new Date().toISOString()}));
+    localStorage.setItem('apex_tareas_estado_event',JSON.stringify({activo:active,at:Date.now()}));
+    paint(active);
+    if(typeof actualizarEstadoActivacionTareas==='function')actualizarEstadoActivacionTareas();
+    if(typeof renderTareasConfig==='function')renderTareasConfig();
+    showAlert(active?'✅ Tareas activadas para hoy':'⏸️ Tareas pausadas para todos',active?'success':'warning');
+  }
+  window.apexActivarDiaDefinitivo=function(){if(confirm('🚀 ¿Activar las tareas de hoy para todos los usuarios?'))call('/api/admin/tasks/activate',true).catch(function(e){showAlert('❌ '+e.message,'danger');});};
+  window.apexPausarDiaDefinitivo=function(){if(confirm('⏸️ ¿Pausar las tareas para todos los usuarios?'))call('/api/admin/tasks/pause',false).catch(function(e){showAlert('❌ '+e.message,'danger');});};
 })();
 </script></body>
 </html>

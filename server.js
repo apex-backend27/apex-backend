@@ -1212,21 +1212,26 @@ app.post('/api/admin/tasks/pause', authenticate, isAdmin, async (req, res) => {
 app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
     try {
         const tareas = (Array.isArray(req.body.tareas) ? req.body.tareas : tareasPorDefecto).slice(0, 5);
-        const actual = await pool.query('SELECT tareas_activacion, tareas_pausadas, tareas_autorizadas, hora_cobro FROM configuracion WHERE id = 1');
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE`);
+        const actual = await pool.query('SELECT tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, hora_cobro FROM configuracion WHERE id = 1');
         const previo = actual.rows[0] || {};
         const fecha = req.body.fecha !== undefined && req.body.fecha !== null ? req.body.fecha : (previo.tareas_activacion || null);
         const pausadas = req.body.pausadas !== undefined ? req.body.pausadas === true : previo.tareas_pausadas === true;
-        const autorizadas = req.body.autorizadas !== undefined ? req.body.autorizadas === true : previo.tareas_autorizadas === true;
+        // Compatibilidad con versiones antiguas del admin: si se envía una fecha
+        // junto con pausadas:false, se trata de una activación explícita.
+        const activacionPorConfiguracion = req.body.pausadas !== undefined && pausadas === false && fecha !== null;
+        const autorizadas = req.body.autorizadas !== undefined ? req.body.autorizadas === true : (activacionPorConfiguracion ? true : previo.tareas_autorizadas === true);
+        const fechaDia = fecha !== null ? String(fecha).slice(0, 10) : (previo.tareas_activacion_dia ? String(previo.tareas_activacion_dia).slice(0, 10) : null);
         const horaSolicitada = String(req.body.horaCobro || req.body.hora_cobro || previo.hora_cobro || '20:00');
         const horaCobro = /^([01]\d|2[0-3]):[0-5]\d$/.test(horaSolicitada) ? horaSolicitada : '20:00';
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         const result = await pool.query(
-            `INSERT INTO configuracion (id, tareas_config, tareas_activacion, tareas_pausadas, tareas_autorizadas, hora_cobro, updated_at)
-             VALUES (1, $1, $2, $3, $4, $5, NOW())
-             ON CONFLICT (id) DO UPDATE SET tareas_config = $1, tareas_activacion = $2, tareas_pausadas = $3, tareas_autorizadas = $4, hora_cobro = $5, updated_at = NOW()
-             RETURNING tareas_config, tareas_activacion, tareas_pausadas, tareas_autorizadas, hora_cobro`,
-            [JSON.stringify(tareas), fecha, pausadas, autorizadas, horaCobro]
+            `INSERT INTO configuracion (id, tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, hora_cobro, updated_at)
+             VALUES (1, $1, $2, $6::date, $3, $4, $5, NOW())
+             ON CONFLICT (id) DO UPDATE SET tareas_config = $1, tareas_activacion = $2, tareas_activacion_dia = COALESCE($6::date, configuracion.tareas_activacion_dia), tareas_pausadas = $3, tareas_autorizadas = $4, hora_cobro = $5, updated_at = NOW()
+             RETURNING tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, hora_cobro`,
+            [JSON.stringify(tareas), fecha, pausadas, autorizadas, horaCobro, fechaDia]
         );
         res.json({ message: 'Configuración de tareas actualizada', config: result.rows[0] });
     } catch (error) {
