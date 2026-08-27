@@ -207,7 +207,8 @@ async function monitorDepositosPolygon() {
         const provider = getPolygonProvider(), latest = await provider.getBlockNumber();
         const cfg = await pool.query('SELECT id, deposit_scanned_block FROM configuracion ORDER BY id LIMIT 1');
         const previous = cfg.rows.length ? Number(cfg.rows[0].deposit_scanned_block || 0) : 0;
-        const lookback = Math.max(900, Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000));
+        const configuredLookback = Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000);
+        const lookback = Math.min(9000, Math.max(900, Number.isFinite(configuredLookback) ? configuredLookback : 2000));
         const fromBlock = Math.max(0, latest - lookback), toBlock = latest;
         const users = await pool.query("SELECT id, LOWER(polygon_address) AS polygon_address FROM users WHERE polygon_address IS NOT NULL AND polygon_address LIKE '0x%'");
         const addressMap = new Map(users.rows.map(u => [String(u.polygon_address).toLowerCase(), u.id]));
@@ -254,7 +255,7 @@ app.get('/', (req, res) => {
   res.send('Servidor funcionando correctamente');
 });
 app.get('/api/deposit-monitor-status', (req, res) => {
-  res.json({ version: DEPOSIT_MONITOR_VERSION, rpc_mode: 'direct-eth_getLogs', batch_size: 500, lookback_blocks: Math.max(900, Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
+  res.json({ version: DEPOSIT_MONITOR_VERSION, rpc_mode: 'direct-eth_getLogs', batch_size: 500, lookback_blocks: Math.min(9000, Math.max(900, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000) : 2000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
 });
 
 app.get('/test', (req, res) => {
