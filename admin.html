@@ -5383,6 +5383,12 @@ function asignarCuponAUsuarioEspecifico(telefono, cuponIndex, silencioso) {
 // ============================================================
 // DEPÓSITOS
 // ============================================================
+// Escapa texto remoto antes de insertarlo en innerHTML.
+function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+        return {'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char];
+    });
+}
 var depositosAdminCache = [];
 var depositosAdminCargando = false;
 
