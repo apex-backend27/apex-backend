@@ -144,9 +144,15 @@ function normalizarPermisos(value) {
     const source = value && typeof value === 'object' ? value : {};
     return ADMIN_PERMISSIONS.reduce((out, key) => { out[key] = source[key] === true; return out; }, {});
 }
+function flagTrue(value) {
+    return value === true || value === 1 || ['true', '1', 't', 'yes', 'si'].includes(String(value ?? '').trim().toLowerCase());
+}
+function flagActive(value) {
+    return value !== false && !['false', '0', 'f', 'no'].includes(String(value ?? '').trim().toLowerCase());
+}
 function tienePermisoAdmin(user, permission) {
-    if (!user || !user.es_admin || user.admin_active === false) return false;
-    if (user.es_super_admin === true) return true;
+    if (!user || !flagTrue(user.es_admin) || !flagActive(user.admin_active)) return false;
+    if (flagTrue(user.es_super_admin)) return true;
     return normalizarPermisos(user.admin_permissions)[permission] === true;
 }
 function permisoRequeridoParaRuta(req) {
@@ -163,7 +169,7 @@ function permisoRequeridoParaRuta(req) {
     return null;
 }
 const isAdmin = async (req, res, next) => {
-    if (!req.user || !req.user.es_admin || req.user.admin_active === false) {
+    if (!req.user || !flagTrue(req.user.es_admin) || !flagActive(req.user.admin_active)) {
         return res.status(403).json({ error: 'Acceso denegado. Se requieren privilegios de administrador.' });
     }
     // Cuentas antiguas sin permisos configurados conservan compatibilidad total.
@@ -175,7 +181,7 @@ const isAdmin = async (req, res, next) => {
     next();
 };
 const requireSuperAdmin = [authenticate, async (req, res, next) => {
-    if (!req.user || req.user.es_super_admin !== true || req.user.admin_active === false) {
+    if (!req.user || !flagTrue(req.user.es_super_admin) || !flagActive(req.user.admin_active)) {
         return res.status(403).json({ error: 'Solo el SuperAdmin puede realizar esta acción.' });
     }
     next();
@@ -731,7 +737,10 @@ function publicUserData(row, referidosOverride) {
         canjes_realizados: Array.isArray(safe.canjes_realizados) ? safe.canjes_realizados : [],
         logros_reclamados: Array.isArray(safe.logros_reclamados) ? safe.logros_reclamados : [],
         tareas_completadas_hoy: Array.isArray(safe.tareas_completadas_hoy) ? safe.tareas_completadas_hoy : [],
-        referidos: referidosOverride || safe.referidos || { izquierda: null, derecha: null, lista: [] }
+        referidos: referidosOverride || safe.referidos || { izquierda: null, derecha: null, lista: [] },
+        es_admin: flagTrue(safe.es_admin),
+        es_super_admin: flagTrue(safe.es_super_admin),
+        admin_active: flagActive(safe.admin_active)
     };
 }
 // ============================================================
