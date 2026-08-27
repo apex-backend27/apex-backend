@@ -631,7 +631,8 @@ function construirBibliotecaMiniJuegos(){
         const tipo=MINI_GAME_TYPES[(i-1)%MINI_GAME_TYPES.length];
         const variante=Math.floor((i-1)/MINI_GAME_TYPES.length)+1;
         const nombres={captcha:'Código de acceso',sequence:'Secuencia relámpago',target:'Objetivo oculto',reaction:'Pulso de reflejos',pair:'Parejas de memoria'};
-        lista.push({id:i,nombre:nombres[tipo]+' #'+variante,descripcion:'Reto interactivo '+i+' de la biblioteca APEX',icono:MINI_GAME_ICONS[(i-1)%MINI_GAME_ICONS.length],tipo_interactivo:tipo,variante:variante});
+        const ayuda={captcha:{instruccion:'Escribe el código que aparece en pantalla.',respuesta:'El código generado que se muestra al usuario.'},sequence:{instruccion:'Memoriza la secuencia y repítela en el mismo orden.',respuesta:'La misma secuencia de 4 emojis, sin cambiar el orden.'},target:{instruccion:'Encuentra y pulsa el símbolo objetivo entre los distractores.',respuesta:'El símbolo indicado en la parte superior del reto.'},reaction:{instruccion:'Espera la señal verde y pulsa el botón cuando aparezca.',respuesta:'Pulsar únicamente después de que la señal se vuelva verde.'},pair:{instruccion:'Descubre dos cartas y encuentra una pareja de emojis iguales.',respuesta:'Dos cartas que tengan exactamente el mismo emoji.'}}[tipo];
+        lista.push({id:i,nombre:nombres[tipo]+' #'+variante,descripcion:'Reto interactivo '+i+' de la biblioteca APEX',icono:MINI_GAME_ICONS[(i-1)%MINI_GAME_ICONS.length],tipo_interactivo:tipo,variante:variante,instruccion:ayuda.instruccion,respuesta:ayuda.respuesta});
     }
     return lista;
 }
