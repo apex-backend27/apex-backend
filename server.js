@@ -156,6 +156,31 @@ function getPolygonProvider() {
     return polygonProvider;
 }
 function topicAddress(topic) { return getAddress('0x' + String(topic).slice(-40)).toLowerCase(); }
+async function rpcGetLogs(filter) {
+    const rpcUrl = process.env.POLYGON_RPC_URL || 'https://polygon.drpc.org';
+    const payload = {
+        jsonrpc: '2.0',
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        method: 'eth_getLogs',
+        params: [{
+            address: filter.address,
+            topics: filter.topics,
+            fromBlock: '0x' + Number(filter.fromBlock).toString(16),
+            toBlock: '0x' + Number(filter.toBlock).toString(16)
+        }]
+    };
+    const response = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    const body = await response.json();
+    if (!response.ok || body.error) {
+        const message = body.error?.message || `HTTP ${response.status}`;
+        throw new Error(`RPC eth_getLogs: ${message}`);
+    }
+    return Array.isArray(body.result) ? body.result : [];
+}
 async function acreditarDeposito(deposito) {
     const client = await pool.connect();
     try {
@@ -193,8 +218,9 @@ async function monitorDepositosPolygon() {
             let detected = 0;
             for (let batchStart = fromBlock; batchStart <= toBlock; batchStart += batchSize) {
                 const batchEnd = Math.min(toBlock, batchStart + batchSize - 1);
-                const logs = await provider.getLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC, null, recipientTopics], fromBlock: batchStart, toBlock: batchEnd });
-                for (const log of logs) {
+                for (const recipientTopic of recipientTopics) {
+                    const logs = await rpcGetLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC, null, recipientTopic], fromBlock: batchStart, toBlock: batchEnd });
+                    for (const log of logs) {
                     if (!log.topics || log.topics.length < 3) continue;
                     let to; try { to = topicAddress(log.topics[2]); } catch (_) { continue; }
                     const userId = addressMap.get(to); if (!userId) continue;
@@ -202,6 +228,7 @@ async function monitorDepositosPolygon() {
                     if (!(amount > 0)) continue;
                     const inserted = await pool.query(`INSERT INTO polygon_deposits (tx_hash, log_index, user_id, token_contract, from_address, to_address, amount, block_number, confirmations, status, raw_log) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10::jsonb) ON CONFLICT (tx_hash, log_index) DO NOTHING RETURNING id`, [log.transactionHash, Number(log.index || 0), userId, POLYGON_TOKEN_CONTRACT, topicAddress(log.topics[1]), to, amount, Number(log.blockNumber), Math.max(0, latest - Number(log.blockNumber) + 1), JSON.stringify({ blockHash: log.blockHash, topics: log.topics, data: log.data })]);
                     if (inserted.rows.length) { detected++; console.log(`Depósito detectado: ${amount} USDT0 para usuario ${userId}, tx ${log.transactionHash}`); }
+                    }
                 }
             }
             if (detected) console.log(`Monitor Polygon: ${detected} depósito(s) nuevo(s) registrado(s)`);
