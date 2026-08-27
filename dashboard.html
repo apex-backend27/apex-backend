@@ -1450,10 +1450,10 @@ function completarTareaDiaria(index) {
 
     renderTareas();
     renderDashboard();
-    showAlert(completadasCount === 5 ? '🎉 ¡Completaste todas las tareas de hoy!' : '✅ Tarea completada. Guardando en NeonTech…', 'success');
+    showAlert(completadasCount === 5 ? '🎉 ¡Completaste todas las tareas de hoy!' : '✅ Tarea completada', 'success');
 
     guardarProgresoTareasRemoto(completadas, hoy, user.racha_dias || 0).then(function() {
-        showAlert(completadasCount === 5 ? '✅ Todas las tareas quedaron guardadas en NeonTech.' : '✅ Progreso guardado en NeonTech.', 'success');
+        showAlert(completadasCount === 5 ? '🎉 ¡Completaste todas las tareas de hoy!' : '✅ Tarea completada', 'success');
     }).catch(function(error) {
         user.tareas_completadas_hoy = completadasAntes;
         user.ultima_fecha_tareas = fechaAnterior;
@@ -1462,7 +1462,7 @@ function completarTareaDiaria(index) {
         localStorage.setItem('apex_user', JSON.stringify(user));
         renderTareas();
         renderDashboard();
-        showAlert('❌ No se pudo guardar la tarea en NeonTech: ' + error.message, 'danger');
+        showAlert('❌ No se pudo completar la tarea. Inténtalo nuevamente.', 'danger');
     });
 }
 
