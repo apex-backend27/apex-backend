@@ -2516,67 +2516,61 @@ function getUsuarioReferido(telefono) {
 // ============================================================
 // VERIFICAR ADMIN
 // ============================================================
-function verificarAdmin() {
-    var token = localStorage.getItem('apex_token');
+async function verificarAdmin() {
+    var token = localStorage.getItem('apex_token') || sessionStorage.getItem('apex_token');
     if (!token) {
         window.location.href = 'index.html';
         return false;
     }
-
-    fetch(API_URL + '/api/verify', {
-        method: 'GET',
-        headers: { 'Authorization': 'Bearer ' + token }
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log('📦 Datos de verificación:', data);
-        
-        if (data.error || !data.user) {
-            console.log('❌ Error en verificación:', data.error);
+    try {
+        var response = await fetch(API_URL + '/api/admin/session?t=' + Date.now(), {
+            method: 'GET',
+            cache: 'no-store',
+            headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+        });
+        var data = {};
+        try { data = await response.json(); } catch (e) { data = {}; }
+        console.log('📦 Sesión administrativa:', response.status, data);
+        if (response.status === 401 || response.status === 403) {
             localStorage.removeItem('apex_token');
             localStorage.removeItem('apex_user');
+            sessionStorage.removeItem('apex_token');
+            sessionStorage.removeItem('apex_user');
             window.location.href = 'index.html';
             return false;
         }
-
+        if (!response.ok || !data.user) {
+            throw new Error(data.error || 'El servidor no pudo verificar la sesión administrativa');
+        }
         var user = data.user;
-        console.log('👤 Usuario verificado:', user);
-        
-        // ✅ FORZAR que 999999999 sea admin SIEMPRE
-        if (user.telefono === '999999999') {
-            user.es_admin = true;
-            user.es_super_admin = true;
-            // Actualizar en la base de datos también
-            actualizarAdminEnBackend(user.id);
-        }
-        
-        // Si no es admin, redirigir
-        if (!user.es_admin) {
-            console.log('❌ Usuario no es admin:', user.telefono);
+        if (user.es_admin !== true) {
+            localStorage.removeItem('apex_token');
+            localStorage.removeItem('apex_user');
+            sessionStorage.removeItem('apex_token');
+            sessionStorage.removeItem('apex_user');
             window.location.href = 'index.html';
             return false;
         }
-
+        localStorage.setItem('apex_token', token);
+        localStorage.setItem('apex_user', JSON.stringify(user));
+        sessionStorage.setItem('apex_token', token);
         sessionStorage.setItem('apex_user', JSON.stringify(user));
         aplicarPermisosVisuales(user);
-        document.getElementById('adminName').textContent = user.nombre + ' ' + (user.apellido || '');
-        document.getElementById('adminAvatar').textContent = user.nombre ? user.nombre[0] : 'A';
-
+        var name = document.getElementById('adminName');
+        var avatar = document.getElementById('adminAvatar');
+        if (name) name.textContent = (user.nombre || '') + ' ' + (user.apellido || '');
+        if (avatar) avatar.textContent = user.nombre ? user.nombre[0] : 'A';
         var superAdminTab = document.getElementById('superAdminTabBtn');
-        if (user.es_super_admin === true) {
-            superAdminTab.style.display = 'block';
-        } else {
-            superAdminTab.style.display = 'none';
-        }
-
+        if (superAdminTab) superAdminTab.style.display = user.es_super_admin === true ? 'block' : 'none';
         cargarDatosAdmin();
         return true;
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('❌ Error al verificar admin:', error);
-        window.location.href = 'index.html';
+        // Un error de red/servidor no debe borrar una sesión válida ni enviarla al login.
+        var notice = document.getElementById('adminSessionNotice');
+        if (notice) notice.textContent = 'No se pudo verificar el servidor. Reintenta en unos segundos.';
         return false;
-    });
+    }
 }
 
 // ✅ NUEVA FUNCIÓN: Forzar que 999999999 sea admin en el backend
@@ -2810,70 +2804,15 @@ function sincronizarTodosLosUsuarios() {
 // VERIFICAR ADMIN - ORIGINAL
 // ============================================================
 function verificarAdminOriginal() {
-    try {
-        var user = JSON.parse(sessionStorage.getItem('apex_user'));
-        if (!user) {
-            window.location.href = 'index.html';
-            return false;
-        }
-        
-        if (user.telefono === '999999999') {
-            user.es_super_admin = true;
-            user.es_admin = true;
-            if (!user.username) {
-                user.username = 'admin1714';
-            }
-            var users = getUsers();
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === '999999999') {
-                    users[i] = user;
-                    break;
-                }
-            }
-            saveUsers(users);
-            sessionStorage.setItem('apex_user', JSON.stringify(user));
-        }
-        
-        if (user.telefono === '999999999' || user.username === 'admin1714') {
-            user.es_super_admin = true;
-            user.es_admin = true;
-            var users = getUsers();
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].telefono === user.telefono || users[i].username === 'admin1714') {
-                    users[i] = user;
-                    break;
-                }
-            }
-            saveUsers(users);
-            sessionStorage.setItem('apex_user', JSON.stringify(user));
-        }
-        
-        if (user.es_admin !== true) {
-            window.location.href = 'index.html';
-            return false;
-        }
-        
-        document.getElementById('adminName').textContent = user.nombre + ' ' + user.apellido;
-        document.getElementById('adminAvatar').textContent = user.nombre[0];
-
-        var superAdminTab = document.getElementById('superAdminTabBtn');
-        if (user.es_super_admin === true) {
-            superAdminTab.style.display = 'block';
-        } else {
-            superAdminTab.style.display = 'none';
-        }
-
-        return true;
-    } catch {
-        window.location.href = 'index.html';
-        return false;
-    }
+    // Alias de compatibilidad: toda verificación pasa por el flujo JWT actual.
+    return verificarAdmin();
 }
 
-function volverDashboard() { window.location.href = 'dashboard.html?v=20260827-telegram'; }
+function volverDashboard() { window.location.href = 'dashboard.html?v=auth-fix-1'; }
 function cerrarSesion() { 
     localStorage.removeItem('apex_token');
     localStorage.removeItem('apex_user');
+    sessionStorage.removeItem('apex_token');
     sessionStorage.removeItem('apex_user');
     window.location.href = 'index.html'; 
 }

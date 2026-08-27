@@ -825,6 +825,21 @@ app.get('/api/verify', authenticate, async (req, res) => {
 });
 
 // ============================================================
+// SESIÓN ADMINISTRATIVA
+// ============================================================
+app.get('/api/admin/session', authenticate, isAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+    const user = result.rows[0];
+    res.json({ user: publicUserData(user), role: user.es_super_admin === true ? 'superadmin' : 'admin' });
+  } catch (error) {
+    console.error('Error en /api/admin/session:', error.message);
+    res.status(500).json({ error: 'No se pudo verificar la sesión administrativa' });
+  }
+});
+
+// ============================================================
 // RUTAS PROTEGIDAS
 // ============================================================
 app.get('/api/me/wallet', authenticate, async (req, res) => {

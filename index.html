@@ -272,12 +272,14 @@ function registerUser(event) {
         showAlert(data.message, 'success');
         localStorage.setItem('apex_token', data.token);
         localStorage.setItem('apex_user', JSON.stringify(data.user));
+        sessionStorage.setItem('apex_token', data.token);
+        sessionStorage.setItem('apex_user', JSON.stringify(data.user));
 
         btn.disabled = false;
         btn.innerHTML = 'Crear Cuenta';
 
         setTimeout(function() {
-            window.location.href = new URL(data.user.es_admin ? '/admin.html?v=20260827-telegram' : '/dashboard.html?v=20260827-telegram', window.location.origin).href;
+            window.location.href = new URL(data.user.es_admin ? '/admin.html?v=auth-fix-1' : '/dashboard.html?v=auth-fix-1', window.location.origin).href;
         }, 1500);
     })
     .catch(error => {
@@ -322,6 +324,8 @@ function loginUser(event) {
 
         localStorage.setItem('apex_token', data.token);
         localStorage.setItem('apex_user', JSON.stringify(data.user));
+        sessionStorage.setItem('apex_token', data.token);
+        sessionStorage.setItem('apex_user', JSON.stringify(data.user));
 
         if (remember) {
             localStorage.setItem('apex_remember', JSON.stringify({
@@ -337,7 +341,7 @@ function loginUser(event) {
         btn.innerHTML = 'Iniciar Sesión';
 
         setTimeout(function() {
-            window.location.href = new URL(data.user.es_admin ? '/admin.html?v=20260827-telegram' : '/dashboard.html?v=20260827-telegram', window.location.origin).href;
+            window.location.href = new URL(data.user.es_admin ? '/admin.html?v=auth-fix-1' : '/dashboard.html?v=auth-fix-1', window.location.origin).href;
         }, 1000);
     })
     .catch(error => {
@@ -380,7 +384,7 @@ function loginUser(event) {
         .then(data => {
             if (data.user) {
                 localStorage.setItem('apex_user', JSON.stringify(data.user));
-                window.location.href = new URL(data.user.es_admin ? '/admin.html?v=20260827-telegram' : '/dashboard.html?v=20260827-telegram', window.location.origin).href;
+                window.location.href = new URL(data.user.es_admin ? '/admin.html?v=auth-fix-1' : '/dashboard.html?v=auth-fix-1', window.location.origin).href;
             } else {
                 localStorage.removeItem('apex_token');
                 localStorage.removeItem('apex_user');
@@ -415,7 +419,7 @@ function loginUser(event) {
     var raw=String(value||'').trim();
     if(!raw)return '';
     if(raw.charAt(0)==='@')return 'https://t.me/'+raw.slice(1);
-    if(!/^https?:\\/\\//i.test(raw))return 'https://t.me/'+raw.replace(/^\\/+/, '');
+    if(!/^https?:\/\//i.test(raw))return 'https://t.me/'+raw.replace(/^\/+/, '');
     try{var parsed=new URL(raw);var host=parsed.hostname.toLowerCase().replace(/^www\\./,'');return ['t.me','telegram.me'].indexOf(host)>=0&&parsed.pathname&&parsed.pathname!=='/'?parsed.toString():'';}catch(_){return '';}
   }
   function apply(data){var url=normalize(data&&data.telegram_soporte_url);var link=document.getElementById('telegramSupportIndex');if(link){link.hidden=!url;if(url)link.href=url;}}
