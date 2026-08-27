@@ -902,6 +902,22 @@ app.put('/api/user/update', async (req, res) => {
         const userId = decoded.userId;
         
         const updates = { ...req.body };
+        const solicitaProgresoDiario = Object.prototype.hasOwnProperty.call(updates, 'tareas_completadas_hoy') || Object.prototype.hasOwnProperty.call(updates, 'ultima_fecha_tareas') || Object.prototype.hasOwnProperty.call(updates, 'cobro_tareas_fecha');
+        if (solicitaProgresoDiario) {
+            const cfg = await pool.query('SELECT tareas_activacion, tareas_pausadas, tareas_autorizadas FROM configuracion WHERE id = 1');
+            const cfgRow = cfg.rows[0] || {};
+            const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+            const valorActivacion = cfgRow.tareas_activacion;
+            const fechaActivacion = valorActivacion ? (String(valorActivacion).match(/^\\d{4}-\\d{2}-\\d{2}$/) ? String(valorActivacion).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(valorActivacion))) : null;
+            const diaAutorizado = cfgRow.tareas_autorizadas === true && cfgRow.tareas_pausadas !== true && fechaActivacion === hoyLima;
+            if (!diaAutorizado) {
+                delete updates.tareas_completadas_hoy;
+                delete updates.ultima_fecha_tareas;
+                delete updates.cobro_tareas_fecha;
+                delete updates.cobro_tareas_monto;
+                delete updates.racha_dias;
+            }
+        }
         if (updates.password) {
             updates.password_hash = await bcrypt.hash(String(updates.password), 10);
             delete updates.password;
@@ -986,7 +1002,12 @@ app.put('/api/user/update', async (req, res) => {
                 codigos_usados_hoy: Number(userData.codigos_usados_hoy || 0),
                 ultimo_reinicio_codigos: userData.ultimo_reinicio_codigos || null,
                 codigos_usados: userData.codigos_usados || [],
-                referidos: userData.referidos || { izquierda: null, derecha: null, lista: [] }
+                referidos: userData.referidos || { izquierda: null, derecha: null, lista: [] },
+                tareas_completadas_hoy: Array.isArray(userData.tareas_completadas_hoy) ? userData.tareas_completadas_hoy : [],
+                ultima_fecha_tareas: userData.ultima_fecha_tareas || null,
+                racha_dias: Number(userData.racha_dias || 0),
+                cobro_tareas_fecha: userData.cobro_tareas_fecha || null,
+                cobro_tareas_monto: Number(userData.cobro_tareas_monto || 0)
             }
         });
         
@@ -1149,7 +1170,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             fechaDia: fechaActivacion,
             hoy: hoyLima,
             pausadas: pausadas,
-            autorizadasHoy: !pausadas && fechaActivacion === hoyLima,
+            autorizadasHoy: !pausadas && autorizacionExplicita && fechaActivacion === hoyLima,
             horaCobro: row.hora_cobro || '20:00',
             hora_cobro: row.hora_cobro || '20:00',
             paqueteMiniJuegos: paqueteActivo ? row.minijuegos_activo.paqueteId : null
@@ -1163,7 +1184,14 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
 app.post('/api/admin/tasks/activate', authenticate, isAdmin, async (req, res) => {
     try {
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE`);
+        const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        const previo = await pool.query('SELECT tareas_activacion FROM configuracion WHERE id = 1');
+        const valorPrevio = previo.rows[0]?.tareas_activacion;
+        const fechaPrevia = valorPrevio ? (String(valorPrevio).match(/^\d{4}-\d{2}-\d{2}$/) ? String(valorPrevio).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(valorPrevio))) : null;
         const r = await pool.query(`UPDATE configuracion SET tareas_activacion = NOW(), tareas_pausadas = FALSE, tareas_autorizadas = TRUE, updated_at = NOW() WHERE id = 1 RETURNING tareas_activacion, tareas_pausadas`);
+        if (fechaPrevia !== hoyLima) {
+            await pool.query(`UPDATE users SET tareas_completadas_hoy = '[]'::jsonb, ultima_fecha_tareas = $1, cobro_tareas_fecha = NULL, cobro_tareas_monto = 0`, [hoyLima]);
+        }
         if (!r.rows.length) return res.status(404).json({error:'No existe la configuración de tareas'});
         res.json({message:'Tareas activadas para hoy', config:r.rows[0]});
     } catch (error) { console.error('Error activando tareas:', error); res.status(500).json({error:'No se pudieron activar las tareas'}); }
@@ -1185,7 +1213,7 @@ app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
         const previo = actual.rows[0] || {};
         const fecha = req.body.fecha !== undefined && req.body.fecha !== null ? req.body.fecha : (previo.tareas_activacion || null);
         const pausadas = req.body.pausadas !== undefined ? req.body.pausadas === true : previo.tareas_pausadas === true;
-        const autorizadas = req.body.autorizadas !== undefined ? req.body.autorizadas === true : (previo.tareas_autorizadas === true || (!pausadas && Boolean(fecha)));
+        const autorizadas = req.body.autorizadas !== undefined ? req.body.autorizadas === true : previo.tareas_autorizadas === true;
         const horaSolicitada = String(req.body.horaCobro || req.body.hora_cobro || previo.hora_cobro || '20:00');
         const horaCobro = /^([01]\d|2[0-3]):[0-5]\d$/.test(horaSolicitada) ? horaSolicitada : '20:00';
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
