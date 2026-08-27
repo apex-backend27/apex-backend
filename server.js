@@ -144,7 +144,7 @@ async function asegurarBilleteraUsuario(userId) {
 // ============================================================
 // MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
 // ============================================================
-const DEPOSIT_MONITOR_VERSION = 'v10-render-rpc-only';
+const DEPOSIT_MONITOR_VERSION = 'v11-render-rpc-only';
 const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
@@ -557,6 +557,9 @@ app.post('/api/me/deposits/sync', authenticate, async (req, res) => {
 app.get('/api/user/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!/^\d+$/.test(String(id))) {
+      return res.status(404).json({ error: 'Ruta de usuario no válida' });
+    }
     
     const result = await pool.query(
       'SELECT id, telefono, nombre, apellido, es_admin, codigo_referido, polygon_address, balance, puntos, plan FROM users WHERE id = $1',
