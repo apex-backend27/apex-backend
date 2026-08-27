@@ -5383,33 +5383,70 @@ function asignarCuponAUsuarioEspecifico(telefono, cuponIndex, silencioso) {
 // ============================================================
 // DEPÓSITOS
 // ============================================================
-function renderDepositos() {
-    var depositos = getDepositos();
+var depositosAdminCache = [];
+var depositosAdminCargando = false;
+
+function tokenAdminDepositos() {
+    return localStorage.getItem('apex_token') || sessionStorage.getItem('apex_token') || localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+}
+
+async function cargarDepositosAdmin() {
+    var tbody = document.getElementById('depositosTableBody');
+    if (!tbody || depositosAdminCargando) return;
+    var token = tokenAdminDepositos();
+    if (!token) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef5350;padding:20px;">Sesión administrativa no disponible</td></tr>';
+        return;
+    }
+    depositosAdminCargando = true;
+    try {
+        var response = await fetch(API_URL + '/api/admin/deposits?limit=200&t=' + Date.now(), {
+            cache: 'no-store',
+            headers: { Authorization: 'Bearer ' + token }
+        });
+        var data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || 'No se pudo cargar el registro de depósitos');
+        depositosAdminCache = Array.isArray(data.deposits) ? data.deposits : [];
+        renderDepositosRemotos();
+    } catch (error) {
+        console.error('Error cargando depósitos admin:', error);
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef5350;padding:20px;">' + escapeHtml(error.message) + '</td></tr>';
+    } finally {
+        depositosAdminCargando = false;
+    }
+}
+
+function renderDepositosRemotos() {
     var tbody = document.getElementById('depositosTableBody');
     if (!tbody) return;
-    
-    if (depositos.length === 0) {
+    var depositos = depositosAdminCache || [];
+    if (!depositos.length) {
         tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:20px;">No hay depósitos registrados</td></tr>';
         return;
     }
-    
-    depositos.sort(function(a, b) { return new Date(b.fecha) - new Date(a.fecha); });
-    
-    var html = '';
-    for (var i = 0; i < depositos.length; i++) {
-        var d = depositos[i];
-        html += '<tr>' +
+    tbody.innerHTML = depositos.map(function(d, i) {
+        var nombre = [d.nombre, d.apellido].filter(Boolean).join(' ') || 'N/A';
+        var hash = String(d.tx_hash || '');
+        var hashCorto = hash ? hash.slice(0, 10) + '...' + hash.slice(-8) : '-';
+        var estado = String(d.status || 'pending').toLowerCase();
+        var estadoTexto = estado === 'credited' ? 'Acreditado' : estado === 'pending' ? 'Pendiente' : estado;
+        var color = estado === 'credited' ? '#4db6ac' : '#f7971e';
+        var fecha = d.created_at || d.credited_at;
+        return '<tr>' +
             '<td>' + (i + 1) + '</td>' +
-            '<td><strong>' + (d.usuario || 'N/A') + '</strong></td>' +
-            '<td>' + (d.telefono || 'N/A') + '</td>' +
-            '<td>' + formatDateTime(d.fecha) + '</td>' +
-            '<td><strong>$' + Number(d.monto || 0).toFixed(2) + '</strong></td>' +
-            '<td style="font-family:monospace;font-size:10px;">' + (d.hash || '-') + '</td>' +
-            '<td style="font-size:10px;">' + (d.nota || '-') + '</td>' +
-            '<td><button class="btn btn-info btn-sm" onclick="agregarNotaDeposito(' + i + ')" data-tooltip="Agregar nota">📝</button></td>' +
+            '<td><strong>' + escapeHtml(nombre) + '</strong><br><small style="color:#999;">ID ' + escapeHtml(d.user_id) + '</small></td>' +
+            '<td>' + escapeHtml(d.telefono || 'N/A') + '</td>' +
+            '<td>' + escapeHtml(formatDateTime(fecha)) + '</td>' +
+            '<td><strong>$' + Number(d.amount || 0).toFixed(2) + '</strong><br><small>' + escapeHtml(estadoTexto) + '</small></td>' +
+            '<td style="font-family:monospace;font-size:10px;"><a href="https://polygonscan.com/tx/' + encodeURIComponent(hash) + '" target="_blank" rel="noopener">' + escapeHtml(hashCorto) + '</a></td>' +
+            '<td style="font-size:10px;">' + escapeHtml((d.confirmations || 0) + ' confirmaciones') + '</td>' +
+            '<td><span style="color:' + color + ';font-weight:700;">' + escapeHtml(estadoTexto) + '</span></td>' +
         '</tr>';
-    }
-    tbody.innerHTML = html;
+    }).join('');
+}
+
+function renderDepositos() {
+    cargarDepositosAdmin();
 }
 
 function agregarDeposito() {

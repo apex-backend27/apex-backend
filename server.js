@@ -369,6 +369,27 @@ app.delete('/api/admin/notifications', authenticate, isAdmin, async (req, res) =
     catch (e) { res.status(500).json({error:'No se pudieron eliminar las notificaciones'}); }
 });
 
+// Registro persistente de depósitos para el panel administrativo.
+app.get('/api/admin/deposits', authenticate, isAdmin, async (req, res) => {
+    try {
+        const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
+        const result = await pool.query(`
+            SELECT d.id, d.user_id, d.tx_hash, d.log_index, d.amount,
+                   d.block_number, d.confirmations, d.status,
+                   d.token_contract, d.created_at, d.credited_at,
+                   u.nombre, u.apellido, u.telefono, u.polygon_address
+            FROM polygon_deposits d
+            LEFT JOIN users u ON u.id = d.user_id
+            ORDER BY d.created_at DESC, d.id DESC
+            LIMIT $1
+        `, [limit]);
+        res.json({ deposits: result.rows });
+    } catch (e) {
+        console.error('Error cargando depósitos admin:', e.message);
+        res.status(500).json({ error: 'No se pudo cargar el registro de depósitos' });
+    }
+});
+
 // ============================================================
 // REGISTRO - CON TODA LA LÓGICA DE REFERIDOS
 // ============================================================
