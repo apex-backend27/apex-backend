@@ -747,7 +747,8 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(423).json({ error: 'Aún no es la hora de realizar el cobro. Estará disponible desde las ' + horaCobro + ' horas.' });
         }
-        if (cfgResult.rows[0]?.tareas_pausadas === true || fechaActivacion !== hoyLima || cfgResult.rows[0]?.tareas_autorizadas !== true) {
+        const diaActivoHoy = fechaActivacion === hoyLima;
+        if (cfgResult.rows[0]?.tareas_pausadas === true || !diaActivoHoy) {
             await client.query('ROLLBACK');
             return res.status(423).json({ error: cfgResult.rows[0]?.tareas_pausadas === true ? 'Las tareas están pausadas por el administrador' : 'Las tareas del nuevo día aún no han sido autorizadas por el administrador' });
         }
