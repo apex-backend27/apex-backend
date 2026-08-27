@@ -13,6 +13,21 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+function normalizarEnlaceTelegram(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    let candidate = raw;
+    if (candidate.startsWith('@')) candidate = `https://t.me/${candidate.slice(1)}`;
+    else if (!/^https?:\/\//i.test(candidate)) candidate = `https://t.me/${candidate.replace(/^\/+/, '')}`;
+    let parsed;
+    try { parsed = new URL(candidate); } catch (_) { throw new Error('El contacto de Telegram no es válido'); }
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+    if (!['t.me', 'telegram.me'].includes(host) || !parsed.pathname || parsed.pathname === '/') {
+        throw new Error('El enlace debe pertenecer a t.me o telegram.me');
+    }
+    return parsed.toString();
+}
+
 async function ensureTaskColumns() {
     try {
         await pool.query(`
@@ -22,6 +37,7 @@ async function ensureTaskColumns() {
                 puntos_por_codigo INTEGER DEFAULT 10,
                 minimo_retiro NUMERIC(18,6) DEFAULT 10,
                 comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
+                telegram_soporte_url TEXT DEFAULT '',
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         `);
@@ -35,7 +51,8 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb,
             ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00',
             ADD COLUMN IF NOT EXISTS minimo_retiro NUMERIC(18,6) DEFAULT 10,
-            ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23
+            ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
+            ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT ''
         `);
         await pool.query(`
             ALTER TABLE users
@@ -58,7 +75,8 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT false,
             ADD COLUMN IF NOT EXISTS deposit_scanned_block BIGINT DEFAULT 0,
             ADD COLUMN IF NOT EXISTS minimo_retiro NUMERIC(18,6) DEFAULT 10,
-            ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23
+            ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
+            ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT ''
         `);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS polygon_deposits (
@@ -768,11 +786,12 @@ app.get('/api/verify', authenticate, async (req, res) => {
         }
         
                 const userData = result.rows[0];
-        const withdrawalConfigResult = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
+        const withdrawalConfigResult = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url FROM configuracion WHERE id = 1');
         const withdrawalConfigRow = withdrawalConfigResult.rows[0] || {};
         const withdrawalConfig = {
             minimo_retiro: Number(withdrawalConfigRow.minimo_retiro ?? 10),
-            comision_retiro_porcentaje: Number(withdrawalConfigRow.comision_retiro_porcentaje ?? 23)
+            comision_retiro_porcentaje: Number(withdrawalConfigRow.comision_retiro_porcentaje ?? 23),
+            telegram_soporte_url: String(withdrawalConfigRow.telegram_soporte_url || '')
         };
         const referralsVerify = await pool.query(`
             SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings, fecha_registro, referido_por
@@ -1380,12 +1399,22 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
 app.get('/api/config/withdrawal', authenticate, async (req, res) => {
     try {
         await ensureTaskColumns();
-        const result = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
+        const result = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
-        res.json({ minimo_retiro: Number(row.minimo_retiro ?? 10), comision_retiro_porcentaje: Number(row.comision_retiro_porcentaje ?? 23) });
+        res.json({ minimo_retiro: Number(row.minimo_retiro ?? 10), comision_retiro_porcentaje: Number(row.comision_retiro_porcentaje ?? 23), telegram_soporte_url: String(row.telegram_soporte_url || '') });
     } catch (error) {
         console.error('Error leyendo configuración de retiro:', error.message);
         res.status(500).json({ error: 'No se pudo cargar la configuración de retiro' });
+    }
+});
+app.get('/api/config/support', async (req, res) => {
+    try {
+        await ensureTaskColumns();
+        const result = await pool.query('SELECT telegram_soporte_url FROM configuracion WHERE id = 1');
+        res.json({ telegram_soporte_url: String(result.rows[0]?.telegram_soporte_url || '') });
+    } catch (error) {
+        console.error('Error leyendo soporte de Telegram:', error.message);
+        res.status(500).json({ error: 'No se pudo cargar el contacto de soporte' });
     }
 });
 // ============================================================
@@ -1393,6 +1422,7 @@ app.get('/api/config/withdrawal', authenticate, async (req, res) => {
 // ============================================================
 app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
     try {
+        await ensureTaskColumns();
         // Verificar que la tabla existe
         await pool.query(`
             CREATE TABLE IF NOT EXISTS configuracion (
@@ -1401,6 +1431,7 @@ app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
                 puntos_por_codigo INTEGER DEFAULT 10,
                 minimo_retiro NUMERIC(18,6) DEFAULT 10,
                 comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
+                telegram_soporte_url TEXT DEFAULT '',
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         `);
@@ -1410,13 +1441,14 @@ app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
             await pool.query(
                 `INSERT INTO configuracion (tiempo_produccion, puntos_por_codigo) VALUES (10, 10)`
             );
-            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10, minimo_retiro: 10, comision_retiro_porcentaje: 23 });
+            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10, minimo_retiro: 10, comision_retiro_porcentaje: 23, telegram_soporte_url: '' });
         }
         res.json({
             tiempo_produccion: result.rows[0].tiempo_produccion || 10,
             puntos_por_codigo: result.rows[0].puntos_por_codigo || 10,
             minimo_retiro: Number(result.rows[0].minimo_retiro ?? 10),
-            comision_retiro_porcentaje: Number(result.rows[0].comision_retiro_porcentaje ?? 23)
+            comision_retiro_porcentaje: Number(result.rows[0].comision_retiro_porcentaje ?? 23),
+            telegram_soporte_url: String(result.rows[0].telegram_soporte_url || '')
         });
     } catch (error) {
         console.error('Error al obtener configuración:', error);
@@ -1426,7 +1458,8 @@ app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
 
 app.put('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
     try {
-        const { tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje } = req.body;
+        await ensureTaskColumns();
+        const { tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url } = req.body;
         
         // Verificar que la tabla existe
         await pool.query(`
@@ -1436,26 +1469,32 @@ app.put('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
                 puntos_por_codigo INTEGER DEFAULT 10,
                 minimo_retiro NUMERIC(18,6) DEFAULT 10,
                 comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
+                telegram_soporte_url TEXT DEFAULT '',
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         `);
         
         // Insertar o actualizar, conservando valores omitidos por el formulario.
-        const actual = await pool.query('SELECT tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
+        const actual = await pool.query('SELECT tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url FROM configuracion WHERE id = 1');
         const previo = actual.rows[0] || {};
         const tiempoFinal = Number(tiempo_produccion) > 0 ? Number(tiempo_produccion) : Number(previo.tiempo_produccion ?? 10);
         const puntosFinal = Number(puntos_por_codigo) > 0 ? Number(puntos_por_codigo) : Number(previo.puntos_por_codigo ?? 10);
         const minimoFinal = minimo_retiro !== undefined && Number(minimo_retiro) >= 0 ? Number(minimo_retiro) : Number(previo.minimo_retiro ?? 10);
         const comisionFinal = comision_retiro_porcentaje !== undefined && Number(comision_retiro_porcentaje) >= 0 && Number(comision_retiro_porcentaje) <= 100 ? Number(comision_retiro_porcentaje) : Number(previo.comision_retiro_porcentaje ?? 23);
+        let telegramFinal;
+        try {
+            telegramFinal = normalizarEnlaceTelegram(telegram_soporte_url !== undefined ? telegram_soporte_url : previo.telegram_soporte_url);
+        } catch (validationError) {
+            return res.status(400).json({ error: validationError.message });
+        }
         await pool.query(
-            `INSERT INTO configuracion (id, tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje, updated_at) 
-             VALUES (1, $1, $2, $3, $4, NOW()) 
+                        `INSERT INTO configuracion (id, tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url, updated_at) 
+             VALUES (1, $1, $2, $3, $4, $5, NOW()) 
              ON CONFLICT (id) DO UPDATE 
-             SET tiempo_produccion = $1, puntos_por_codigo = $2, minimo_retiro = $3, comision_retiro_porcentaje = $4, updated_at = NOW()`,
-            [tiempoFinal, puntosFinal, minimoFinal, comisionFinal]
+             SET tiempo_produccion = $1, puntos_por_codigo = $2, minimo_retiro = $3, comision_retiro_porcentaje = $4, telegram_soporte_url = $5, updated_at = NOW()`,
+            [tiempoFinal, puntosFinal, minimoFinal, comisionFinal, telegramFinal]
         );
-        
-        res.json({ message: 'Configuración actualizada', minimo_retiro: minimoFinal, comision_retiro_porcentaje: comisionFinal });
+        res.json({ message: 'Configuración actualizada', minimo_retiro: minimoFinal, comision_retiro_porcentaje: comisionFinal, telegram_soporte_url: telegramFinal });
     } catch (error) {
         console.error('Error al guardar configuración:', error);
         res.status(500).json({ error: 'Error en el servidor' });

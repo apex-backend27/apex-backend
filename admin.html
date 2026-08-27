@@ -1604,6 +1604,7 @@ TAB TAREAS (NUEVO)
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
             <div class="form-group"><label>Mínimo de retiro (USDT0)</label><input id="superAdminMinimoRetiro" type="number" min="0" step="0.01" value="10"></div>
             <div class="form-group"><label>Comisión (%)</label><input id="superAdminComision" type="number" min="0" max="100" step="0.01" value="23"></div>
+            <div class="form-group" style="flex:1 1 260px;min-width:240px;"><label>Telegram de soporte</label><input id="superAdminTelegram" type="text" maxlength="500" placeholder="https://t.me/tu_soporte o @tu_soporte"></div>
             <button class="btn btn-primary" type="button" onclick="guardarConfiguracionRetiros()">💾 Guardar configuración</button>
         </div>
     </div>
@@ -6003,20 +6004,23 @@ async function cargarConfiguracionRetiros() {
     try {
         const response = await fetch(API_URL + '/api/admin/config', { headers: { Authorization: 'Bearer ' + token } });
         const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo cargar la configuración');
-        const minimo = document.getElementById('superAdminMinimoRetiro'); const comision = document.getElementById('superAdminComision');
+        const minimo = document.getElementById('superAdminMinimoRetiro'); const comision = document.getElementById('superAdminComision'); const telegram = document.getElementById('superAdminTelegram');
         if (minimo) minimo.value = Number(data.minimo_retiro ?? 10);
         if (comision) comision.value = Number(data.comision_retiro_porcentaje ?? 23);
+        if (telegram) telegram.value = String(data.telegram_soporte_url || '');
     } catch (error) { console.error('Error cargando configuración de retiros:', error); }
 }
 async function guardarConfiguracionRetiros() {
     const minimo = Number(document.getElementById('superAdminMinimoRetiro').value);
     const comision = Number(document.getElementById('superAdminComision').value);
+    const telegram = String(document.getElementById('superAdminTelegram').value || '').trim();
     if (!Number.isFinite(minimo) || minimo < 0 || !Number.isFinite(comision) || comision < 0 || comision > 100) { showAlert('⚠️ Revisa el mínimo y la comisión.', 'danger'); return; }
     try {
-        const response = await fetch(API_URL + '/api/admin/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('apex_token') }, body: JSON.stringify({ minimo_retiro: minimo, comision_retiro_porcentaje: comision }) });
+        const response = await fetch(API_URL + '/api/admin/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('apex_token') }, body: JSON.stringify({ minimo_retiro: minimo, comision_retiro_porcentaje: comision, telegram_soporte_url: telegram }) });
         const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo guardar');
         if (data.minimo_retiro !== undefined) document.getElementById('superAdminMinimoRetiro').value = Number(data.minimo_retiro);
         if (data.comision_retiro_porcentaje !== undefined) document.getElementById('superAdminComision').value = Number(data.comision_retiro_porcentaje);
+        if (data.telegram_soporte_url !== undefined) document.getElementById('superAdminTelegram').value = String(data.telegram_soporte_url || '');
         await cargarConfiguracionRetiros();
         showAlert('✅ Configuración global guardada y confirmada en NeonTech.', 'success');
     } catch (error) { showAlert('❌ ' + error.message, 'danger'); }
