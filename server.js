@@ -1171,6 +1171,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             hoy: hoyLima,
             pausadas: pausadas,
             autorizadasHoy: !pausadas && autorizacionExplicita && fechaActivacion === hoyLima,
+            autorizadas: autorizacionExplicita,
             horaCobro: row.hora_cobro || '20:00',
             hora_cobro: row.hora_cobro || '20:00',
             paqueteMiniJuegos: paqueteActivo ? row.minijuegos_activo.paqueteId : null
