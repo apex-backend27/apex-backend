@@ -6902,5 +6902,15 @@ async function apexToggleTodas(on){var ts=getTareasConfig().map(function(t){retu
 })();
 </script><style id="apex-mini-games-collapsible-v1">
 .apex-mg-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;margin:14px 0 0;padding:12px 15px;border:1px solid #27d3ff66;border-radius:11px;background:#091a31;color:#6dffcf;font-weight:900;font-size:12px;cursor:pointer;transition:background .18s,border-color .18s,transform .18s}.apex-mg-toggle:hover{background:#12304d;border-color:#6dffcf}.apex-mg-toggle:active{transform:scale(.98)}#apexMiniGamesLibrary .apex-mg-grid{max-height:0;overflow:hidden;opacity:0;margin-top:0;transition:max-height .22s ease-out,opacity .18s ease-out,margin-top .22s ease-out}#apexMiniGamesLibrary[data-packages-open="1"] .apex-mg-grid{max-height:5000px;overflow:visible;opacity:1;margin-top:10px}
-</style></body>
+</style><script id="apex-notifications-server-sync-v1">
+(function(){
+  function tok(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';}
+  function mapRow(n){return {id:String(n.id),tipo:n.tipo,titulo:n.titulo,descripcion:n.descripcion,usuario:[n.usuario,n.apellido].filter(Boolean).join(' ')||'Desconocido',telefono:n.telefono||'N/A',accion:n.accion||'informativa',leido:n.leido===true,fecha:n.created_at||new Date().toISOString(),metadata:n.metadata||{}};}
+  async function sync(){var t=tok();if(!t)return;try{var r=await fetch(API_URL+'/api/admin/notifications?limit=200&t='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+t}});var x=await r.json();if(!r.ok||x.error)throw Error(x.error||'No se pudieron cargar');var rows=Array.isArray(x.notifications)?x.notifications.map(mapRow):[];localStorage.setItem(NOTIFICACIONES_KEY,JSON.stringify(rows));notificacionesCache=rows;actualizarBadgeNotificacionesAdmin();if(document.getElementById('notificacionesLista'))renderNotificacionesAdmin(filtroActual||'todas');}catch(e){console.warn('No se pudieron sincronizar notificaciones:',e.message);}}
+  window.sincronizarNotificacionesServidor=sync;
+  window.addEventListener('load',function(){sync();setInterval(sync,15000);});
+  window.marcarTodasLeidasNotif=async function(){var t=tok();try{var r=await fetch(API_URL+'/api/admin/notifications/read-all',{method:'POST',headers:{Authorization:'Bearer '+t}});if(!r.ok)throw Error('No se pudieron marcar');await sync();showAlert('✅ Todas las notificaciones marcadas como leídas','success');}catch(e){showAlert('❌ '+e.message,'danger');}};
+  window.limpiarTodasNotificaciones=async function(){if(!confirm('⚠️ ¿Eliminar TODAS las notificaciones?'))return;if(!confirm('⚠️ Esta acción no se puede deshacer. ¿Estás seguro?'))return;var t=tok();try{var r=await fetch(API_URL+'/api/admin/notifications',{method:'DELETE',headers:{Authorization:'Bearer '+t}});if(!r.ok)throw Error('No se pudieron eliminar');await sync();showAlert('✅ Todas las notificaciones eliminadas','success');}catch(e){showAlert('❌ '+e.message,'danger');}};
+})();
+</script></body>
 </html>

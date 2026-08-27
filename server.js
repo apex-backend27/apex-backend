@@ -127,6 +127,31 @@ const pool = new Pool({
 
 ensureTaskColumns();
 
+async function ensureNotificationTable() {
+    try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS notifications (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            tipo TEXT NOT NULL,
+            titulo TEXT NOT NULL,
+            descripcion TEXT NOT NULL DEFAULT '',
+            accion TEXT NOT NULL DEFAULT 'informativa',
+            entidad_id TEXT,
+            metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+            leido BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at DESC)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)');
+    } catch (error) { console.error('Error preparando notificaciones:', error.message); }
+}
+ensureNotificationTable();
+async function crearNotificacion({ userId = null, tipo, titulo, descripcion = '', accion = 'informativa', entidadId = null, metadata = {} }) {
+    if (!tipo || !titulo) return null;
+    const result = await pool.query(`INSERT INTO notifications (user_id, tipo, titulo, descripcion, accion, entidad_id, metadata) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb) RETURNING *`, [userId, String(tipo), String(titulo), String(descripcion), String(accion), entidadId == null ? null : String(entidadId), JSON.stringify(metadata || {})]);
+    return result.rows[0];
+}
+
 function derivarDireccionDeposito(walletIndex) {
     const mnemonic = String(process.env.APEX_DEPOSIT_MNEMONIC || '').trim();
     if (!mnemonic) throw new Error('APEX_DEPOSIT_MNEMONIC no está configurada en Render');
@@ -198,6 +223,7 @@ async function acreditarDeposito(deposito) {
         await client.query('UPDATE users SET balance = COALESCE(balance,0) + $1, historial_detallado = $2 WHERE id = $3', [amount, JSON.stringify(history), d.user_id]);
         await client.query("UPDATE polygon_deposits SET status = 'credited', credited_at = NOW(), updated_at = NOW() WHERE id = $1", [d.id]);
         await client.query('COMMIT');
+        try { await crearNotificacion({ userId: d.user_id, tipo: 'deposito', titulo: 'Depósito acreditado', descripcion: `${amount} USDT0 acreditados en tu saldo`, accion: 'informativa', entidadId: `${d.tx_hash}:${d.log_index}`, metadata: { tx_hash: d.tx_hash, amount, network: 'Polygon Mainnet' } }); } catch (notificationError) { console.error('No se pudo crear notificación de depósito:', notificationError.message); }
         console.log(`Depósito acreditado: ${amount} USDT0 para usuario ${d.user_id}, tx ${d.tx_hash}`);
         return true;
     } catch (error) { await client.query('ROLLBACK'); throw error; }
@@ -265,6 +291,41 @@ app.get('/api/deposit-monitor-status', (req, res) => {
 
 app.get('/test', (req, res) => {
   res.json({ mensaje: 'Backend funcionando correctamente' });
+});
+
+// ============================================================
+// NOTIFICACIONES PERSISTENTES
+// ============================================================
+app.get('/api/admin/notifications', authenticate, isAdmin, async (req, res) => {
+    try {
+        await ensureNotificationTable();
+        const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 100));
+        const r = await pool.query(`SELECT n.*, u.nombre AS usuario, u.apellido, u.telefono FROM notifications n LEFT JOIN users u ON u.id=n.user_id ORDER BY n.created_at DESC LIMIT $1`, [limit]);
+        res.json({ notifications: r.rows });
+    } catch (e) { console.error('Error cargando notificaciones admin:', e); res.status(500).json({ error: 'No se pudieron cargar las notificaciones' }); }
+});
+app.get('/api/user/notifications', authenticate, async (req, res) => {
+    try {
+        await ensureNotificationTable();
+        const r = await pool.query(`SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`, [req.userId]);
+        res.json({ notifications: r.rows });
+    } catch (e) { res.status(500).json({ error: 'No se pudieron cargar las notificaciones' }); }
+});
+app.patch('/api/admin/notifications/:id/read', authenticate, isAdmin, async (req, res) => {
+    try { const r = await pool.query('UPDATE notifications SET leido=TRUE WHERE id=$1 RETURNING *', [req.params.id]); if (!r.rows.length) return res.status(404).json({error:'Notificación no encontrada'}); res.json({notification:r.rows[0]}); }
+    catch (e) { res.status(500).json({error:'No se pudo marcar la notificación'}); }
+});
+app.patch('/api/user/notifications/:id/read', authenticate, async (req, res) => {
+    try { const r = await pool.query('UPDATE notifications SET leido=TRUE WHERE id=$1 AND user_id=$2 RETURNING *', [req.params.id, req.userId]); if (!r.rows.length) return res.status(404).json({error:'Notificación no encontrada'}); res.json({notification:r.rows[0]}); }
+    catch (e) { res.status(500).json({error:'No se pudo marcar la notificación'}); }
+});
+app.post('/api/admin/notifications/read-all', authenticate, isAdmin, async (req, res) => {
+    try { await pool.query('UPDATE notifications SET leido=TRUE WHERE leido=FALSE'); res.json({message:'Notificaciones marcadas como leídas'}); }
+    catch (e) { res.status(500).json({error:'No se pudieron marcar las notificaciones'}); }
+});
+app.delete('/api/admin/notifications', authenticate, isAdmin, async (req, res) => {
+    try { await pool.query('DELETE FROM notifications'); res.json({message:'Notificaciones eliminadas'}); }
+    catch (e) { res.status(500).json({error:'No se pudieron eliminar las notificaciones'}); }
 });
 
 // ============================================================
@@ -945,7 +1006,7 @@ app.post('/api/user/game/prize', authenticate, async (req,res)=>{
   const prizeField={ruleta:'premio_ruleta',cofre:'premio_cofre',dados:'premio_dados'}[game];
   if(!usage||!prizeField||!Number.isFinite(requestedAmount)||requestedAmount<0) return res.status(400).json({error:'Premio inválido'});
   const client=await pool.connect();
-  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const amount=Number(u[prizeField]||0); const usos=Number(u[usage]||0); if(amount<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'Esta actividad no tiene un premio configurado por el administrador'});} if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const item={tipo:'juego',juego:game,monto:amount,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), historial_detallado=$2::jsonb WHERE id=$3 RETURNING *`,[amount,JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); res.json({message:'Premio acreditado',premio:amount,user:out.rows[0]});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
+  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const amount=Number(u[prizeField]||0); const usos=Number(u[usage]||0); if(amount<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'Esta actividad no tiene un premio configurado por el administrador'});} if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const item={tipo:'juego',juego:game,monto:amount,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), historial_detallado=$2::jsonb WHERE id=$3 RETURNING *`,[amount,JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); try { await crearNotificacion({ userId: req.userId, tipo: 'actividad', titulo: 'Premio acreditado', descripcion: `Ganaste ${amount.toFixed(2)} USDT en ${game}`, accion: 'informativa', entidadId: `${game}:${new Date().toISOString().slice(0,10)}:${Date.now()}`, metadata: { game, amount } }); } catch (notificationError) { console.error('No se pudo crear notificación de premio:', notificationError.message); } res.json({message:'Premio acreditado',premio:amount,user:out.rows[0]});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
 });
 
 // ============================================================
@@ -1424,6 +1485,7 @@ app.post('/api/admin/user/:id/balance', authenticate, isAdmin, async (req, res) 
         const history = await registrarMovimiento(client, req.params.id, delta > 0 ? 'admin_saldo_agregado' : 'admin_saldo_retirado', delta, req.body.concepto || 'Ajuste administrativo', { adminId: req.userId });
         const updated = await client.query('UPDATE users SET balance = $1, historial_detallado = $2 WHERE id = $3 RETURNING *', [newBalance, JSON.stringify(history), req.params.id]);
         await client.query('COMMIT');
+        try { await crearNotificacion({ userId: req.params.id, tipo: 'saldo', titulo: delta > 0 ? 'Saldo agregado por administración' : 'Saldo ajustado por administración', descripcion: `${delta > 0 ? '+' : ''}${delta.toFixed(2)} USDT. ${req.body.concepto || 'Ajuste administrativo'}`, accion: 'informativa', entidadId: `saldo:${req.userId}:${Date.now()}`, metadata: { delta, adminId: req.userId, oldBalance, newBalance } }); } catch (notificationError) { console.error('No se pudo crear notificación de saldo:', notificationError.message); }
         res.json({ message: 'Saldo actualizado', user: updated.rows[0], oldBalance, newBalance });
     } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudo actualizar el saldo' }); } finally { client.release(); }
 });
@@ -1442,6 +1504,7 @@ app.post('/api/admin/user/:id/points', authenticate, isAdmin, async (req, res) =
         const history = await registrarMovimiento(client, req.params.id, delta > 0 ? 'admin_puntos_agregados' : 'admin_puntos_retirados', 0, req.body.concepto || 'Ajuste de puntos', { puntos: delta, adminId: req.userId });
         const updated = await client.query('UPDATE users SET puntos = $1, historial_detallado = $2 WHERE id = $3 RETURNING *', [newPoints, JSON.stringify(history), req.params.id]);
         await client.query('COMMIT');
+        try { await crearNotificacion({ userId: req.params.id, tipo: 'puntos', titulo: delta > 0 ? 'Puntos agregados por administración' : 'Puntos ajustados por administración', descripcion: `${delta > 0 ? '+' : ''}${delta} puntos. ${req.body.concepto || 'Ajuste administrativo'}`, accion: 'informativa', entidadId: `puntos:${req.userId}:${Date.now()}`, metadata: { delta, adminId: req.userId, oldPoints, newPoints } }); } catch (notificationError) { console.error('No se pudo crear notificación de puntos:', notificationError.message); }
         res.json({ message: 'Puntos actualizados', user: updated.rows[0], oldPoints, newPoints });
     } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudieron actualizar los puntos' }); } finally { client.release(); }
 });
