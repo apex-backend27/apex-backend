@@ -42,6 +42,18 @@ function obtenerDiaSemanaLima(date = new Date()) {
     const nombre = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Lima', weekday: 'short' }).format(date);
     return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(nombre);
 }
+function normalizarFechaLima(value) {
+    if (!value) return null;
+    const texto = String(value);
+    const iso = texto.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    const fecha = new Date(value);
+    if (Number.isNaN(fecha.getTime())) return null;
+    const partes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(fecha);
+    const out = {};
+    partes.forEach(p => { if (p.type !== 'literal') out[p.type] = p.value; });
+    return out.year && out.month && out.day ? `${out.year}-${out.month}-${out.day}` : null;
+}
 async function ensureTaskColumns() {
     try {
         await pool.query(`
@@ -1271,7 +1283,7 @@ app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
         // junto con pausadas:false, se trata de una activación explícita.
         const activacionPorConfiguracion = req.body.pausadas !== undefined && pausadas === false && fecha !== null;
         const autorizadas = req.body.autorizadas !== undefined ? req.body.autorizadas === true : (activacionPorConfiguracion ? true : previo.tareas_autorizadas === true);
-        const fechaDia = fecha !== null ? String(fecha).slice(0, 10) : (previo.tareas_activacion_dia ? String(previo.tareas_activacion_dia).slice(0, 10) : null);
+        const fechaDia = normalizarFechaLima(fecha) || normalizarFechaLima(previo.tareas_activacion_dia);
         const horaSolicitada = String(req.body.horaCobro || req.body.hora_cobro || previo.hora_cobro || '20:00');
         const horaCobro = /^([01]\d|2[0-3]):[0-5]\d$/.test(horaSolicitada) ? horaSolicitada : '20:00';
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
