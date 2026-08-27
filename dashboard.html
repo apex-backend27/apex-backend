@@ -730,11 +730,20 @@ function getCuponesSistema() {
     try { return remoto || JSON.parse(localStorage.getItem(CUPONES_KEY)) || []; } catch { return remoto || []; }
 }
 
-function generarDireccionPolygon() {
-    var chars = '0123456789abcdef';
-    var address = '0x';
-    for (var i = 0; i < 40; i++) { address += chars[Math.floor(Math.random() * 16)]; }
-    return address;
+function generarDireccionPolygon() { return 'Generando dirección segura...'; }
+function cargarWalletDeposito() {
+    var tok = localStorage.getItem('apex_token') || sessionStorage.getItem('apex_token');
+    if (!tok) return;
+    fetch(API_URL + '/api/me/wallet?t=' + Date.now(), { cache: 'no-store', headers: { Authorization: 'Bearer ' + tok } })
+      .then(function(r){ return r.json().then(function(x){ if(!r.ok) throw Error(x.error || 'No se pudo cargar la billetera'); return x; }); })
+      .then(function(x){
+        if (!x.wallet) return;
+        user.polygon_address = x.wallet;
+        sessionStorage.setItem('apex_user', JSON.stringify(user));
+        var el = document.getElementById('walletAddress');
+        if (el) el.textContent = x.wallet;
+      })
+      .catch(function(e){ console.warn('Billetera de depósito:', e.message); });
 }
 
 function getIndicePlan(plan) {
@@ -1094,6 +1103,7 @@ function renderDashboard() {
     document.getElementById('balanceAmount').textContent = '$' + Number(user.balance || 0).toFixed(2);
     document.getElementById('pointsAmount').textContent = user.puntos || 0;
     document.getElementById('walletAddress').textContent = user.polygon_address || generarDireccionPolygon();
+    if (!user.polygon_address) cargarWalletDeposito();
 
     renderPerfil();
     renderPlans();

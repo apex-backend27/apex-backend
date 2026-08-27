@@ -1,5 +1,6 @@
 const express = require('express');
 const { Pool } = require('pg');
+const { HDNodeWallet } = require('ethers');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -40,7 +41,9 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS cobro_tareas_fecha DATE,
             ADD COLUMN IF NOT EXISTS cobro_tareas_monto NUMERIC DEFAULT 0,
             ADD COLUMN IF NOT EXISTS plan_activo BOOLEAN DEFAULT TRUE,
-            ADD COLUMN IF NOT EXISTS nivel_autorizado INTEGER DEFAULT 0
+            ADD COLUMN IF NOT EXISTS nivel_autorizado INTEGER DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS wallet_index INTEGER,
+            ADD COLUMN IF NOT EXISTS wallet_created_at TIMESTAMP
         `);
         await pool.query(`
             ALTER TABLE configuracion
@@ -100,6 +103,21 @@ const pool = new Pool({
 
 ensureTaskColumns();
 
+function derivarDireccionDeposito(walletIndex) {
+    const mnemonic = String(process.env.APEX_DEPOSIT_MNEMONIC || '').trim();
+    if (!mnemonic) throw new Error('APEX_DEPOSIT_MNEMONIC no está configurada en Render');
+    return HDNodeWallet.fromPhrase(mnemonic, undefined, "m/44'/60'/0'/0/" + Number(walletIndex)).address;
+}
+async function asegurarBilleteraUsuario(userId) {
+    const actual = await pool.query('SELECT id, polygon_address, wallet_index FROM users WHERE id = $1', [userId]);
+    if (!actual.rows.length) throw new Error('Usuario no encontrado');
+    const row = actual.rows[0];
+    if (row.polygon_address && row.wallet_index !== null && row.wallet_index !== undefined) return row;
+    const address = derivarDireccionDeposito(Number(row.id));
+    const saved = await pool.query('UPDATE users SET polygon_address = $1, wallet_index = $2, wallet_created_at = COALESCE(wallet_created_at, NOW()) WHERE id = $3 RETURNING id, polygon_address, wallet_index, wallet_created_at', [address, Number(row.id), userId]);
+    return saved.rows[0];
+}
+
 // ============================================================
 // RUTAS PÚBLICAS
 // ============================================================
@@ -145,8 +163,8 @@ app.post('/api/register', async (req, res) => {
     // Generar código de referido
     const referralCodeGenerated = 'APEX' + Math.random().toString(36).substring(2, 8).toUpperCase();
 
-    // Generar dirección de wallet
-    const walletAddress = '0x' + Math.random().toString(16).substring(2, 42);
+    // La dirección se deriva después de obtener el ID real del usuario.
+    const walletAddress = null;
 
     // Hashear contraseñas
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -262,6 +280,9 @@ if (codigoInv && codigoInv !== 'Eamb1714') {
       { expiresIn: '24h' }
     );
 
+    let walletData = null;
+    try { walletData = await asegurarBilleteraUsuario(result.rows[0].id); }
+    catch (walletError) { console.error('No se pudo derivar wallet del usuario:', walletError.message); }
     const mensaje = esAdmin ? '✅ Registro exitoso como ADMINISTRADOR!' : '✅ Registro exitoso!';
     res.status(201).json({
     message: mensaje,
@@ -273,7 +294,7 @@ if (codigoInv && codigoInv !== 'Eamb1714') {
         apellido: apellido,
         es_admin: esAdmin,
         codigo_referido: referralCodeGenerated,
-        polygon_address: walletAddress,
+        polygon_address: walletData ? walletData.polygon_address : null,
         balance: 0,
         puntos: 0,
         plan: 'Sin plan',
@@ -400,6 +421,16 @@ app.get('/api/verify', authenticate, async (req, res) => {
 // ============================================================
 // RUTAS PROTEGIDAS
 // ============================================================
+app.get('/api/me/wallet', authenticate, async (req, res) => {
+  try {
+    const wallet = await asegurarBilleteraUsuario(req.userId);
+    res.json({ wallet: wallet.polygon_address, index: wallet.wallet_index, created_at: wallet.wallet_created_at, network: 'polygon-mainnet', token_contract: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F' });
+  } catch (error) {
+    console.error('Error en /api/me/wallet:', error.message);
+    res.status(503).json({ error: 'No se pudo preparar la billetera de depósito' });
+  }
+});
+
 app.get('/api/user/:id', async (req, res) => {
   try {
     const { id } = req.params;
