@@ -1,6 +1,6 @@
 const express = require('express');
 const { Pool } = require('pg');
-const { HDNodeWallet } = require('ethers');
+const { HDNodeWallet, JsonRpcProvider, id, formatUnits, getAddress } = require('ethers');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
@@ -49,8 +49,31 @@ async function ensureTaskColumns() {
             ALTER TABLE configuracion
             ADD COLUMN IF NOT EXISTS tareas_config JSONB DEFAULT '[]'::jsonb,
             ADD COLUMN IF NOT EXISTS tareas_activacion DATE,
-            ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT false
+            ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT false,
+            ADD COLUMN IF NOT EXISTS deposit_scanned_block BIGINT DEFAULT 0
         `);
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS polygon_deposits (
+                id BIGSERIAL PRIMARY KEY,
+                tx_hash TEXT NOT NULL,
+                log_index INTEGER NOT NULL DEFAULT 0,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                token_contract TEXT NOT NULL,
+                from_address TEXT NOT NULL,
+                to_address TEXT NOT NULL,
+                amount NUMERIC(36, 18) NOT NULL,
+                block_number BIGINT NOT NULL,
+                confirmations INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'pending',
+                credited_at TIMESTAMPTZ,
+                raw_log JSONB,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE (tx_hash, log_index)
+            )
+        `);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_polygon_deposits_user ON polygon_deposits(user_id)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_polygon_deposits_status ON polygon_deposits(status)');
     } catch (error) {
         console.error('Error preparando columnas de tareas:', error.message);
     }
@@ -117,6 +140,70 @@ async function asegurarBilleteraUsuario(userId) {
     const saved = await pool.query('UPDATE users SET polygon_address = $1, wallet_index = $2, wallet_created_at = COALESCE(wallet_created_at, NOW()) WHERE id = $3 RETURNING id, polygon_address, wallet_index, wallet_created_at', [address, Number(row.id), userId]);
     return saved.rows[0];
 }
+
+// ============================================================
+// MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
+// ============================================================
+const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
+const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
+const POLYGON_TOKEN_DECIMALS = 6;
+const DEPOSIT_CONFIRMATIONS = Math.max(1, Number(process.env.DEPOSIT_CONFIRMATIONS || 10));
+const DEPOSIT_SCAN_INTERVAL_MS = Math.max(30000, Number(process.env.DEPOSIT_SCAN_INTERVAL_MS || 60000));
+let polygonProvider = null;
+function getPolygonProvider() {
+    if (!polygonProvider) polygonProvider = new JsonRpcProvider(process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com');
+    return polygonProvider;
+}
+function topicAddress(topic) { return getAddress('0x' + String(topic).slice(-40)).toLowerCase(); }
+async function acreditarDeposito(deposito) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const locked = await client.query('SELECT * FROM polygon_deposits WHERE id = $1 FOR UPDATE', [deposito.id]);
+        if (!locked.rows.length || locked.rows[0].status === 'credited') { await client.query('ROLLBACK'); return false; }
+        const d = locked.rows[0];
+        const u = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [d.user_id]);
+        if (!u.rows.length) throw new Error('Usuario del depósito no encontrado');
+        const user = u.rows[0], amount = Number(d.amount || 0), history = Array.isArray(user.historial_detallado) ? user.historial_detallado : [];
+        history.push({ tipo: 'deposito', concepto: 'Depósito USDT0 confirmado en Polygon', monto: amount, tx_hash: d.tx_hash, fecha: new Date().toISOString(), estado: 'confirmado', red: 'Polygon Mainnet' });
+        await client.query('UPDATE users SET balance = COALESCE(balance,0) + $1, historial_detallado = $2 WHERE id = $3', [amount, JSON.stringify(history), d.user_id]);
+        await client.query("UPDATE polygon_deposits SET status = 'credited', credited_at = NOW(), updated_at = NOW() WHERE id = $1", [d.id]);
+        await client.query('COMMIT');
+        return true;
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
+}
+async function monitorDepositosPolygon() {
+    if (!process.env.APEX_DEPOSIT_MNEMONIC) { console.warn('Monitor Polygon detenido: falta APEX_DEPOSIT_MNEMONIC'); return; }
+    try {
+        const provider = getPolygonProvider(), latest = await provider.getBlockNumber();
+        const cfg = await pool.query('SELECT id, deposit_scanned_block FROM configuracion ORDER BY id LIMIT 1');
+        const previous = cfg.rows.length ? Number(cfg.rows[0].deposit_scanned_block || 0) : 0;
+        const fromBlock = Math.max(0, previous ? previous + 1 : latest - 2000), toBlock = Math.min(latest, fromBlock + 900);
+        const users = await pool.query("SELECT id, LOWER(polygon_address) AS polygon_address FROM users WHERE polygon_address IS NOT NULL AND polygon_address LIKE '0x%'");
+        const addressMap = new Map(users.rows.map(u => [String(u.polygon_address).toLowerCase(), u.id]));
+        if (fromBlock <= toBlock && addressMap.size) {
+            const logs = await provider.getLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC], fromBlock, toBlock });
+            for (const log of logs) {
+                if (!log.topics || log.topics.length < 3) continue;
+                let to; try { to = topicAddress(log.topics[2]); } catch (_) { continue; }
+                const userId = addressMap.get(to); if (!userId) continue;
+                const amount = Number(formatUnits(BigInt(log.data), POLYGON_TOKEN_DECIMALS));
+                if (!(amount > 0)) continue;
+                await pool.query(`INSERT INTO polygon_deposits (tx_hash, log_index, user_id, token_contract, from_address, to_address, amount, block_number, confirmations, status, raw_log) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10::jsonb) ON CONFLICT (tx_hash, log_index) DO NOTHING`, [log.transactionHash, Number(log.index || 0), userId, POLYGON_TOKEN_CONTRACT, topicAddress(log.topics[1]), to, amount, Number(log.blockNumber), Math.max(0, latest - Number(log.blockNumber) + 1), JSON.stringify({ blockHash: log.blockHash, topics: log.topics, data: log.data })]);
+            }
+            if (cfg.rows.length) await pool.query('UPDATE configuracion SET deposit_scanned_block = $1 WHERE id = $2', [toBlock, cfg.rows[0].id]);
+            else await pool.query('INSERT INTO configuracion (deposit_scanned_block) VALUES ($1)', [toBlock]);
+        }
+        const pending = await pool.query("SELECT * FROM polygon_deposits WHERE status = 'pending' AND token_contract = $1", [POLYGON_TOKEN_CONTRACT]);
+        for (const d of pending.rows) {
+            const confirmations = Math.max(0, latest - Number(d.block_number) + 1);
+            await pool.query('UPDATE polygon_deposits SET confirmations = $1, updated_at = NOW() WHERE id = $2', [confirmations, d.id]);
+            if (confirmations >= DEPOSIT_CONFIRMATIONS) await acreditarDeposito(d);
+        }
+    } catch (error) { console.error('Monitor Polygon:', error.message); }
+}
+setTimeout(function(){ monitorDepositosPolygon(); setInterval(monitorDepositosPolygon, DEPOSIT_SCAN_INTERVAL_MS); }, 12000);
 
 // ============================================================
 // RUTAS PÚBLICAS
@@ -428,6 +515,15 @@ app.get('/api/me/wallet', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Error en /api/me/wallet:', error.message);
     res.status(503).json({ error: 'No se pudo preparar la billetera de depósito' });
+  }
+});
+app.get('/api/me/deposits', authenticate, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, tx_hash, amount, block_number, confirmations, status, created_at, credited_at FROM polygon_deposits WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [req.userId]);
+    res.json({ deposits: result.rows });
+  } catch (error) {
+    console.error('Error en /api/me/deposits:', error.message);
+    res.status(500).json({ error: 'No se pudo cargar el historial de depósitos' });
   }
 });
 
