@@ -151,7 +151,7 @@ const DEPOSIT_CONFIRMATIONS = Math.max(1, Number(process.env.DEPOSIT_CONFIRMATIO
 const DEPOSIT_SCAN_INTERVAL_MS = Math.max(30000, Number(process.env.DEPOSIT_SCAN_INTERVAL_MS || 60000));
 let polygonProvider = null;
 function getPolygonProvider() {
-    if (!polygonProvider) polygonProvider = new JsonRpcProvider(process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com');
+    if (!polygonProvider) polygonProvider = new JsonRpcProvider(process.env.POLYGON_RPC_URL || 'https://polygon.drpc.org');
     return polygonProvider;
 }
 function topicAddress(topic) { return getAddress('0x' + String(topic).slice(-40)).toLowerCase(); }
