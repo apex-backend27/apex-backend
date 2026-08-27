@@ -170,7 +170,7 @@ async function asegurarBilleteraUsuario(userId) {
 // ============================================================
 // MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
 // ============================================================
-const DEPOSIT_MONITOR_VERSION = 'v13-rpc-failover-idempotent';
+const DEPOSIT_MONITOR_VERSION = 'v14-alchemy-transfers-receipts-idempotent';
 const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
@@ -229,6 +229,43 @@ async function acreditarDeposito(deposito) {
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }
 }
+async function obtenerTransferenciasAlchemy(toAddress, fromBlock, toBlock) {
+    const transfers = [];
+    let pageKey;
+    do {
+        const params = {
+            fromBlock: '0x' + Math.max(0, fromBlock).toString(16),
+            toBlock: '0x' + Math.max(0, toBlock).toString(16),
+            toAddress,
+            category: ['erc20'],
+            contractAddresses: [POLYGON_TOKEN_CONTRACT],
+            excludeZeroValue: true,
+            withMetadata: false,
+            maxCount: '0x3e8'
+        };
+        if (pageKey) params.pageKey = pageKey;
+        const result = await rpcCall('alchemy_getAssetTransfers', [params]);
+        if (Array.isArray(result?.transfers)) transfers.push(...result.transfers);
+        pageKey = result?.pageKey || null;
+    } while (pageKey);
+    return transfers;
+}
+async function obtenerLogTransferVerificado(txHash, toAddress) {
+    const receipt = await rpcCall('eth_getTransactionReceipt', [txHash]);
+    if (!receipt || receipt.status !== '0x1' || !Array.isArray(receipt.logs)) return null;
+    const wantedTo = String(toAddress).toLowerCase();
+    for (const log of receipt.logs) {
+        if (String(log.address || '').toLowerCase() !== POLYGON_TOKEN_CONTRACT) continue;
+        if (!Array.isArray(log.topics) || log.topics.length < 3 || String(log.topics[0]).toLowerCase() !== POLYGON_TRANSFER_TOPIC.toLowerCase()) continue;
+        let to;
+        try { to = topicAddress(log.topics[2]); } catch (_) { continue; }
+        if (to !== wantedTo) continue;
+        let from;
+        try { from = topicAddress(log.topics[1]); } catch (_) { from = '0x0000000000000000000000000000000000000000'; }
+        return { log, from, to, logIndex: parseInt(log.logIndex || log.index || '0x0', 16), blockNumber: parseInt(receipt.blockNumber || '0x0', 16), blockHash: receipt.blockHash };
+    }
+    return null;
+}
 async function monitorDepositosPolygon() {
     if (monitorRunning) return;
     monitorRunning = true;
@@ -236,36 +273,29 @@ async function monitorDepositosPolygon() {
     try {
         await ensureTaskColumns();
         const latest = parseInt(await rpcCall('eth_blockNumber', []), 16);
-        const cfg = await pool.query('SELECT id, deposit_scanned_block FROM configuracion ORDER BY id LIMIT 1');
-        const configuredLookback = Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000);
-        const lookback = Math.min(9000, Math.max(900, Number.isFinite(configuredLookback) ? configuredLookback : 2000));
+        const configuredLookback = Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 20000);
+        const lookback = Math.min(50000, Math.max(100, Number.isFinite(configuredLookback) ? configuredLookback : 20000));
         const fromBlock = Math.max(0, latest - lookback), toBlock = latest;
         const users = await pool.query("SELECT id, LOWER(polygon_address) AS polygon_address FROM users WHERE polygon_address IS NOT NULL AND polygon_address LIKE '0x%'");
         const addressMap = new Map(users.rows.map(u => [String(u.polygon_address).toLowerCase(), u.id]));
-        if (fromBlock <= toBlock && addressMap.size) {
-            const batchSize = 500;
-            const recipientTopics = Array.from(addressMap.keys()).map(address => '0x' + String(address).replace(/^0x/, '').padStart(64, '0'));
-            console.log(`Monitor Polygon: buscando Transfer hacia ${recipientTopics.length} dirección(es)`);
+        if (addressMap.size) {
+            console.log(`Monitor Polygon: Transfers API hacia ${addressMap.size} dirección(es), rango ${fromBlock}-${toBlock}`);
             let detected = 0;
-            for (let batchStart = fromBlock; batchStart <= toBlock; batchStart += batchSize) {
-                const batchEnd = Math.min(toBlock, batchStart + batchSize - 1);
-                for (const recipientTopic of recipientTopics) {
-                    const logs = await rpcGetLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC, null, recipientTopic], fromBlock: batchStart, toBlock: batchEnd });
-                    for (const log of logs) {
-                    if (!log.topics || log.topics.length < 3) continue;
-                    let to; try { to = topicAddress(log.topics[2]); } catch (_) { continue; }
-                    const userId = addressMap.get(to); if (!userId) continue;
-                    const amount = Number(formatUnits(BigInt(log.data), POLYGON_TOKEN_DECIMALS));
+            for (const [address, userId] of addressMap.entries()) {
+                const transfers = await obtenerTransferenciasAlchemy(address, fromBlock, toBlock);
+                for (const transfer of transfers) {
+                    const txHash = transfer.hash;
+                    if (!txHash) continue;
+                    const verified = await obtenerLogTransferVerificado(txHash, address);
+                    if (!verified) continue;
+                    const amount = Number(transfer.value || 0);
                     if (!(amount > 0)) continue;
-                    const inserted = await pool.query(`INSERT INTO polygon_deposits (tx_hash, log_index, user_id, token_contract, from_address, to_address, amount, block_number, confirmations, status, raw_log) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10::jsonb) ON CONFLICT (tx_hash, log_index) DO NOTHING RETURNING id`, [log.transactionHash, Number(log.index || 0), userId, POLYGON_TOKEN_CONTRACT, topicAddress(log.topics[1]), to, amount, Number(log.blockNumber), Math.max(0, latest - Number(log.blockNumber) + 1), JSON.stringify({ blockHash: log.blockHash, topics: log.topics, data: log.data })]);
-                    if (inserted.rows.length) { detected++; console.log(`Depósito detectado: ${amount} USDT0 para usuario ${userId}, tx ${log.transactionHash}`); }
-                    }
+                    const inserted = await pool.query(`INSERT INTO polygon_deposits (tx_hash, log_index, user_id, token_contract, from_address, to_address, amount, block_number, confirmations, status, raw_log) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10::jsonb) ON CONFLICT (tx_hash, log_index) DO NOTHING RETURNING id`, [txHash, verified.logIndex, userId, POLYGON_TOKEN_CONTRACT, verified.from, verified.to, amount, verified.blockNumber, Math.max(0, latest - verified.blockNumber + 1), JSON.stringify({ blockHash: verified.blockHash, topics: verified.log.topics, data: verified.log.data, source: 'alchemy_getAssetTransfers' })]);
+                    if (inserted.rows.length) { detected++; console.log(`Depósito detectado: ${amount} USDT0 para usuario ${userId}, tx ${txHash}, log_index ${verified.logIndex}`); }
                 }
             }
             if (detected) console.log(`Monitor Polygon: ${detected} depósito(s) nuevo(s) registrado(s)`);
-            if (cfg.rows.length) await pool.query('UPDATE configuracion SET deposit_scanned_block = $1 WHERE id = $2', [toBlock, cfg.rows[0].id]);
-            else await pool.query('INSERT INTO configuracion (deposit_scanned_block) VALUES ($1)', [toBlock]);
-            console.log(`Monitor Polygon: escaneo RPC completado en lotes de 500 (${fromBlock}-${toBlock})`);
+            console.log(`Monitor Polygon: Transfers API completada (${fromBlock}-${toBlock})`);
         }
         const pending = await pool.query("SELECT * FROM polygon_deposits WHERE status = 'pending' AND token_contract = $1", [POLYGON_TOKEN_CONTRACT]);
         for (const d of pending.rows) {
@@ -276,7 +306,7 @@ async function monitorDepositosPolygon() {
     } catch (error) { console.error('Monitor Polygon:', error.message); }
     finally { monitorRunning = false; }
 }
-setTimeout(function(){ console.log(`Monitor Polygon ${DEPOSIT_MONITOR_VERSION}: RPC con failover, eth_getLogs directo, lotes de 500 bloques, contrato ${POLYGON_TOKEN_CONTRACT}`); monitorDepositosPolygon(); setInterval(monitorDepositosPolygon, DEPOSIT_SCAN_INTERVAL_MS); }, 12000);
+setTimeout(function(){ console.log(`Monitor Polygon ${DEPOSIT_MONITOR_VERSION}: Alchemy Transfers API + eth_getTransactionReceipt, contrato ${POLYGON_TOKEN_CONTRACT}`); monitorDepositosPolygon(); setInterval(monitorDepositosPolygon, DEPOSIT_SCAN_INTERVAL_MS); }, 12000);
 
 // ============================================================
 // RUTAS PÚBLICAS
@@ -286,7 +316,7 @@ app.get('/', (req, res) => {
   res.send('Servidor funcionando correctamente');
 });
 app.get('/api/deposit-monitor-status', (req, res) => {
-  res.json({ version: DEPOSIT_MONITOR_VERSION, rpc_mode: 'direct-eth_getLogs_with_failover', rpc_endpoints: POLYGON_RPC_URLS.map(x => { try { return new URL(x).host; } catch (_) { return 'invalid'; } }), batch_size: 500, lookback_blocks: Math.min(9000, Math.max(900, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000) : 2000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
+  res.json({ version: DEPOSIT_MONITOR_VERSION, rpc_mode: 'alchemy_getAssetTransfers_plus_eth_getTransactionReceipt', rpc_endpoints: POLYGON_RPC_URLS.map(x => { try { return new URL(x).host; } catch (_) { return 'invalid'; } }), batch_size: 500, lookback_blocks: Math.min(9000, Math.max(900, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000) : 2000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
 });
 
 app.get('/test', (req, res) => {
