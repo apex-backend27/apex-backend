@@ -170,7 +170,7 @@ async function asegurarBilleteraUsuario(userId) {
 // ============================================================
 // MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
 // ============================================================
-const DEPOSIT_MONITOR_VERSION = 'v16-alchemy-transfers-1k-receipts-idempotent';
+const DEPOSIT_MONITOR_VERSION = 'v17-skip-invalid-addresses-alchemy-idempotent';
 const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
@@ -285,7 +285,10 @@ async function monitorDepositosPolygon() {
         const lookback = Math.min(50000, Math.max(100, Number.isFinite(configuredLookback) ? configuredLookback : 50000));
         const fromBlock = Math.max(0, latest - lookback), toBlock = latest;
         const users = await pool.query("SELECT id, LOWER(polygon_address) AS polygon_address FROM users WHERE polygon_address IS NOT NULL AND polygon_address LIKE '0x%'");
-        const addressMap = new Map(users.rows.map(u => [String(u.polygon_address).toLowerCase(), u.id]));
+        const validAddress = /^0x[a-f0-9]{40}$/i;
+        const invalidUsers = users.rows.filter(u => !validAddress.test(String(u.polygon_address || '')));
+        if (invalidUsers.length) console.warn(`Monitor Polygon: ${invalidUsers.length} dirección(es) inválida(s) ignorada(s): ${invalidUsers.map(u => `usuario ${u.id} (${String(u.polygon_address).slice(0, 18)}...)`).join(', ')}`);
+        const addressMap = new Map(users.rows.filter(u => validAddress.test(String(u.polygon_address || ''))).map(u => [String(u.polygon_address).toLowerCase(), u.id]));
         if (addressMap.size) {
             console.log(`Monitor Polygon: Transfers API hacia ${addressMap.size} dirección(es), rango ${fromBlock}-${toBlock}`);
             let detected = 0;
