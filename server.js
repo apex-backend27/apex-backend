@@ -1074,6 +1074,44 @@ app.put('/api/user/update', async (req, res) => {
         res.status(500).json({ error: 'Error en el servidor' });
     }
 });
+
+// ============================================================
+// PROGRESO DIARIO DE TAREAS: ESCRITURA ATÓMICA E IDEMPOTENTE
+// ============================================================
+app.put('/api/user/tasks/progress', authenticate, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const cfg = await client.query('SELECT tareas_pausadas, tareas_dias_activos FROM configuracion WHERE id = 1');
+        const cfgRow = cfg.rows[0] || {};
+        const diaHabilitado = cfgRow.tareas_pausadas !== true && normalizarDiasActivos(cfgRow.tareas_dias_activos).includes(obtenerDiaSemanaLima());
+        if (!diaHabilitado) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Las tareas no están habilitadas hoy' });
+        }
+        const q = await client.query('SELECT id, tareas_completadas_hoy, ultima_fecha_tareas, racha_dias FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
+        if (!q.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        const anterior = q.rows[0];
+        const mismaFecha = normalizarFechaLima(anterior.ultima_fecha_tareas) === hoyLima;
+        const existentes = mismaFecha && Array.isArray(anterior.tareas_completadas_hoy) ? anterior.tareas_completadas_hoy : [];
+        const entrantes = Array.isArray(req.body && req.body.tareas_completadas_hoy) ? req.body.tareas_completadas_hoy : [];
+        const combinadas = [...new Set(existentes.concat(entrantes).map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < 5))].sort((a, b) => a - b);
+        const racha = Number.isFinite(Number(req.body && req.body.racha_dias)) ? Math.max(0, Number(req.body.racha_dias)) : Number(anterior.racha_dias || 0);
+        const updated = await client.query('UPDATE users SET tareas_completadas_hoy = $1::jsonb, ultima_fecha_tareas = $2::date, racha_dias = $3 WHERE id = $4 RETURNING id, telefono, nombre, apellido, username, es_admin, es_super_admin, codigo_referido, polygon_address, balance, puntos, plan, plan_amount, daily_earnings, direccion_retiro, nivel_autorizado, cuenta_habilitada, produccion_pausada, tareas_completadas_hoy, ultima_fecha_tareas, racha_dias, cobro_tareas_fecha, cobro_tareas_monto', [JSON.stringify(combinadas), hoyLima, racha, req.userId]);
+        await client.query('COMMIT');
+        res.json({ message: 'Progreso de tareas guardado', user: updated.rows[0] });
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        console.error('Error guardando progreso de tareas:', error.message);
+        res.status(500).json({ error: 'No se pudo guardar el progreso de tareas' });
+    } finally {
+        client.release();
+    }
+});
 // ============================================================
 // REFERIDOS DEL USUARIO AUTENTICADO
 // ============================================================
