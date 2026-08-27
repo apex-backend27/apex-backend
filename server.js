@@ -144,7 +144,7 @@ async function asegurarBilleteraUsuario(userId) {
 // ============================================================
 // MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
 // ============================================================
-const DEPOSIT_MONITOR_VERSION = 'v7-batches-500';
+const DEPOSIT_MONITOR_VERSION = 'v10-render-rpc-only';
 const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
@@ -178,6 +178,7 @@ async function acreditarDeposito(deposito) {
 async function monitorDepositosPolygon() {
     if (!process.env.APEX_DEPOSIT_MNEMONIC) { console.warn('Monitor Polygon detenido: falta APEX_DEPOSIT_MNEMONIC'); return; }
     try {
+        await ensureTaskColumns();
         const provider = getPolygonProvider(), latest = await provider.getBlockNumber();
         const cfg = await pool.query('SELECT id, deposit_scanned_block FROM configuracion ORDER BY id LIMIT 1');
         const previous = cfg.rows.length ? Number(cfg.rows[0].deposit_scanned_block || 0) : 0;
@@ -187,10 +188,12 @@ async function monitorDepositosPolygon() {
         const addressMap = new Map(users.rows.map(u => [String(u.polygon_address).toLowerCase(), u.id]));
         if (fromBlock <= toBlock && addressMap.size) {
             const batchSize = 500;
+            const recipientTopics = Array.from(addressMap.keys()).map(address => '0x' + String(address).replace(/^0x/, '').padStart(64, '0'));
+            console.log(`Monitor Polygon: buscando Transfer hacia ${recipientTopics.length} dirección(es)`);
             let detected = 0;
             for (let batchStart = fromBlock; batchStart <= toBlock; batchStart += batchSize) {
                 const batchEnd = Math.min(toBlock, batchStart + batchSize - 1);
-                const logs = await provider.getLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC], fromBlock: batchStart, toBlock: batchEnd });
+                const logs = await provider.getLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC, null, recipientTopics], fromBlock: batchStart, toBlock: batchEnd });
                 for (const log of logs) {
                     if (!log.topics || log.topics.length < 3) continue;
                     let to; try { to = topicAddress(log.topics[2]); } catch (_) { continue; }
@@ -204,6 +207,7 @@ async function monitorDepositosPolygon() {
             if (detected) console.log(`Monitor Polygon: ${detected} depósito(s) nuevo(s) registrado(s)`);
             if (cfg.rows.length) await pool.query('UPDATE configuracion SET deposit_scanned_block = $1 WHERE id = $2', [toBlock, cfg.rows[0].id]);
             else await pool.query('INSERT INTO configuracion (deposit_scanned_block) VALUES ($1)', [toBlock]);
+            console.log(`Monitor Polygon: escaneo RPC completado en lotes de 500 (${fromBlock}-${toBlock})`);
         }
         const pending = await pool.query("SELECT * FROM polygon_deposits WHERE status = 'pending' AND token_contract = $1", [POLYGON_TOKEN_CONTRACT]);
         for (const d of pending.rows) {
