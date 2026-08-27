@@ -2486,5 +2486,13 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   window.sincronizarDepositos=syncDeposits;
   window.addEventListener('load',function(){setTimeout(syncDeposits,2500);setInterval(syncDeposits,60000);});
 })();
+</script><script id="apex-claim-time-authoritative-v1">
+(function(){
+  function token(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';}
+  function valid(h){return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(h||''));}
+  function apply(h){if(!valid(h))return;window.horaCobroRemota=String(h);var info=document.getElementById('cobroTareasInfo');if(info){var old=info.textContent||'';var completed=old.match(/Has completado[^.]+\./i);info.textContent='Horario de cobro: desde las '+h+' hasta medianoche.'+(completed?' '+completed[0]:'');}}
+  async function sync(){var t=token();if(!t)return;try{var r=await fetch(API_URL+'/api/tasks/claim-time?authority=1&t='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+t}});var x=await r.json();if(r.ok)apply(x.horaCobro||x.hora_cobro);}catch(e){console.warn('No se pudo sincronizar la hora de cobro:',e.message);}}
+  window.addEventListener('load',function(){sync();setInterval(sync,5000);});
+})();
 </script></body>
 </html>
