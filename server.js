@@ -676,7 +676,16 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         const pausadas = row.tareas_pausadas === true;
         const autorizacionExplicita = row.tareas_autorizadas === true;
         const paqueteActivo = row.minijuegos_activo && row.minijuegos_activo.activo === true && row.minijuegos_activo.fecha === hoyLima;
-        const tareasConfiguradas = paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length ? row.minijuegos_activo.tareas : ((Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5));
+        const tareasBase = (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5);
+        const tareasConfiguradas = paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length
+            ? row.minijuegos_activo.tareas.slice(0, 5).map((j, i) => Object.assign({}, j, {
+                hora: tareasBase[i] && tareasBase[i].hora !== undefined ? tareasBase[i].hora : j.hora,
+                minuto: tareasBase[i] && tareasBase[i].minuto !== undefined ? tareasBase[i].minuto : j.minuto,
+                duracionMinutos: tareasBase[i] && tareasBase[i].duracionMinutos !== undefined ? tareasBase[i].duracionMinutos : j.duracionMinutos,
+                sin_horario: tareasBase[i] && tareasBase[i].sin_horario !== undefined ? tareasBase[i].sin_horario : j.sin_horario,
+                activo: tareasBase[i] && tareasBase[i].activo !== undefined ? tareasBase[i].activo : j.activo
+            }))
+            : tareasBase;
         res.json({
             tareas: tareasConfiguradas,
             fecha: row.tareas_activacion || null,

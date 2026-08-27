@@ -2306,16 +2306,6 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   function ocultarRacha(){document.querySelectorAll('.racha-container,#rachaDias').forEach(function(e){var box=e.closest('.racha-container')||e;if(box)box.style.display='none'});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ocultarRacha);else ocultarRacha();
 })();
-</script><style id="apex-test-mode-no-daily-lock">#tareasStatusBadge{background:#e8f5e9!important;color:#2e7d32!important}#tareasContainer .apex-task-disabled{opacity:1!important;filter:none!important}#tareasContainer .apex-daily-test:disabled{opacity:1!important;cursor:pointer!important}</style><script id="apex-test-mode-final">
-(function(){
-  window.APEX_TEST_MODE=true;
-  function liberar(){window.tareasPausadasRemoto=false;window.tareasAutorizadasHoyRemoto=true;if(typeof renderTareas==='function')renderTareas();}
-  liberar();
-  var cargarOriginal=window.cargarConfiguracionTareasRemota;
-  if(typeof cargarOriginal==='function'){window.cargarConfiguracionTareasRemota=function(){var r=cargarOriginal.apply(this,arguments);return Promise.resolve(r).then(function(v){liberar();return v},function(e){liberar();return e})};}
-  var completarOriginal=window.completarTareaDiaria;
-  if(typeof completarOriginal==='function'){window.completarTareaDiaria=function(i,p){window.tareasPausadasRemoto=false;window.tareasAutorizadasHoyRemoto=true;return completarOriginal.call(this,i,p)};}
-})();
 </script><script id="apex-production-history-fix">
 (function(){
   function historialCompleto(){
