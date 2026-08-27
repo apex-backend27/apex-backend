@@ -1157,15 +1157,15 @@ body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;ba
 
 <div class="sidebar" id="sidebar">
     <nav class="sidebar-nav">
-        <button class="active" onclick="switchTab('usuarios')">👥 Usuarios</button>
-	 <button onclick="switchTab('tareas')">📋 Tareas</button>
-        <button onclick="switchTab('retiros')">💸 Retiros</button>
-        <button onclick="switchTab('actividades')">🎮 Actividades</button>
-        <button onclick="switchTab('depositos')">💰 Depósitos</button>
-        <button onclick="switchTab('estadisticas')">📊 Estadísticas</button>
-	<button onclick="switchTab('notificaciones')" id="notifTabBtn">📬 Notificaciones <span id="notifTabBadge" style="background:#ef5350;color:#fff;border-radius:50%;padding:0 8px;font-size:10px;margin-left:4px;display:none;">0</span></button>
+        <button class="active" data-admin-permission="usuarios" onclick="switchTab('usuarios')">👥 Usuarios</button>
+	 <button data-admin-permission="tareas" onclick="switchTab('tareas')">📋 Tareas</button>
+        <button data-admin-permission="retiros" onclick="switchTab('retiros')">💸 Retiros</button>
+        <button data-admin-permission="actividades" onclick="switchTab('actividades')">🎮 Actividades</button>
+        <button data-admin-permission="depositos" onclick="switchTab('depositos')">💰 Depósitos</button>
+        <button data-admin-permission="usuarios" onclick="switchTab('estadisticas')">📊 Estadísticas</button>
+	<button data-admin-permission="notificaciones" onclick="switchTab('notificaciones')" id="notifTabBtn">📬 Notificaciones <span id="notifTabBadge" style="background:#ef5350;color:#fff;border-radius:50%;padding:0 8px;font-size:10px;margin-left:4px;display:none;">0</span></button>
  <button onclick="switchTab('superadmin')" id="superAdminTabBtn" style="display:none;">👑 Super Admin</button>
-        <button onclick="switchTab('historial')">📊 Historial</button>
+        <button data-admin-permission="usuarios" onclick="switchTab('historial')">📊 Historial</button>
     </nav>
 </div>
 
@@ -1636,9 +1636,29 @@ TAB TAREAS (NUEVO)
             <p style="font-size:12px;color:#e65100;">⚠️ <strong>Importante:</strong> Después de guardar, tendrás que iniciar sesión con tu nuevo usuario o teléfono.</p>
         </div>
     </div>
+    <div class="card" style="margin-top:18px;">
+        <div class="card-title">⚙️ Configuración global de retiros</div>
+        <p style="font-size:13px;color:#666;margin-bottom:14px;">Estos valores se aplican en el servidor a todas las solicitudes nuevas de retiro.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+            <div class="form-group"><label>Mínimo de retiro (USDT0)</label><input id="superAdminMinimoRetiro" type="number" min="0" step="0.01" value="10"></div>
+            <div class="form-group"><label>Comisión (%)</label><input id="superAdminComision" type="number" min="0" max="100" step="0.01" value="23"></div>
+            <button class="btn btn-primary" type="button" onclick="guardarConfiguracionRetiros()">💾 Guardar configuración</button>
+        </div>
+    </div>
+    <div class="card" style="margin-top:18px;">
+        <div class="card-title">🛡️ Sub-Admins y permisos por módulo</div>
+        <p style="font-size:13px;color:#666;margin-bottom:14px;">Crea administradores con acceso únicamente a los módulos que selecciones. Los cambios se guardan en la base de datos y se aplican al siguiente acceso.</p>
+        <form id="formCrearSubAdmin" onsubmit="crearSubAdmin(event)" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end;">
+            <div class="form-group"><label>Nombre</label><input id="subAdminNombre" required placeholder="Nombre"></div>
+            <div class="form-group"><label>Apellido</label><input id="subAdminApellido" placeholder="Apellido"></div>
+            <div class="form-group"><label>Teléfono</label><input id="subAdminTelefono" required pattern="[0-9]{6,15}" placeholder="Teléfono"></div>
+            <div class="form-group"><label>Usuario opcional</label><input id="subAdminUsername" placeholder="Usuario"></div>
+            <div class="form-group"><label>Contraseña</label><input id="subAdminPassword" type="password" required minlength="6" placeholder="Mínimo 6 caracteres"></div>
+            <button class="btn btn-primary" type="submit">➕ Crear Sub-Admin</button>
+        </form>
+        <div id="subAdminsContainer" style="margin-top:18px;"><div style="color:#999;text-align:center;padding:16px;">Cargando administradores...</div></div>
+    </div>
 </div>
-</div>
-
 <!-- MODAL EDITAR USUARIO -->
 <div class="modal-overlay" id="editModal">
     <div class="modal">
@@ -2573,6 +2593,7 @@ function verificarAdmin() {
         }
 
         sessionStorage.setItem('apex_user', JSON.stringify(user));
+        aplicarPermisosVisuales(user);
         document.getElementById('adminName').textContent = user.nombre + ' ' + (user.apellido || '');
         document.getElementById('adminAvatar').textContent = user.nombre ? user.nombre[0] : 'A';
 
@@ -2667,6 +2688,8 @@ function cargarDatosAdmin() {
         actualizarSelectoresCupones();
         switchTab('usuarios');
         cargarSuperAdmin();
+    cargarConfiguracionRetiros();
+    cargarSubAdmins();
         actualizarStats();
 	actualizarEstadoActivacionTareas();
     })
@@ -5955,9 +5978,92 @@ function toggleDarkMode() {
     }
 })();
 
+const SUB_ADMIN_MODULES = {
+    usuarios: 'Usuarios', tareas: 'Tareas', actividades: 'Actividades', depositos: 'Depósitos',
+    retiros: 'Retiros', configuracion: 'Configuración', notificaciones: 'Notificaciones',
+    minijuegos: 'Mini-juegos', referidos: 'Referidos'
+};
+function permisosVaciosAdmin() { return Object.keys(SUB_ADMIN_MODULES).reduce((o, k) => { o[k] = false; return o; }, {}); }
+async function cargarSubAdmins() {
+    const container = document.getElementById('subAdminsContainer');
+    if (!container) return;
+    try {
+        const response = await fetch(API_URL + '/api/superadmin/admins', { headers: { Authorization: 'Bearer ' + localStorage.getItem('apex_token') } });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'No se pudieron cargar');
+        renderSubAdmins(data.admins || []);
+    } catch (error) { container.innerHTML = '<div class="alert alert-danger show">' + escapeHtml(error.message) + '</div>'; }
+}
+function renderSubAdmins(admins) {
+    const container = document.getElementById('subAdminsContainer');
+    if (!container) return;
+    if (!admins.length) { container.innerHTML = '<div style="color:#999;text-align:center;padding:16px;">No hay administradores registrados.</div>'; return; }
+    container.innerHTML = admins.map(admin => {
+        const perms = normalizarPermisosUI(admin.admin_permissions);
+        const controls = Object.keys(SUB_ADMIN_MODULES).map(key => '<label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;margin:3px 8px 3px 0;"><input type="checkbox" data-perm="' + key + '" data-admin-id="' + admin.id + '" ' + (perms[key] ? 'checked' : '') + ' ' + (admin.es_super_admin ? 'disabled' : '') + '> ' + SUB_ADMIN_MODULES[key] + '</label>').join('');
+        return '<div class="asignacion-item" style="border-left-color:' + (admin.es_super_admin ? '#f7971e' : '#4db6ac') + ';">' +
+            '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;"><strong>' + escapeHtml((admin.nombre || '') + ' ' + (admin.apellido || '')) + '</strong><span class="badge ' + (admin.admin_active === false ? 'badge-danger' : 'badge-success') + '">' + (admin.es_super_admin ? 'SUPERADMIN' : (admin.admin_active === false ? 'INACTIVO' : 'SUB-ADMIN')) + '</span></div>' +
+            '<div style="font-size:10px;color:#666;margin:4px 0;">ID ' + admin.id + ' · Teléfono: ' + escapeHtml(admin.telefono || '') + (admin.username ? ' · Usuario: ' + escapeHtml(admin.username) : '') + '</div>' +
+            (admin.es_super_admin ? '<div style="font-size:11px;color:#e65100;">El SuperAdmin conserva todos los permisos.</div>' : '<div style="margin:6px 0;">' + controls + '</div><div style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="guardarPermisosSubAdmin(' + admin.id + ')">💾 Guardar permisos</button><button class="btn ' + (admin.admin_active === false ? 'btn-success' : 'btn-warning') + ' btn-sm" onclick="cambiarEstadoSubAdmin(' + admin.id + ',' + (admin.admin_active === false) + ')">' + (admin.admin_active === false ? 'Activar' : 'Desactivar') + '</button><button class="btn btn-danger btn-sm" onclick="retirarSubAdmin(' + admin.id + ')">Retirar acceso</button></div>') +
+            '</div>';
+    }).join('');
+}
+function normalizarPermisosUI(value) { const src = value || {}; return Object.keys(SUB_ADMIN_MODULES).reduce((o, k) => { o[k] = src[k] === true; return o; }, {}); }
+async function crearSubAdmin(event) {
+    event.preventDefault();
+    const body = { nombre: document.getElementById('subAdminNombre').value.trim(), apellido: document.getElementById('subAdminApellido').value.trim(), telefono: document.getElementById('subAdminTelefono').value.trim(), username: document.getElementById('subAdminUsername').value.trim() || null, password: document.getElementById('subAdminPassword').value, permissions: permisosVaciosAdmin() };
+    try {
+        const response = await fetch(API_URL + '/api/superadmin/admins', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('apex_token') }, body: JSON.stringify(body) });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo crear');
+        document.getElementById('formCrearSubAdmin').reset(); showAlert('✅ Sub-Admin creado. Selecciona sus permisos en la lista y guarda.', 'success'); cargarSubAdmins();
+    } catch (error) { showAlert('❌ ' + error.message, 'danger'); }
+}
+async function guardarPermisosSubAdmin(id) {
+    const permissions = permisosVaciosAdmin();
+    document.querySelectorAll('[data-admin-id="' + id + '"]').forEach(input => { permissions[input.dataset.perm] = input.checked; });
+    await actualizarSubAdmin(id, { permissions });
+}
+async function cambiarEstadoSubAdmin(id, active) { await actualizarSubAdmin(id, { active }); }
+async function actualizarSubAdmin(id, body) {
+    try { const response = await fetch(API_URL + '/api/superadmin/admins/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('apex_token') }, body: JSON.stringify(body) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo actualizar'); showAlert('✅ Cambios guardados correctamente.', 'success'); cargarSubAdmins(); }
+    catch (error) { showAlert('❌ ' + error.message, 'danger'); }
+}
+async function retirarSubAdmin(id) {
+    if (!confirm('¿Retirar todos los privilegios de este Sub-Admin?')) return;
+    try { const response = await fetch(API_URL + '/api/superadmin/admins/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + localStorage.getItem('apex_token') } }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo retirar'); showAlert('✅ Acceso administrativo retirado.', 'success'); cargarSubAdmins(); }
+    catch (error) { showAlert('❌ ' + error.message, 'danger'); }
+}
 // ============================================================
 // CARGAR DATOS DEL SUPER ADMIN
 // ============================================================
+async function cargarConfiguracionRetiros() {
+    const token = localStorage.getItem('apex_token');
+    try {
+        const response = await fetch(API_URL + '/api/admin/config', { headers: { Authorization: 'Bearer ' + token } });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo cargar la configuración');
+        const minimo = document.getElementById('superAdminMinimoRetiro'); const comision = document.getElementById('superAdminComision');
+        if (minimo) minimo.value = Number(data.minimo_retiro ?? 10);
+        if (comision) comision.value = Number(data.comision_retiro_porcentaje ?? 23);
+    } catch (error) { console.error('Error cargando configuración de retiros:', error); }
+}
+async function guardarConfiguracionRetiros() {
+    const minimo = Number(document.getElementById('superAdminMinimoRetiro').value);
+    const comision = Number(document.getElementById('superAdminComision').value);
+    if (!Number.isFinite(minimo) || minimo < 0 || !Number.isFinite(comision) || comision < 0 || comision > 100) { showAlert('⚠️ Revisa el mínimo y la comisión.', 'danger'); return; }
+    try {
+        const response = await fetch(API_URL + '/api/admin/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + localStorage.getItem('apex_token') }, body: JSON.stringify({ minimo_retiro: minimo, comision_retiro_porcentaje: comision }) });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo guardar');
+        showAlert('✅ Configuración global guardada.', 'success');
+    } catch (error) { showAlert('❌ ' + error.message, 'danger'); }
+}
+function aplicarPermisosVisuales(user) {
+    const configured = user && user.admin_permissions && Object.keys(user.admin_permissions).length > 0;
+    document.querySelectorAll('[data-admin-permission]').forEach(button => {
+        const permission = button.dataset.adminPermission;
+        const allowed = user && (user.es_super_admin === true || !configured || normalizarPermisosUI(user.admin_permissions)[permission]);
+        button.style.display = allowed ? '' : 'none';
+    });
+}
 function cargarSuperAdmin() {
     var users = getUsers();
     var user = users.find(function(u) { return u.es_super_admin === true; });

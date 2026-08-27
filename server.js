@@ -20,6 +20,8 @@ async function ensureTaskColumns() {
                 id SERIAL PRIMARY KEY,
                 tiempo_produccion INTEGER DEFAULT 10,
                 puntos_por_codigo INTEGER DEFAULT 10,
+                minimo_retiro NUMERIC(18,6) DEFAULT 10,
+                comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         `);
@@ -31,7 +33,9 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE,
             ADD COLUMN IF NOT EXISTS juegos_config JSONB DEFAULT '{}'::jsonb,
             ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb,
-            ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'
+            ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00',
+            ADD COLUMN IF NOT EXISTS minimo_retiro NUMERIC(18,6) DEFAULT 10,
+            ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23
         `);
         await pool.query(`
             ALTER TABLE users
@@ -43,14 +47,18 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS plan_activo BOOLEAN DEFAULT TRUE,
             ADD COLUMN IF NOT EXISTS nivel_autorizado INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS wallet_index INTEGER,
-            ADD COLUMN IF NOT EXISTS wallet_created_at TIMESTAMP
+            ADD COLUMN IF NOT EXISTS wallet_created_at TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS admin_permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
+            ADD COLUMN IF NOT EXISTS admin_active BOOLEAN NOT NULL DEFAULT TRUE
         `);
         await pool.query(`
             ALTER TABLE configuracion
             ADD COLUMN IF NOT EXISTS tareas_config JSONB DEFAULT '[]'::jsonb,
             ADD COLUMN IF NOT EXISTS tareas_activacion DATE,
             ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT false,
-            ADD COLUMN IF NOT EXISTS deposit_scanned_block BIGINT DEFAULT 0
+            ADD COLUMN IF NOT EXISTS deposit_scanned_block BIGINT DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS minimo_retiro NUMERIC(18,6) DEFAULT 10,
+            ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23
         `);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS polygon_deposits (
@@ -112,12 +120,47 @@ const authenticate = async (req, res, next) => {
 // ============================================================
 // MIDDLEWARE PARA VERIFICAR SI ES ADMIN
 // ============================================================
+const ADMIN_PERMISSIONS = ['usuarios', 'tareas', 'actividades', 'depositos', 'retiros', 'configuracion', 'notificaciones', 'minijuegos', 'referidos'];
+function normalizarPermisos(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return ADMIN_PERMISSIONS.reduce((out, key) => { out[key] = source[key] === true; return out; }, {});
+}
+function tienePermisoAdmin(user, permission) {
+    if (!user || !user.es_admin || user.admin_active === false) return false;
+    if (user.es_super_admin === true) return true;
+    return normalizarPermisos(user.admin_permissions)[permission] === true;
+}
+function permisoRequeridoParaRuta(req) {
+    const path = String(req.path || '');
+    if (/deposit/i.test(path)) return 'depositos';
+    if (/notification/i.test(path)) return 'notificaciones';
+    if (/minigame|game/i.test(path)) return 'minijuegos';
+    if (/task|tarea/i.test(path)) return 'tareas';
+    if (/withdraw|retiro|canje/i.test(path)) return 'retiros';
+    if (/config|catalog|code|codigo/i.test(path)) return 'configuracion';
+    if (/activ|premio|logro|cupon/i.test(path)) return 'actividades';
+    if (/refer/i.test(path)) return 'referidos';
+    if (/user|usuario/i.test(path)) return 'usuarios';
+    return null;
+}
 const isAdmin = async (req, res, next) => {
-    if (!req.user || !req.user.es_admin) {
+    if (!req.user || !req.user.es_admin || req.user.admin_active === false) {
         return res.status(403).json({ error: 'Acceso denegado. Se requieren privilegios de administrador.' });
+    }
+    // Cuentas antiguas sin permisos configurados conservan compatibilidad total.
+    const configured = req.user.admin_permissions && typeof req.user.admin_permissions === 'object' && Object.keys(req.user.admin_permissions).length > 0;
+    const required = permisoRequeridoParaRuta(req);
+    if (configured && required && !tienePermisoAdmin(req.user, required)) {
+        return res.status(403).json({ error: `Acceso denegado. Tu Sub-Admin no tiene permiso para el módulo ${required}.` });
     }
     next();
 };
+const requireSuperAdmin = [authenticate, async (req, res, next) => {
+    if (!req.user || req.user.es_super_admin !== true || req.user.admin_active === false) {
+        return res.status(403).json({ error: 'Solo el SuperAdmin puede realizar esta acción.' });
+    }
+    next();
+}];
 
 // Conexión a NeonTech
 const pool = new Pool({
@@ -390,6 +433,82 @@ app.get('/api/admin/deposits', authenticate, isAdmin, async (req, res) => {
     }
 });
 
+// ============================================================
+// GESTIÓN DE SUB-ADMINS: SOLO SUPERADMIN
+// ============================================================
+app.get('/api/superadmin/admins', ...requireSuperAdmin, async (req, res) => {
+    try {
+        const result = await pool.query(`SELECT id, telefono, nombre, apellido, username,
+            es_admin, es_super_admin, admin_permissions, admin_active, fecha_registro
+            FROM users WHERE es_admin = TRUE ORDER BY es_super_admin DESC, id ASC`);
+        res.json({ admins: result.rows.map(row => ({ ...row, admin_permissions: normalizarPermisos(row.admin_permissions) })) });
+    } catch (error) {
+        console.error('Error listando administradores:', error);
+        res.status(500).json({ error: 'No se pudieron cargar los administradores' });
+    }
+});
+app.post('/api/superadmin/admins', ...requireSuperAdmin, async (req, res) => {
+    try {
+        const { telefono, nombre, apellido = '', password, password_retiro = '000000', username = null, permissions = {} } = req.body || {};
+        if (!telefono || !nombre || !password || String(password).length < 6) {
+            return res.status(400).json({ error: 'Teléfono, nombre y contraseña de mínimo 6 caracteres son obligatorios.' });
+        }
+        if (!/^\d{6,15}$/.test(String(telefono))) return res.status(400).json({ error: 'El teléfono debe contener entre 6 y 15 dígitos.' });
+        const normalizedUsername = username ? String(username).trim() : null;
+        const exists = await pool.query('SELECT id FROM users WHERE telefono = $1 OR ($2::text IS NOT NULL AND username = $2)', [String(telefono), normalizedUsername]);
+        if (exists.rows.length) return res.status(409).json({ error: 'El teléfono o nombre de usuario ya está registrado.' });
+        const hashedPassword = await bcrypt.hash(String(password), 10);
+        const hashedWithdrawPassword = await bcrypt.hash(String(password_retiro), 10);
+        const referralCode = 'APEXADM' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        const result = await pool.query(`INSERT INTO users
+            (telefono, nombre, apellido, username, password_hash, password_retiro_hash,
+             es_admin, es_super_admin, admin_permissions, admin_active, codigo_referido,
+             balance, puntos, plan, plan_amount, daily_earnings, cuenta_habilitada,
+             referidos, fechas_invito, historial, historial_detallado, historial_codigos,
+             codigos_usados, cupones_asignados, logros_asignados, logros_pendientes_aprobar,
+             tareas_asignadas, canjes_realizados, logros_reclamados, referidos_directos)
+            VALUES ($1,$2,$3,$4,$5,$6,TRUE,FALSE,$7::jsonb,TRUE,$8,0,0,'Sin plan',0,0,TRUE,
+                    '{}'::jsonb,'{}'::jsonb,'[]'::jsonb,'[]'::jsonb,'[]'::jsonb,'[]'::jsonb,
+                    '[]'::jsonb,'[]'::jsonb,'[]'::jsonb,'[]'::jsonb,'[]'::jsonb,'[]'::jsonb,'{}'::jsonb)
+            RETURNING id, telefono, nombre, apellido, username, es_admin, es_super_admin, admin_permissions, admin_active`,
+            [String(telefono), String(nombre).trim(), String(apellido).trim(), normalizedUsername, hashedPassword, hashedWithdrawPassword, JSON.stringify(normalizarPermisos(permissions)), referralCode]);
+        res.status(201).json({ message: 'Sub-Admin creado correctamente', admin: result.rows[0] });
+    } catch (error) {
+        console.error('Error creando Sub-Admin:', error);
+        res.status(500).json({ error: 'No se pudo crear el Sub-Admin. Verifica la estructura de users.' });
+    }
+});
+app.put('/api/superadmin/admins/:id', ...requireSuperAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: 'ID inválido.' });
+        const target = await pool.query('SELECT id, es_super_admin FROM users WHERE id = $1', [id]);
+        if (!target.rows.length) return res.status(404).json({ error: 'Administrador no encontrado.' });
+        if (target.rows[0].es_super_admin) return res.status(400).json({ error: 'El SuperAdmin principal no se puede degradar.' });
+        const fields = []; const values = []; let n = 1;
+        if (req.body.permissions !== undefined) { fields.push(`admin_permissions = $${n++}::jsonb`); values.push(JSON.stringify(normalizarPermisos(req.body.permissions))); }
+        if (req.body.active !== undefined) { fields.push(`admin_active = $${n++}`); values.push(Boolean(req.body.active)); }
+        if (req.body.password) { fields.push(`password_hash = $${n++}`); values.push(await bcrypt.hash(String(req.body.password), 10)); }
+        if (!fields.length) return res.status(400).json({ error: 'No hay cambios para guardar.' });
+        values.push(id);
+        const result = await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = $${n} RETURNING id, telefono, nombre, apellido, username, es_admin, es_super_admin, admin_permissions, admin_active`, values);
+        res.json({ message: 'Permisos actualizados correctamente', admin: result.rows[0] });
+    } catch (error) {
+        console.error('Error actualizando Sub-Admin:', error);
+        res.status(500).json({ error: 'No se pudieron guardar los permisos.' });
+    }
+});
+app.delete('/api/superadmin/admins/:id', ...requireSuperAdmin, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        const result = await pool.query(`UPDATE users SET es_admin=FALSE, es_super_admin=FALSE, admin_active=FALSE, admin_permissions='{}'::jsonb WHERE id=$1 AND es_super_admin=FALSE RETURNING id`, [id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Sub-Admin no encontrado o no se puede retirar.' });
+        res.json({ message: 'Privilegios de Sub-Admin retirados.' });
+    } catch (error) {
+        console.error('Error retirando Sub-Admin:', error);
+        res.status(500).json({ error: 'No se pudo retirar el Sub-Admin.' });
+    }
+});
 // ============================================================
 // REGISTRO - CON TODA LA LÓGICA DE REFERIDOS
 // ============================================================
@@ -1206,7 +1325,7 @@ app.post('/api/validate-code', authenticate, async (req, res) => {
 });
 
 // Obtener todos los usuarios (solo admin)
-app.get('/api/admin/users', async (req, res) => {
+app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
@@ -1251,7 +1370,7 @@ app.get('/api/admin/users', async (req, res) => {
 // ============================================================
 // ADMIN - CONFIGURACIÓN
 // ============================================================
-app.get('/api/admin/config', authenticate, isAdmin, async (req, res) => {
+app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
     try {
         // Verificar que la tabla existe
         await pool.query(`
@@ -1259,6 +1378,8 @@ app.get('/api/admin/config', authenticate, isAdmin, async (req, res) => {
                 id SERIAL PRIMARY KEY,
                 tiempo_produccion INTEGER DEFAULT 10,
                 puntos_por_codigo INTEGER DEFAULT 10,
+                minimo_retiro NUMERIC(18,6) DEFAULT 10,
+                comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         `);
@@ -1268,11 +1389,13 @@ app.get('/api/admin/config', authenticate, isAdmin, async (req, res) => {
             await pool.query(
                 `INSERT INTO configuracion (tiempo_produccion, puntos_por_codigo) VALUES (10, 10)`
             );
-            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10 });
+            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10, minimo_retiro: 10, comision_retiro_porcentaje: 23 });
         }
         res.json({
             tiempo_produccion: result.rows[0].tiempo_produccion || 10,
-            puntos_por_codigo: result.rows[0].puntos_por_codigo || 10
+            puntos_por_codigo: result.rows[0].puntos_por_codigo || 10,
+            minimo_retiro: Number(result.rows[0].minimo_retiro ?? 10),
+            comision_retiro_porcentaje: Number(result.rows[0].comision_retiro_porcentaje ?? 23)
         });
     } catch (error) {
         console.error('Error al obtener configuración:', error);
@@ -1280,9 +1403,9 @@ app.get('/api/admin/config', authenticate, isAdmin, async (req, res) => {
     }
 });
 
-app.put('/api/admin/config', authenticate, isAdmin, async (req, res) => {
+app.put('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
     try {
-        const { tiempo_produccion, puntos_por_codigo } = req.body;
+        const { tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje } = req.body;
         
         // Verificar que la tabla existe
         await pool.query(`
@@ -1290,17 +1413,25 @@ app.put('/api/admin/config', authenticate, isAdmin, async (req, res) => {
                 id SERIAL PRIMARY KEY,
                 tiempo_produccion INTEGER DEFAULT 10,
                 puntos_por_codigo INTEGER DEFAULT 10,
+                minimo_retiro NUMERIC(18,6) DEFAULT 10,
+                comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
                 updated_at TIMESTAMP DEFAULT NOW()
             )
         `);
         
-        // Insertar o actualizar
+        // Insertar o actualizar, conservando valores omitidos por el formulario.
+        const actual = await pool.query('SELECT tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
+        const previo = actual.rows[0] || {};
+        const tiempoFinal = Number(tiempo_produccion) > 0 ? Number(tiempo_produccion) : Number(previo.tiempo_produccion ?? 10);
+        const puntosFinal = Number(puntos_por_codigo) > 0 ? Number(puntos_por_codigo) : Number(previo.puntos_por_codigo ?? 10);
+        const minimoFinal = minimo_retiro !== undefined && Number(minimo_retiro) >= 0 ? Number(minimo_retiro) : Number(previo.minimo_retiro ?? 10);
+        const comisionFinal = comision_retiro_porcentaje !== undefined && Number(comision_retiro_porcentaje) >= 0 && Number(comision_retiro_porcentaje) <= 100 ? Number(comision_retiro_porcentaje) : Number(previo.comision_retiro_porcentaje ?? 23);
         await pool.query(
-            `INSERT INTO configuracion (id, tiempo_produccion, puntos_por_codigo, updated_at) 
-             VALUES (1, $1, $2, NOW()) 
+            `INSERT INTO configuracion (id, tiempo_produccion, puntos_por_codigo, minimo_retiro, comision_retiro_porcentaje, updated_at) 
+             VALUES (1, $1, $2, $3, $4, NOW()) 
              ON CONFLICT (id) DO UPDATE 
-             SET tiempo_produccion = $1, puntos_por_codigo = $2, updated_at = NOW()`,
-            [tiempo_produccion || 10, puntos_por_codigo || 10]
+             SET tiempo_produccion = $1, puntos_por_codigo = $2, minimo_retiro = $3, comision_retiro_porcentaje = $4, updated_at = NOW()`,
+            [tiempoFinal, puntosFinal, minimoFinal, comisionFinal]
         );
         
         res.json({ message: 'Configuración actualizada' });
@@ -1367,7 +1498,7 @@ app.put('/api/admin/codes/:id', authenticate, isAdmin, async (req, res) => {
 });
 
 // Actualizar usuario (admin)
-app.put('/api/admin/user/:id', async (req, res) => {
+app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
@@ -1436,7 +1567,7 @@ app.put('/api/admin/user/:id', async (req, res) => {
 // ============================================================
 // ASIGNAR ACTIVIDADES A USUARIO CON PLAN ACTIVO
 // ============================================================
-app.put('/api/admin/user/:id/activities', async (req, res) => {
+app.put('/api/admin/user/:id/activities', authenticate, isAdmin, async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
@@ -1473,7 +1604,7 @@ app.put('/api/admin/user/:id/activities', async (req, res) => {
 // ============================================================
 // ELIMINAR USUARIO (ADMIN)
 // ============================================================
-app.delete('/api/admin/user/:id', async (req, res) => {
+app.delete('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
     try {
         const token = req.headers.authorization?.split(' ')[1];
         if (!token) {
@@ -1574,7 +1705,7 @@ app.post('/api/admin/user/:id/points', authenticate, isAdmin, async (req, res) =
 app.post('/api/user/withdraw', authenticate, async (req, res) => {
     const { amount, password, address } = req.body || {};
     const value = Number(amount);
-    if (!Number.isFinite(value) || value < 30) return res.status(400).json({error:'Monto mínimo $30'});
+    if (!Number.isFinite(value) || value <= 0) return res.status(400).json({error:'El monto debe ser mayor que cero'});
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -1584,10 +1715,15 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
         const stored=u.password_retiro_hash || u.password_retiro;
         const valid=stored ? (String(stored).startsWith('$2') ? await bcrypt.compare(String(password||''),String(stored)) : String(password||'')===String(stored)) : false;
         if (!valid) { await client.query('ROLLBACK'); return res.status(401).json({error:'Contraseña incorrecta'}); }
+        const configResult = await client.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
+        const config = configResult.rows[0] || {};
+        const minimoRetiro = Number(config.minimo_retiro ?? 10);
+        const comisionPorcentaje = Number(config.comision_retiro_porcentaje ?? 23);
+        if (value < minimoRetiro) { await client.query('ROLLBACK'); return res.status(400).json({error:`El retiro mínimo es de ${minimoRetiro.toFixed(2)} USDT0`}); }
         const addr=String(address || u.direccion_retiro || '');
         if (!addr.startsWith('0x')) { await client.query('ROLLBACK'); return res.status(400).json({error:'Dirección de retiro no configurada'}); }
         if (Number(u.balance||0) < value) { await client.query('ROLLBACK'); return res.status(400).json({error:'Saldo insuficiente'}); }
-        const commission=value*0.23, net=value-commission, item={type:'retiro',amount:value,commission,netAmount:net,date:new Date().toISOString(),status:'pendiente',address:addr};
+        const commission=value*(comisionPorcentaje/100), net=value-commission, item={type:'retiro',amount:value,commission,commissionPercentage:comisionPorcentaje,netAmount:net,date:new Date().toISOString(),status:'pendiente',address:addr};
         const hist=Array.isArray(u.historial)?u.historial:[]; hist.push(item);
         const detail=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; detail.push({tipo:'retiro',concepto:'Retiro de $'+value.toFixed(2),monto:value,comision:commission,neto:net,fecha:item.date,estado:'pendiente'});
         const updated=await client.query('UPDATE users SET balance=balance-$1,historial=$2,historial_detallado=$3 WHERE id=$4 RETURNING balance,historial,historial_detallado',[value,JSON.stringify(hist),JSON.stringify(detail),req.userId]);
