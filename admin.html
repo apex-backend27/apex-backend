@@ -4066,8 +4066,40 @@ function renderRetiros() {
     tbody.innerHTML = html;
 }
 
+async function procesarRetiroAdminBackend(accion, telefono, fecha, index, nota) {
+    var users = getUsers();
+    var user = users.find(function(u) { return u.telefono === telefono; });
+    if (!user || !user.id) throw new Error('Usuario no encontrado en el backend');
+    var token = localStorage.getItem('apex_token');
+    if (!token) throw new Error('Sesión administrativa no disponible');
+    var pending = Array.isArray(user.historial) ? user.historial.find(function(item) { return item && item.type === 'retiro' && item.status === 'pendiente' && String(item.date) === String(fecha); }) : null;
+    var response = await fetch(API_URL + '/api/admin/user/' + user.id + '/withdraw/' + accion, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ fecha: fecha, index: index, nota: nota || '' })
+    });
+    var data = await response.json().catch(function() { return {}; });
+    if (!response.ok) throw new Error(data.error || 'No se pudo actualizar el retiro');
+    if (data.user) {
+        users[users.indexOf(user)] = Object.assign({}, user, data.user);
+        saveUsers(users);
+    }
+    if (accion === 'approve' && pending) {
+        var pagos = getPagos();
+        pagos.push({ usuario: user.nombre + ' ' + user.apellido, telefono: user.telefono, monto: Number(pending.amount || 0), neto: Number(pending.netAmount || pending.amount || 0), concepto: 'Retiro aprobado. Nota: ' + (nota || 'Sin nota'), fecha: new Date().toISOString(), estado: 'completado' });
+        savePagos(pagos);
+    }
+    renderRetiros();
+    renderPagos();
+    actualizarStats();
+    showAlert(accion === 'approve' ? '✅ Retiro aprobado. El usuario podrá solicitar otro.' : '❌ Retiro rechazado y saldo devuelto. El usuario podrá solicitar otro.', accion === 'approve' ? 'success' : 'warning');
+}
 function aprobarRetiro(telefono, fecha, index) {
     if (!confirm('✅ ¿Aprobar este retiro?')) return;
+    var notaInput = document.getElementById('nota_retiro_' + index);
+    var nota = notaInput ? notaInput.value.trim() : 'Sin nota';
+    procesarRetiroAdminBackend('approve', telefono, fecha, index, nota).catch(function(error) { showAlert('❌ ' + error.message, 'danger'); });
+    return;
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
     if (!user) { showAlert('⚠️ Usuario no encontrado', 'danger'); return; }
@@ -4113,6 +4145,10 @@ function aprobarRetiro(telefono, fecha, index) {
 
 function rechazarRetiro(telefono, fecha, index) {
     if (!confirm('❌ ¿Rechazar este retiro?')) return;
+    var notaInput = document.getElementById('nota_retiro_' + index);
+    var nota = notaInput ? notaInput.value.trim() : 'Sin nota';
+    procesarRetiroAdminBackend('reject', telefono, fecha, index, nota).catch(function(error) { showAlert('❌ ' + error.message, 'danger'); });
+    return;
     var users = getUsers();
     var user = users.find(function(u) { return u.telefono === telefono; });
     if (!user) { showAlert('⚠️ Usuario no encontrado', 'danger'); return; }
@@ -6904,7 +6940,7 @@ guardarLogrosSistema = async function(){ try { _guardarLogrosSistemaOriginal.app
 <script>
 async function guardarConfigTareasRemota(fecha,pausadas){var tok=localStorage.getItem('apex_token'),ts=typeof getTareasConfig==='function'?getTareasConfig():[],hora=(document.getElementById('apexHoraCobroInput')||{}).value||localStorage.getItem('apex_hora_cobro')||'20:00';var r=await fetch(API_URL+'/api/admin/tasks/config',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({tareas:ts,fecha:fecha,pausadas:pausadas,autorizadas:(!pausadas&&Boolean(fecha)),horaCobro:hora})});var x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'No se pudo guardar tareas');return x}
 async function agregarTareaPrueba(){var ts=getTareasConfig();var item={id:'prueba_'+Date.now(),hora:null,minuto:null,nombre:'Tarea de prueba manual',icono:'🧪',activo:false,sin_horario:true,descripcion:'Tarea manual para pruebas, sin horario'};ts.push(item);saveTareasConfig(ts);try{await guardarConfigTareasRemota(null,false);renderTareasConfig();showAlert('✅ Tarea manual agregada y guardada. Actívala desde el admin.','success')}catch(e){showAlert('❌ '+e.message,'danger')}}
-async function rechazarRetiro(telefono,fecha,index){if(!confirm('¿Rechazar este retiro y devolver el saldo?'))return;var us=getUsers(),u=us.find(function(x){return x.telefono===telefono;}),h=(u&&u.historial||[]),real=h.findIndex(function(x){return x.type==='retiro'&&x.status==='pendiente'&&(!fecha||x.date===fecha)});if(!u||!u.id||real<0){showAlert('⚠️ Retiro pendiente no encontrado','danger');return}try{var tok=localStorage.getItem('apex_token'),r=await fetch(API_URL+'/api/admin/user/'+u.id+'/withdraw/reject',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({index:real})}),x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'Error al rechazar');showAlert('✅ Retiro rechazado y saldo devuelto','success');renderRetiros();renderUsuarios()}catch(e){showAlert('❌ '+e.message,'danger')}}
+async function rechazarRetiro(telefono,fecha,index){if(!confirm('¿Rechazar este retiro y devolver el saldo?'))return;var us=getUsers(),u=us.find(function(x){return x.telefono===telefono;}),h=(u&&u.historial||[]),real=h.findIndex(function(x){return x.type==='retiro'&&x.status==='pendiente'&&(!fecha||x.date===fecha)});if(!u||!u.id||real<0){showAlert('⚠️ Retiro pendiente no encontrado','danger');return}try{var tok=localStorage.getItem('apex_token'),r=await fetch(API_URL+'/api/admin/user/'+u.id+'/withdraw/reject',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({index:real,fecha:fecha||''})}),x=await r.json();if(!r.ok||x.error)throw new Error(x.error||'Error al rechazar');if(x.user){us[us.indexOf(u)]=Object.assign({},u,x.user);saveUsers(us)}showAlert('✅ Retiro rechazado y saldo devuelto. El usuario ya puede solicitar otro.','success');renderRetiros();renderUsuarios()}catch(e){showAlert('❌ '+e.message,'danger')}}
 </script>
 <script id="apex-v13-task-toggle-controls">
 async function apexGuardarTareasToggle(ts){saveTareasConfig(ts);var tok=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/admin/tasks/config',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({tareas:ts})});var x=await r.json();if(!r.ok||x.error)throw Error(x.error||'Error sincronizando tareas')}

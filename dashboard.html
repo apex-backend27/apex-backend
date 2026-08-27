@@ -2199,6 +2199,8 @@ function getPremiosCofres(){return apexGameConfig.cofres||{premios:[5,8,10,12,15
 function getPremiosDados(){return apexGameConfig.dados||{premios:[5,10,15,20,25,30]};}
 async function requestWithdraw(){
  var input=document.getElementById('withdrawAmount'), amount=Number(input&&input.value||0), minimum=Number(window.apexWithdrawalConfig&&window.apexWithdrawalConfig.minimo_retiro||10); if(!amount||amount<minimum){showAlert('⚠️ El mínimo de retiro es $'+minimum.toFixed(2),'danger');return;} if(!user.direccion_retiro){showAlert('⚠️ Configura dirección de retiro','danger');return;}
+ var pendingWithdrawal=Array.isArray(user.historial)&&user.historial.some(function(item){return item&&item.type==='retiro'&&item.status==='pendiente';});
+ if(pendingWithdrawal){showAlert('⏳ Ya tienes un retiro pendiente. Podrás solicitar otro cuando el administrador lo apruebe o lo rechace.','warning');return;}
  var pass=prompt('🔐 Contraseña de retiro (6 dígitos):');if(!pass)return;if(!confirm('¿Confirmar retiro de $'+amount.toFixed(2)+'?'))return;
  try{var token=localStorage.getItem('apex_token');var r=await fetch(API_URL+'/api/user/withdraw',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({amount:amount,password:pass,address:user.direccion_retiro})});var data=await r.json();if(!r.ok||data.error)throw new Error(data.error||'Error en el servidor');if(data.user){user.balance=Number(data.user.balance||user.balance);user.historial=data.user.historial||user.historial;user.historial_detallado=data.user.historial_detallado||user.historial_detallado;sessionStorage.setItem('apex_user',JSON.stringify(user));localStorage.setItem('apex_user',JSON.stringify(user));}showAlert('✅ Solicitud de retiro enviada','success');renderDashboard();input.value='';}catch(e){showAlert('❌ '+e.message,'danger');}
 }
@@ -2270,9 +2272,10 @@ function renderTareas(){
  var c=document.getElementById('tareasContainer'); if(!c)return;
  var tareas=apexConfigTareas();
  if(!tareas.length){c.innerHTML='<div class="apex-task-disabled" style="padding:18px;text-align:center">No hay tareas configuradas.</div>';return}
- var comp=Array.isArray(user.tareas_completadas_hoy)?user.tareas_completadas_hoy:[], manualDone=!!user.tarea_manual_completada_hoy, html='';
+ var comp=Array.isArray(user.tareas_completadas_hoy)?user.tareas_completadas_hoy:[], manualDone=!!user.tarea_manual_completada_hoy, html='', doneCount=0;
  for(var i=0;i<tareas.length;i++){
   var t=tareas[i]||{}, nombreVisible=String(t.nombre||('Tarea '+(i+1))).replace(/\s+#\d+\s*$/,'').trim(), manual=!!t.sin_horario, done=manual?manualDone:comp.indexOf(i)!==-1, active=t.activo!==false;
+  if(done) doneCount++;
   var available=apexTienePlan()&&active&&apexHoraDisponible(t)&&!tareasPausadasRemoto;
   var disabled=done||!available;
   var h=Number(t.hora||0), m=Number(t.minuto||0), dur=Math.max(1,Number(t.duracionMinutos||t.duracion||t.duracion_minutos||30));
@@ -2288,7 +2291,12 @@ function renderTareas(){
  }
  c.innerHTML=html;
  c.querySelectorAll('[data-task-index]').forEach(function(b){b.onclick=function(){var i=Number(b.dataset.taskIndex);window.completarTareaDiaria(i)}});
- actualizarEstadoBotonCobro(comp.length+(manualDone?1:0));
+ var resumenTotal=5, resumenPorcentaje=Math.min(100,Math.round((doneCount/resumenTotal)*100));
+ var resumenProgreso=document.getElementById('progresoTareas'), resumenPorcentajeEl=document.getElementById('porcentajePlan'), resumenBarra=document.getElementById('progresoBarra');
+ if(resumenProgreso) resumenProgreso.textContent=doneCount+'/'+resumenTotal;
+ if(resumenPorcentajeEl) resumenPorcentajeEl.textContent=resumenPorcentaje+'%';
+ if(resumenBarra) resumenBarra.style.width=resumenPorcentaje+'%';
+ actualizarEstadoBotonCobro(doneCount);
 }
 var _oldDaily=window.completarTareaDiaria;window.completarTareaDiaria=function(index){if(!apexTienePlan()){showAlert('🔒 Primero debes adquirir un plan activo para realizar tareas','warning');return}if(typeof _oldDaily==='function')return _oldDaily.call(this,index)};
 var _oldClaim=window.cobrarTareasDelDia;window.cobrarTareasDelDia=async function(){if(!apexTienePlan()){showAlert('🔒 Primero debes adquirir un plan activo para cobrar','warning');return}return _oldClaim.apply(this,arguments)};
