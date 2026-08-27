@@ -144,7 +144,7 @@ async function asegurarBilleteraUsuario(userId) {
 // ============================================================
 // MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
 // ============================================================
-const DEPOSIT_MONITOR_VERSION = 'v11-render-rpc-only';
+const DEPOSIT_MONITOR_VERSION = 'v12-render-raw-rpc';
 const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
@@ -244,7 +244,7 @@ async function monitorDepositosPolygon() {
         }
     } catch (error) { console.error('Monitor Polygon:', error.message); }
 }
-setTimeout(function(){ console.log(`Monitor Polygon ${DEPOSIT_MONITOR_VERSION}: lotes de 500 bloques, contrato ${POLYGON_TOKEN_CONTRACT}`); monitorDepositosPolygon(); setInterval(monitorDepositosPolygon, DEPOSIT_SCAN_INTERVAL_MS); }, 12000);
+setTimeout(function(){ console.log(`Monitor Polygon ${DEPOSIT_MONITOR_VERSION}: JSON-RPC directo eth_getLogs, lotes de 500 bloques, contrato ${POLYGON_TOKEN_CONTRACT}`); monitorDepositosPolygon(); setInterval(monitorDepositosPolygon, DEPOSIT_SCAN_INTERVAL_MS); }, 12000);
 
 // ============================================================
 // RUTAS PÚBLICAS
@@ -254,7 +254,7 @@ app.get('/', (req, res) => {
   res.send('Servidor funcionando correctamente');
 });
 app.get('/api/deposit-monitor-status', (req, res) => {
-  res.json({ version: DEPOSIT_MONITOR_VERSION, batch_size: 500, token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
+  res.json({ version: DEPOSIT_MONITOR_VERSION, rpc_mode: 'direct-eth_getLogs', batch_size: 500, lookback_blocks: Math.max(900, Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 2000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
 });
 
 app.get('/test', (req, res) => {
