@@ -169,6 +169,7 @@ async function acreditarDeposito(deposito) {
         await client.query('UPDATE users SET balance = COALESCE(balance,0) + $1, historial_detallado = $2 WHERE id = $3', [amount, JSON.stringify(history), d.user_id]);
         await client.query("UPDATE polygon_deposits SET status = 'credited', credited_at = NOW(), updated_at = NOW() WHERE id = $1", [d.id]);
         await client.query('COMMIT');
+        console.log(`Depósito acreditado: ${amount} USDT0 para usuario ${d.user_id}, tx ${d.tx_hash}`);
         return true;
     } catch (error) { await client.query('ROLLBACK'); throw error; }
     finally { client.release(); }
@@ -184,15 +185,22 @@ async function monitorDepositosPolygon() {
         const users = await pool.query("SELECT id, LOWER(polygon_address) AS polygon_address FROM users WHERE polygon_address IS NOT NULL AND polygon_address LIKE '0x%'");
         const addressMap = new Map(users.rows.map(u => [String(u.polygon_address).toLowerCase(), u.id]));
         if (fromBlock <= toBlock && addressMap.size) {
-            const logs = await provider.getLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC], fromBlock, toBlock });
-            for (const log of logs) {
-                if (!log.topics || log.topics.length < 3) continue;
-                let to; try { to = topicAddress(log.topics[2]); } catch (_) { continue; }
-                const userId = addressMap.get(to); if (!userId) continue;
-                const amount = Number(formatUnits(BigInt(log.data), POLYGON_TOKEN_DECIMALS));
-                if (!(amount > 0)) continue;
-                await pool.query(`INSERT INTO polygon_deposits (tx_hash, log_index, user_id, token_contract, from_address, to_address, amount, block_number, confirmations, status, raw_log) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10::jsonb) ON CONFLICT (tx_hash, log_index) DO NOTHING`, [log.transactionHash, Number(log.index || 0), userId, POLYGON_TOKEN_CONTRACT, topicAddress(log.topics[1]), to, amount, Number(log.blockNumber), Math.max(0, latest - Number(log.blockNumber) + 1), JSON.stringify({ blockHash: log.blockHash, topics: log.topics, data: log.data })]);
+            const batchSize = 500;
+            let detected = 0;
+            for (let batchStart = fromBlock; batchStart <= toBlock; batchStart += batchSize) {
+                const batchEnd = Math.min(toBlock, batchStart + batchSize - 1);
+                const logs = await provider.getLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC], fromBlock: batchStart, toBlock: batchEnd });
+                for (const log of logs) {
+                    if (!log.topics || log.topics.length < 3) continue;
+                    let to; try { to = topicAddress(log.topics[2]); } catch (_) { continue; }
+                    const userId = addressMap.get(to); if (!userId) continue;
+                    const amount = Number(formatUnits(BigInt(log.data), POLYGON_TOKEN_DECIMALS));
+                    if (!(amount > 0)) continue;
+                    const inserted = await pool.query(`INSERT INTO polygon_deposits (tx_hash, log_index, user_id, token_contract, from_address, to_address, amount, block_number, confirmations, status, raw_log) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10::jsonb) ON CONFLICT (tx_hash, log_index) DO NOTHING RETURNING id`, [log.transactionHash, Number(log.index || 0), userId, POLYGON_TOKEN_CONTRACT, topicAddress(log.topics[1]), to, amount, Number(log.blockNumber), Math.max(0, latest - Number(log.blockNumber) + 1), JSON.stringify({ blockHash: log.blockHash, topics: log.topics, data: log.data })]);
+                    if (inserted.rows.length) { detected++; console.log(`Depósito detectado: ${amount} USDT0 para usuario ${userId}, tx ${log.transactionHash}`); }
+                }
             }
+            if (detected) console.log(`Monitor Polygon: ${detected} depósito(s) nuevo(s) registrado(s)`);
             if (cfg.rows.length) await pool.query('UPDATE configuracion SET deposit_scanned_block = $1 WHERE id = $2', [toBlock, cfg.rows[0].id]);
             else await pool.query('INSERT INTO configuracion (deposit_scanned_block) VALUES ($1)', [toBlock]);
         }
