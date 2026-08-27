@@ -2216,16 +2216,16 @@ function renderTareas(){
  if(!tareas.length){c.innerHTML='<div class="apex-task-disabled" style="padding:18px;text-align:center">No hay tareas configuradas.</div>';return}
  var comp=Array.isArray(user.tareas_completadas_hoy)?user.tareas_completadas_hoy:[], manualDone=!!user.tarea_manual_completada_hoy, html='';
  for(var i=0;i<tareas.length;i++){
-  var t=tareas[i]||{}, manual=!!t.sin_horario, done=manual?manualDone:comp.indexOf(i)!==-1, active=t.activo!==false;
+  var t=tareas[i]||{}, nombreVisible=String(t.nombre||('Tarea '+(i+1))).replace(/\s+#\d+\s*$/,'').trim(), manual=!!t.sin_horario, done=manual?manualDone:comp.indexOf(i)!==-1, active=t.activo!==false;
   var available=apexTienePlan()&&active&&apexHoraDisponible(t)&&!tareasPausadasRemoto;
   var disabled=done||!available;
   var h=Number(t.hora||0), m=Number(t.minuto||0), dur=Math.max(1,Number(t.duracionMinutos||t.duracion||t.duracion_minutos||30));
   var horaTexto=manual?'Activación manual':String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+' hrs';
   var estado=done?'✅ Completada':!apexTienePlan()?'🔒 Necesitas un plan activo':!active?'⏸️ Desactivada':tareasPausadasRemoto?'⏸️ Pausada':!apexHoraDisponible(t)?'⏳ '+apexProximaHora(t):'▶️ Disponible';
   html+='<article class="tarea-card '+(disabled?'apex-task-disabled':'')+'" style="position:relative;padding:15px;margin:10px 0;border:1px solid #27d3ff66;border-radius:15px;background:linear-gradient(135deg,#071326,#10233d)">';
-  html+='<div style="display:flex;justify-content:space-between;gap:10px"><strong>'+(t.icono||'📋')+' '+(t.nombre||'Tarea '+(i+1))+'</strong><span>'+estado+'</span></div>';
+  html+='<div style="display:flex;justify-content:space-between;gap:10px"><strong>'+(t.icono||'📋')+' '+nombreVisible+'</strong><span>'+estado+'</span></div>';
   html+='<div class="apex-task-schedule">🕒 Horario: <b>'+horaTexto+'</b> · ⏱️ Duración: <b>'+dur+' min</b></div>';
-  html+='<p style="opacity:.86;margin:8px 0">'+(t.descripcion||'Sin descripción')+'</p>';
+  html+='<p style="opacity:.86;margin:8px 0">Reto interactivo</p>';
   if(done) html+='<small style="color:#6dffcf">✅ Tarea completada</small>';
   else html+='<button class="btn-action" data-task-index="'+i+'" '+(disabled?'disabled':'')+'>'+(manual?'Iniciar tarea':'✅ Completar tarea')+'</button>';
   html+='</article>';
@@ -2350,7 +2350,7 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   function taskOf(i){var ts=typeof apexConfigTareas==='function'?apexConfigTareas():(window.HORARIOS_TAREAS||[]);return ts[i]||{};}
   function kindOf(t,i){var k=String(t.interaccion||t.interactivo||t.tipo_interactivo||'').toLowerCase();return ['captcha','sequence','target','reaction','pair'].indexOf(k)>=0?k:kinds[i]||'captcha';}
   function openInteractive(index){
-    var t=taskOf(index),kind=kindOf(t,index),name=t.nombre||('Tarea '+(index+1)),modal=document.createElement('div');
+    var t=taskOf(index),kind=kindOf(t,index),name=String(t.nombre||('Tarea '+(index+1))).replace(/\s+#\d+\s*$/,'').trim(),modal=document.createElement('div');
     modal.className='apex-interactive-backdrop';
     var payload={captcha:'',sequence:[],seqPos:0,sequenceDone:false,targetFound:false,first:null,second:null,reaction:false,armed:false};
     var content='';
@@ -2400,7 +2400,7 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
  function kind(t,i){var k=String(t.tipo_interactivo||t.interaccion||'').toLowerCase();return extra.indexOf(k)>=0?k:''}
  function task(i){var ts=typeof apexConfigTareas==='function'?apexConfigTareas():window.HORARIOS_TAREAS||[];return ts[i]||{}}
- function open(i){var t=task(i),k=kind(t,i);if(!k){previous(i);return}var seed=Number(t.id&&String(t.id).replace(/\D/g,''))||i+1, modal=document.createElement('div'), ok=false, data={};modal.className='apex-interactive-backdrop';
+ function open(i){var t=task(i),k=kind(t,i);if(!k){previous(i);return}var seed=Number(t.id&&String(t.id).replace(/\D/g,''))||i+1, modal=document.createElement('div'), ok=false, data={};t.nombre=String(t.nombre||'').replace(/\s+#\d+\s*$/,'').trim();modal.className='apex-interactive-backdrop';
   var icons=['🚀','💎','⚡','🌟','🎯','🪙','🧠','🏆'],colors=['#ff5577','#ffd447','#6dffcf','#7aa7ff'],content='';
   if(k==='count'){var total=3+(seed%5);content='<div class="apex-int-label">¿Cuántos '+icons[seed%icons.length]+' aparecen?</div><div class="apex-varied-icons">'+Array(total).fill(icons[seed%icons.length]).join(' ')+'</div><input id="apexVarInput" class="apex-int-input" type="number" min="0" placeholder="Escribe el total">';data.answer=total}
   else if(k==='oddone'){var pos=seed%9;content='<div class="apex-int-label">Pulsa el símbolo diferente</div><div class="apex-var-grid">'+Array.from({length:9},function(_,n){return '<button type="button" data-good="'+(n===pos?'1':'0')+'">'+(n===pos?'🔶':'🔷')+'</button>'}).join('')+'</div>';}
