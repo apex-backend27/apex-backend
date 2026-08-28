@@ -1822,16 +1822,41 @@ function calcularGanancias() {
 function updateWithdrawAddress() {
     var input = document.getElementById('withdrawAddress');
     var address = input.value.trim();
-    if (!address || address.indexOf('0x') !== 0 || address.length < 40) {
-        showAlert('⚠️ Dirección inválida. Debe comenzar con 0x', 'danger');
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address)) {
+        showAlert('⚠️ Dirección Polygon inválida', 'danger');
         return;
     }
-    user.direccion_retiro = address;
-    saveUserData();
-    document.getElementById('currentWithdrawAddress').textContent = address;
-    if (document.getElementById('currentWithdrawAddress')) document.getElementById('currentWithdrawAddress').style.color = '#4db6ac';
-    showAlert('✅ Dirección de retiro guardada', 'success');
-    input.value = '';
+    var token = apexTokenUsuario();
+    if (!token) {
+        showAlert('⚠️ Tu sesión expiró. Vuelve a iniciar sesión.', 'warning');
+        return;
+    }
+    var button = input.parentElement ? input.parentElement.querySelector('.btn-action') : null;
+    if (button) { button.disabled = true; button.dataset.originalText = button.textContent; button.textContent = 'Guardando…'; }
+    fetch(API_URL + '/api/user/withdraw-address', {
+        method: 'PUT',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ direccion_retiro: address })
+    }).then(function(response) {
+        return response.json().then(function(data) {
+            if (!response.ok || data.error) throw new Error(data.error || 'No se pudo guardar la dirección');
+            return data;
+        });
+    }).then(function(data) {
+        var savedAddress = data.direccion_retiro || address;
+        user.direccion_retiro = savedAddress;
+        sessionStorage.setItem('apex_user', JSON.stringify(user));
+        localStorage.setItem('apex_user', JSON.stringify(user));
+        var current = document.getElementById('currentWithdrawAddress');
+        if (current) { current.textContent = savedAddress; current.style.color = '#63edbe'; }
+        input.value = '';
+        showAlert('✅ Dirección de retiro guardada', 'success');
+    }).catch(function(error) {
+        showAlert('❌ No se pudo guardar la dirección de retiro. Inténtalo nuevamente.', 'danger');
+    }).finally(function() {
+        if (button) { button.disabled = false; button.textContent = button.dataset.originalText || 'Guardar'; }
+    });
 }
 
 function requestWithdrawLegacy() {
@@ -2672,5 +2697,159 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
   });
   window.addEventListener('focus',function(){if(typeof cargarConfiguracionTareasRemota==='function')cargarConfiguracionTareasRemota();});
 })();
-</script></body>
+</script><style id="apex-metallic-sections-v3">
+/* APEX METALLIC SECTIONS — black / blue / red / yellow */
+:root{
+  --apx-black:#05080d;
+  --apx-ink:#091321;
+  --apx-blue:#1688c9;
+  --apx-blue-bright:#39c7ff;
+  --apx-red:#a9283d;
+  --apx-red-bright:#f05a62;
+  --apx-yellow:#ffd447;
+  --apx-silver:#d6e2ee;
+  --apx-muted:#9eb2c6;
+  --apx-line:rgba(166,211,239,.28);
+  --apx-shadow:0 16px 38px rgba(0,0,0,.42),inset 0 1px rgba(255,255,255,.07);
+}
+body{background:radial-gradient(circle at 7% 2%,rgba(20,125,196,.24),transparent 30%),radial-gradient(circle at 93% 20%,rgba(189,37,58,.23),transparent 28%),linear-gradient(145deg,#030507 0%,#081321 48%,#16080e 100%)!important;color:var(--apx-silver)!important}
+body:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;background:linear-gradient(115deg,transparent 0 43%,rgba(255,212,71,.025) 50%,transparent 57%);mix-blend-mode:screen}
+.header{background:linear-gradient(105deg,rgba(3,8,15,.98),rgba(9,38,66,.96) 52%,rgba(61,11,23,.96))!important;border-bottom:1px solid rgba(255,212,71,.42)!important;box-shadow:0 8px 28px rgba(0,0,0,.48),inset 0 -1px rgba(57,199,255,.32)!important}
+.main{background:transparent!important}
+.card,.actividad-card,.plan-card,.ganancia-stat,.profile-section{background:linear-gradient(145deg,rgba(16,31,50,.96),rgba(5,10,18,.98))!important;border:1px solid var(--apx-line)!important;box-shadow:var(--apx-shadow)!important;color:var(--apx-silver)!important}
+.card{position:relative;overflow:hidden}
+.card:after,.plan-card:after,.actividad-card:after,.profile-section:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,rgba(255,255,255,.055),transparent 24%,transparent 72%,rgba(255,212,71,.035));opacity:.8}
+.card>* ,.plan-card>* ,.actividad-card>* ,.profile-section>*{position:relative;z-index:1}
+.label,.card-title,.profile-section .section-label{color:#e8f3ff!important;text-shadow:0 1px rgba(0,0,0,.7)}
+.sub,.desc,.details,.phone,.withdraw-hint,.info,.hora,.profile-field .label{color:var(--apx-muted)!important}
+.amount,.balance-card .amount{color:var(--apx-yellow)!important;text-shadow:0 0 20px rgba(255,212,71,.3)!important}
+.points span,.number.gold{color:var(--apx-yellow)!important}
+/* Inicio */
+#tab-inicio>.card:nth-child(1){border-color:rgba(255,212,71,.62)!important;background:linear-gradient(145deg,rgba(93,66,12,.66),rgba(9,18,29,.98))!important}
+#tab-inicio>#tareasCard{border-color:rgba(57,199,255,.58)!important;background:linear-gradient(145deg,rgba(8,58,94,.78),rgba(5,14,26,.98))!important}
+#tab-inicio>#tareasCard .progreso-container{background:rgba(2,9,17,.72)!important;border-color:rgba(57,199,255,.3)!important}
+#tab-inicio>#tareasCard .racha-container{background:linear-gradient(135deg,rgba(113,29,42,.65),rgba(88,62,9,.58))!important;border-color:rgba(255,212,71,.55)!important}
+#tab-inicio>.card:nth-child(3){border-color:rgba(240,90,98,.5)!important;background:linear-gradient(145deg,rgba(77,21,34,.66),rgba(8,17,27,.98))!important}
+#tab-inicio .address-box{background:rgba(2,9,17,.62)!important;border-color:rgba(240,90,98,.34)!important;color:var(--apx-silver)!important}
+/* Planes */
+#tab-planes{padding-top:2px!important}
+#planesContainer .plan-card{border-left:4px solid var(--apx-blue)!important}
+#planesContainer .plan-card:nth-child(even){border-left-color:var(--apx-red-bright)!important;background:linear-gradient(145deg,rgba(70,18,30,.72),rgba(7,14,24,.98))!important}
+#planesContainer .plan-card:nth-child(3n){border-left-color:var(--apx-yellow)!important;background:linear-gradient(145deg,rgba(82,60,11,.7),rgba(8,15,24,.98))!important}
+#planesContainer .plan-card.active-plan{border-color:var(--apx-yellow)!important;box-shadow:0 0 0 1px rgba(255,212,71,.25),var(--apx-shadow)!important}
+#planesContainer .plan-card .info .name,#planesContainer .plan-card .action .price{color:#f4f8ff!important}
+#planesContainer .plan-card .info .details strong{color:var(--apx-yellow)!important}
+#planesContainer .plan-card .buy-btn{background:linear-gradient(135deg,#0b5f9e,#159fd5 52%,#0a3c79)!important;border-color:rgba(57,199,255,.78)!important}
+#planesContainer .plan-card:nth-child(even) .buy-btn{background:linear-gradient(135deg,#741b2a,#d84b58 52%,#641322)!important;border-color:rgba(240,90,98,.82)!important}
+#planesContainer .plan-card:nth-child(3n) .buy-btn{background:linear-gradient(135deg,#9b6b0c,#ffd447 52%,#a66d0b)!important;color:#1b1404!important;border-color:#ffef9b!important}
+/* Referidos */
+#tab-referidos>.card{border-color:rgba(240,90,98,.58)!important;background:linear-gradient(145deg,rgba(55,15,28,.88),rgba(7,14,24,.98))!important}
+#tab-referidos .card>div[style*="background:#f8f9fa"],#tab-referidos .card>div[style*="background:#f5f5f5"]{background:linear-gradient(145deg,rgba(10,39,65,.9),rgba(6,13,23,.95))!important;border-color:rgba(57,199,255,.32)!important;color:var(--apx-silver)!important}
+#tab-referidos [style*="color:#26354d"],#tab-referidos [style*="color:#2f4563"],#tab-referidos [style*="color:#666"],#tab-referidos [style*="color:#000"]{color:#d8e8f7!important}
+#tab-referidos #totalReferidos{color:var(--apx-yellow)!important;text-shadow:0 0 14px rgba(255,212,71,.26)}
+#tab-referidos #referidosConPlan{color:#63edbe!important;text-shadow:0 0 14px rgba(99,237,190,.22)}
+#tab-referidos button{background:linear-gradient(135deg,#8e2034,#e34f5c 52%,#711523)!important;border:1px solid #ff8585!important;color:#fff!important}
+/* Historial */
+#tab-historial .ganancias-stats .ganancia-stat:first-child{border-color:rgba(255,212,71,.55)!important;background:linear-gradient(145deg,rgba(86,62,10,.7),rgba(8,15,24,.97))!important}
+#tab-historial .ganancias-stats .ganancia-stat:last-child{border-color:rgba(57,199,255,.5)!important;background:linear-gradient(145deg,rgba(9,57,91,.75),rgba(6,14,24,.97))!important}
+#tab-historial .ganancia-stat .label{color:#d9e8f5!important}
+#tab-historial .ganancia-stat .number.green{color:#63edbe!important}
+#tab-historial .filter-tabs .filter-btn{background:rgba(8,20,33,.88)!important;border-color:rgba(57,199,255,.32)!important;color:#b6c9db!important}
+#tab-historial .filter-tabs .filter-btn.active{background:linear-gradient(135deg,#8c1e32,#e34f5c 54%,#711522)!important;border-color:#ff8585!important;color:#fff!important}
+#tab-historial .historial-item{border-bottom-color:rgba(166,211,239,.2)!important}
+#tab-historial .historial-item .left .desc{color:#e9f4ff!important}
+#tab-historial .historial-item .left .date,.historial-item .right .status,.historial-item .right .origen{color:#9eb2c6!important}
+#tab-historial .historial-item .right .amount.positive{color:#63edbe!important}
+#tab-historial .historial-item .right .amount.negative{color:#ff727b!important}
+/* Actividades */
+#tab-actividades{padding-top:2px!important}
+#actividadesGrid .actividad-card{border-top:3px solid var(--apx-blue)!important;background:linear-gradient(145deg,rgba(9,55,88,.82),rgba(6,13,24,.98))!important}
+#actividadesGrid .actividad-card:nth-child(3n+2){border-top-color:var(--apx-red-bright)!important;background:linear-gradient(145deg,rgba(74,19,32,.82),rgba(7,13,23,.98))!important}
+#actividadesGrid .actividad-card:nth-child(3n){border-top-color:var(--apx-yellow)!important;background:linear-gradient(145deg,rgba(81,59,10,.78),rgba(8,15,23,.98))!important}
+#actividadesGrid .actividad-card .nombre{color:#f0f7ff!important}
+#actividadesGrid .actividad-card .desc{color:#b5c9db!important}
+#actividadesGrid .actividad-card .estado{color:#63edbe!important}
+/* Perfil */
+#tab-perfil .profile-section{position:relative;padding:18px!important;border-radius:16px!important;margin-bottom:14px!important}
+#tab-perfil .profile-section:nth-child(odd){border-left:4px solid var(--apx-blue)!important;background:linear-gradient(145deg,rgba(9,54,86,.82),rgba(6,13,23,.98))!important}
+#tab-perfil .profile-section:nth-child(even){border-left:4px solid var(--apx-red-bright)!important;background:linear-gradient(145deg,rgba(72,19,32,.78),rgba(7,13,23,.98))!important}
+#tab-perfil .profile-section:nth-child(3n){border-left-color:var(--apx-yellow)!important;background:linear-gradient(145deg,rgba(77,57,10,.74),rgba(8,15,23,.98))!important}
+#tab-perfil .profile-field{border-bottom-color:rgba(166,211,239,.2)!important}
+#tab-perfil .profile-field .value{color:#f0f7ff!important}
+#tab-perfil .profile-field #profileReferralCode{color:var(--apx-yellow)!important}
+#tab-perfil .profile-input-group input{background:rgba(2,9,17,.68)!important;border-color:rgba(57,199,255,.42)!important;color:#f0f7ff!important}
+#tab-perfil .profile-input-group input:focus{border-color:var(--apx-yellow)!important;box-shadow:0 0 0 3px rgba(255,212,71,.12)!important}
+#tab-perfil .withdraw-info{background:rgba(3,10,18,.72)!important;border-color:rgba(255,212,71,.35)!important;color:#bfd1e2!important}
+#tab-perfil .withdraw-info strong{color:#fff!important}
+#tab-perfil #withdrawBalance{color:var(--apx-yellow)!important}
+#tab-perfil .telegram-support-link{background:linear-gradient(135deg,rgba(9,71,111,.9),rgba(6,15,26,.96))!important;border-color:rgba(57,199,255,.52)!important;color:#ecf7ff!important}
+.bottom-nav{background:linear-gradient(100deg,rgba(3,8,15,.99),rgba(8,30,51,.98),rgba(48,10,22,.98))!important;border-top-color:rgba(255,212,71,.42)!important}
+.bottom-nav .nav-item.active,.bottom-nav .nav-item:hover{color:var(--apx-yellow)!important}
+@media(max-width:560px){#tab-perfil .profile-section{padding:16px!important}.plan-card{gap:10px!important}}
+</style><style id="apex-metallic-components-v4">
+/* COMPONENTES METÁLICOS DESTACADOS — no modifica el fondo general */
+#tab-inicio>#tareasCard{background:linear-gradient(135deg,#0a3f6b 0%,#071a2c 46%,#3b101e 100%)!important;border:1px solid #2bb7ff!important;box-shadow:0 0 0 1px rgba(227,71,82,.25),0 18px 40px rgba(0,0,0,.5)!important}
+#tab-inicio>#tareasCard>.label{color:#ffd447!important;font-size:13px!important;text-shadow:0 0 10px rgba(255,212,71,.28)!important}
+#tab-inicio>#tareasCard .progreso-container{border:1px solid rgba(255,212,71,.42)!important;background:linear-gradient(135deg,#050b13,#0d2740)!important}
+#tab-inicio>#tareasCard .progreso-texto{color:#f1f7ff!important}
+#tab-inicio>#tareasCard .progreso-llenado{background:linear-gradient(90deg,#e34752 0%,#ffd447 50%,#2bb7ff 100%)!important}
+#tareasContainer>.tarea-card{border-width:2px!important;box-shadow:inset 0 1px rgba(255,255,255,.08),0 8px 20px rgba(0,0,0,.24)!important}
+#tareasContainer>.tarea-card:nth-child(3n+1){background:linear-gradient(135deg,rgba(84,18,34,.94),rgba(13,16,28,.98))!important;border-color:#f05a62!important}
+#tareasContainer>.tarea-card:nth-child(3n+2){background:linear-gradient(135deg,rgba(83,61,10,.94),rgba(13,17,27,.98))!important;border-color:#ffd447!important}
+#tareasContainer>.tarea-card:nth-child(3n){background:linear-gradient(135deg,rgba(8,67,108,.94),rgba(9,15,28,.98))!important;border-color:#39c7ff!important}
+#tareasContainer>.tarea-card .apex-task-schedule{color:#ffd447!important}
+#tareasContainer>.tarea-card .apex-task-title,#tareasContainer>.tarea-card strong{color:#f4f8ff!important}
+#tareasContainer>.tarea-card button{border-color:rgba(255,255,255,.52)!important}
+#tareasContainer>.tarea-card:nth-child(3n+1) button{background:linear-gradient(135deg,#7c192c,#ed5863)!important}
+#tareasContainer>.tarea-card:nth-child(3n+2) button{background:linear-gradient(135deg,#9c6c0d,#ffd447)!important;color:#1c1405!important}
+#tareasContainer>.tarea-card:nth-child(3n) button{background:linear-gradient(135deg,#0a5e9d,#2bb7ff)!important}
+/* Planes */
+#planesContainer>.plan-card{min-height:118px!important;border-top-width:2px!important;border-bottom-width:2px!important}
+#planesContainer>.plan-card:nth-child(3n+1){background:linear-gradient(135deg,rgba(8,67,108,.95),rgba(7,14,25,.99))!important;border-top-color:#39c7ff!important;border-bottom-color:rgba(57,199,255,.55)!important}
+#planesContainer>.plan-card:nth-child(3n+2){background:linear-gradient(135deg,rgba(84,18,34,.95),rgba(8,14,24,.99))!important;border-top-color:#f05a62!important;border-bottom-color:rgba(240,90,98,.55)!important}
+#planesContainer>.plan-card:nth-child(3n){background:linear-gradient(135deg,rgba(85,62,9,.95),rgba(10,15,23,.99))!important;border-top-color:#ffd447!important;border-bottom-color:rgba(255,212,71,.58)!important}
+#planesContainer>.plan-card .action .price{color:#ffd447!important;text-shadow:0 0 14px rgba(255,212,71,.28)!important}
+#planesContainer>.plan-card:nth-child(3n+1) .action .price{color:#7ddcff!important}
+#planesContainer>.plan-card:nth-child(3n+2) .action .price{color:#ff8c91!important}
+/* Referidos */
+#tab-referidos>.card{background:linear-gradient(135deg,#521525 0%,#111626 42%,#073d64 100%)!important;border:2px solid #f05a62!important}
+#tab-referidos>.card>.label{color:#ffd447!important;font-size:13px!important}
+#tab-referidos .card>div[style*="background:#f8f9fa"],#tab-referidos .card>div[style*="background:#f5f5f5"]{background:linear-gradient(135deg,#092e4d,#10182a 55%,#401222)!important;border:1px solid rgba(57,199,255,.55)!important;box-shadow:inset 0 1px rgba(255,255,255,.06)!important}
+#tab-referidos .card>div[style*="background:#f5f5f5"]:first-of-type{border-color:rgba(255,212,71,.62)!important}
+#tab-referidos #referralLinkDisplay{color:#eaf7ff!important}
+#tab-referidos #totalReferidos{color:#ffd447!important}
+#tab-referidos #referidosConPlan{color:#63edbe!important}
+#tab-referidos #referidosListaContainer{border-top:1px solid rgba(240,90,98,.45)!important;padding-top:10px!important}
+/* Historial */
+#tab-historial .ganancia-stat{min-height:102px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;border-width:2px!important}
+#tab-historial .ganancias-stats .ganancia-stat:first-child{background:linear-gradient(135deg,#6b4b09,#191827 70%)!important;border-color:#ffd447!important}
+#tab-historial .ganancias-stats .ganancia-stat:last-child{background:linear-gradient(135deg,#084f80,#121827 70%)!important;border-color:#39c7ff!important}
+#tab-historial .ganancia-stat .label{color:#f0f7ff!important;font-size:11px!important}
+#tab-historial .ganancia-stat .number{font-size:27px!important}
+#tab-historial .filter-tabs .filter-btn{border-width:2px!important}
+#tab-historial .historial-item{margin:7px 0!important;padding:12px 13px!important;border:1px solid rgba(57,199,255,.28)!important;border-left:4px solid #39c7ff!important;border-radius:11px!important;background:linear-gradient(100deg,rgba(8,47,77,.8),rgba(7,14,24,.92))!important}
+#tab-historial .historial-item:nth-child(even){border-left-color:#f05a62!important;background:linear-gradient(100deg,rgba(73,17,31,.8),rgba(7,14,24,.92))!important}
+#tab-historial .historial-item .right .amount{font-weight:900!important}
+/* Actividades */
+#actividadesGrid{gap:14px!important}
+#actividadesGrid>.actividad-card{border-width:2px!important;border-top-width:5px!important;min-height:142px!important;box-shadow:inset 0 1px rgba(255,255,255,.08),0 12px 26px rgba(0,0,0,.32)!important}
+#actividadesGrid>.actividad-card:nth-child(3n+1){background:linear-gradient(145deg,#0a5b8c,#081626 66%)!important;border-color:#39c7ff!important}
+#actividadesGrid>.actividad-card:nth-child(3n+2){background:linear-gradient(145deg,#792036,#0d1524 66%)!important;border-color:#f05a62!important}
+#actividadesGrid>.actividad-card:nth-child(3n){background:linear-gradient(145deg,#86620e,#141824 66%)!important;border-color:#ffd447!important}
+#actividadesGrid>.actividad-card .icono{filter:drop-shadow(0 0 8px rgba(255,212,71,.35))!important}
+#actividadesGrid>.actividad-card .nombre{color:#fff!important;font-size:14px!important}
+#actividadesGrid>.actividad-card .desc{color:#d6e6f5!important}
+/* Perfil: los tres recuadros */
+#tab-perfil>.profile-section{border-width:2px!important;box-shadow:inset 0 1px rgba(255,255,255,.08),0 12px 28px rgba(0,0,0,.34)!important}
+#tab-perfil>.profile-section:nth-child(1){background:linear-gradient(135deg,#0b5c8c,#091626 68%)!important;border-color:#39c7ff!important}
+#tab-perfil>.profile-section:nth-child(2){background:linear-gradient(135deg,#7a1f35,#0e1524 68%)!important;border-color:#f05a62!important}
+#tab-perfil>.profile-section:nth-child(3){background:linear-gradient(135deg,#89640e,#151824 68%)!important;border-color:#ffd447!important}
+#tab-perfil>.profile-section .section-label{color:#ffd447!important;font-size:12px!important}
+#tab-perfil>.profile-section:nth-child(2) .section-label{color:#ff9da2!important}
+#tab-perfil>.profile-section:nth-child(3) .section-label{color:#fff0a1!important}
+#tab-perfil>.profile-section .profile-field .value{color:#fff!important}
+#tab-perfil>.profile-section input{background:#050c15!important;border-color:rgba(57,199,255,.7)!important}
+#tab-perfil>.profile-section:nth-child(2) input{border-color:rgba(240,90,98,.72)!important}
+#tab-perfil>.profile-section:nth-child(3) input{border-color:rgba(255,212,71,.72)!important}
+</style></body>
 </html>

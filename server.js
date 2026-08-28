@@ -948,6 +948,30 @@ app.get('/api/prizes', async (req, res) => {
 });
 
 // ============================================================
+// GUARDAR DIRECCIÓN DE RETIRO DEL USUARIO
+// ============================================================
+app.put('/api/user/withdraw-address', authenticate, async (req, res) => {
+    try {
+        const raw = String(req.body?.direccion_retiro || '').trim();
+        let address;
+        try {
+            address = getAddress(raw);
+        } catch (_) {
+            return res.status(400).json({ error: 'Dirección Polygon inválida' });
+        }
+        const result = await pool.query(
+            'UPDATE users SET direccion_retiro = $1 WHERE id = $2 RETURNING direccion_retiro',
+            [address, req.userId]
+        );
+        if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        res.json({ direccion_retiro: result.rows[0].direccion_retiro });
+    } catch (error) {
+        console.error('Error guardando dirección de retiro:', error.message);
+        res.status(500).json({ error: 'No se pudo guardar la dirección de retiro' });
+    }
+});
+
+// ============================================================
 // ACTUALIZAR DATOS DEL USUARIO (NUEVA RUTA)
 // ============================================================
 app.put('/api/user/update', async (req, res) => {
