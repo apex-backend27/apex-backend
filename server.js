@@ -821,7 +821,7 @@ app.post('/api/login', async (req, res) => {
 // ============================================================
 app.get('/api/verify', authenticate, async (req, res) => {
     try {
-        const hoyTareasLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        const hoyTareasLima = normalizarFechaLima(new Date());
         await pool.query(`UPDATE users SET tareas_completadas_hoy = '[]'::jsonb, ultima_fecha_tareas = $1, cobro_tareas_fecha = NULL, cobro_tareas_monto = 0 WHERE id = $2 AND (ultima_fecha_tareas IS NULL OR ultima_fecha_tareas <> $1)`, [hoyTareasLima, req.userId]);
         const result = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
         
@@ -965,9 +965,9 @@ app.put('/api/user/update', async (req, res) => {
         if (solicitaProgresoDiario) {
             const cfg = await pool.query('SELECT tareas_activacion, tareas_pausadas, tareas_autorizadas, tareas_dias_activos FROM configuracion WHERE id = 1');
             const cfgRow = cfg.rows[0] || {};
-            const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+            const hoyLima = normalizarFechaLima(new Date());
             const valorActivacion = cfgRow.tareas_activacion;
-            const fechaActivacion = valorActivacion ? (String(valorActivacion).match(/^\\d{4}-\\d{2}-\\d{2}$/) ? String(valorActivacion).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(valorActivacion))) : null;
+            const fechaActivacion = valorActivacion ? (String(valorActivacion).match(/^\\d{4}-\\d{2}-\\d{2}$/) ? String(valorActivacion).slice(0, 10) : normalizarFechaLima(new Date(valorActivacion))) : null;
             const diaAutorizado = cfgRow.tareas_pausadas !== true && normalizarDiasActivos(cfgRow.tareas_dias_activos).includes(obtenerDiaSemanaLima());
             if (!diaAutorizado) {
                 delete updates.tareas_completadas_hoy;
@@ -1082,7 +1082,7 @@ app.put('/api/user/tasks/progress', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const hoyLima = normalizarFechaLima(new Date());
         const cfg = await client.query('SELECT tareas_pausadas, tareas_dias_activos FROM configuracion WHERE id = 1');
         const cfgRow = cfg.rows[0] || {};
         const diaHabilitado = cfgRow.tareas_pausadas !== true && normalizarDiasActivos(cfgRow.tareas_dias_activos).includes(obtenerDiaSemanaLima());
@@ -1246,8 +1246,8 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE, ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
         const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, tareas_dias_activos, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
-        const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
-        const fechaActivacion = row.tareas_activacion_dia ? String(row.tareas_activacion_dia).slice(0, 10) : (row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}/) ? String(row.tareas_activacion).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(row.tareas_activacion))) : null);
+        const hoyLima = normalizarFechaLima(new Date());
+        const fechaActivacion = row.tareas_activacion_dia ? String(row.tareas_activacion_dia).slice(0, 10) : (row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}/) ? String(row.tareas_activacion).slice(0, 10) : normalizarFechaLima(new Date(row.tareas_activacion))) : null);
         const pausadas = row.tareas_pausadas === true;
         const autorizacionExplicita = row.tareas_autorizadas === true;
         const diasActivos = normalizarDiasActivos(row.tareas_dias_activos);
@@ -1291,10 +1291,10 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
 app.post('/api/admin/tasks/activate', authenticate, isAdmin, async (req, res) => {
     try {
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE`);
-        const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        const hoyLima = normalizarFechaLima(new Date());
         const previo = await pool.query('SELECT tareas_activacion, tareas_activacion_dia FROM configuracion WHERE id = 1');
         const valorPrevio = previo.rows[0]?.tareas_activacion;
-        const fechaPrevia = previo.rows[0]?.tareas_activacion_dia ? String(previo.rows[0].tareas_activacion_dia).slice(0, 10) : (valorPrevio ? (String(valorPrevio).match(/^\d{4}-\d{2}-\d{2}/) ? String(valorPrevio).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(valorPrevio))) : null);
+        const fechaPrevia = previo.rows[0]?.tareas_activacion_dia ? String(previo.rows[0].tareas_activacion_dia).slice(0, 10) : (valorPrevio ? (String(valorPrevio).match(/^\d{4}-\d{2}-\d{2}/) ? String(valorPrevio).slice(0, 10) : normalizarFechaLima(new Date(valorPrevio))) : null);
         const r = await pool.query(`UPDATE configuracion SET tareas_activacion = NOW(), tareas_activacion_dia = $1::date, tareas_pausadas = FALSE, tareas_autorizadas = TRUE, updated_at = NOW() WHERE id = 1 RETURNING tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas`, [hoyLima]);
         if (fechaPrevia !== hoyLima) {
             await pool.query(`UPDATE users SET tareas_completadas_hoy = '[]'::jsonb, ultima_fecha_tareas = $1, cobro_tareas_fecha = NULL, cobro_tareas_monto = 0`, [hoyLima]);
@@ -1400,9 +1400,9 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const u = result.rows[0];
         await client.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00', ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
         const cfgResult = await client.query('SELECT tareas_pausadas, tareas_activacion, tareas_activacion_dia, tareas_autorizadas, tareas_dias_activos, hora_cobro FROM configuracion WHERE id = 1');
-        const hoyLima = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        const hoyLima = normalizarFechaLima(new Date());
         const fechaValor = cfgResult.rows[0]?.tareas_activacion;
-        const fechaActivacion = fechaValor ? (String(fechaValor).match(/^\d{4}-\d{2}-\d{2}$/) ? String(fechaValor).slice(0, 10) : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date(fechaValor))) : null;
+        const fechaActivacion = fechaValor ? (String(fechaValor).match(/^\d{4}-\d{2}-\d{2}$/) ? String(fechaValor).slice(0, 10) : normalizarFechaLima(new Date(fechaValor))) : null;
         const horaCobro = String(cfgResult.rows[0]?.hora_cobro || '20:00');
         const [hCobro, mCobro] = horaCobro.split(':').map(Number);
         const partesHora = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).split(':').map(Number);
@@ -1417,7 +1417,7 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(423).json({ error: cfgResult.rows[0]?.tareas_pausadas === true ? 'Las tareas están pausadas por el administrador' : 'Las tareas no están habilitadas hoy según el calendario' });
         }
-        const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima' }).format(new Date());
+        const hoy = normalizarFechaLima(new Date());
         if (u.cobro_tareas_fecha && String(u.cobro_tareas_fecha).slice(0, 10) === hoy) {
             await client.query('ROLLBACK');
             return res.status(409).json({ error: 'El cobro de hoy ya fue realizado' });

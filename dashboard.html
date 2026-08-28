@@ -916,6 +916,30 @@ function verificarToken(token) {
 }
 
 // ============================================================
+// NORMALIZACIÓN DEL PROGRESO DIARIO
+// ============================================================
+function apexFechaLima(valor) {
+    if (!valor) return '';
+    var texto = String(valor);
+    var iso = texto.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    var fecha = new Date(valor);
+    if (Number.isNaN(fecha.getTime())) return '';
+    var partes = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(fecha);
+    var salida = {};
+    partes.forEach(function(parte) { if (parte.type !== 'literal') salida[parte.type] = parte.value; });
+    return salida.year && salida.month && salida.day ? salida.year + '-' + salida.month + '-' + salida.day : '';
+}
+function apexListaTareasCompletadas(valor) {
+    var lista = valor;
+    if (typeof lista === 'string') {
+        try { lista = JSON.parse(lista); } catch (_) { lista = []; }
+    }
+    if (!Array.isArray(lista)) return [];
+    return [...new Set(lista.map(Number).filter(function(n) { return Number.isInteger(n) && n >= 0 && n < 5; }))].sort(function(a, b) { return a - b; });
+}
+
+// ============================================================
 // CARGAR USUARIO
 // ============================================================
 function cargarUsuario(dataUser) {
@@ -936,7 +960,6 @@ function cargarUsuario(dataUser) {
         codigo_referido: dataUser.codigo_referido || 'APEX000',
         polygon_address: dataUser.polygon_address || generarDireccionPolygon(),
         direccion_retiro: dataUser.direccion_retiro || null,
-        password_retiro: dataUser.password_retiro || '000000',
         referidos: dataUser.referidos || { izquierda: null, derecha: null, lista: [] },
         fechas_invito: dataUser.fechas_invito || { primero: null, segundo: null, fechaRegistro: new Date().toISOString(), fechaPrimerPlan: null },
         verificado: dataUser.verificado || { izquierdaCompleto: false, derechaCompleto: false, puedeUsarCodigo: true },
@@ -961,8 +984,8 @@ function cargarUsuario(dataUser) {
         descuentoRetiroActivo: dataUser.descuentoRetiroActivo || null,
         bonusReferidoActivo: dataUser.bonusReferidoActivo || null,
         fecha_registro: dataUser.fecha_registro || new Date().toISOString(),
-        tareas_completadas_hoy: dataUser.tareas_completadas_hoy || [],
-        ultima_fecha_tareas: dataUser.ultima_fecha_tareas || null,
+        tareas_completadas_hoy: apexListaTareasCompletadas(dataUser.tareas_completadas_hoy),
+        ultima_fecha_tareas: apexFechaLima(dataUser.ultima_fecha_tareas) || null,
         racha_dias: dataUser.racha_dias || 0,
         daily_earnings: dataUser.daily_earnings || 0,
         nivel_autorizado: Number(dataUser.nivel_autorizado || 0),
@@ -980,8 +1003,8 @@ function cargarUsuario(dataUser) {
 // ============================================================
 function verificarNuevoDia() {
     if (!user) return;
-    var hoy = new Date().toDateString();
-    var ultimaFecha = user.ultima_fecha_tareas || '';
+    var hoy = apexFechaLima(new Date());
+    var ultimaFecha = apexFechaLima(user.ultima_fecha_tareas);
 
     if (hoy !== ultimaFecha) {
         var completadasAyer = user.tareas_completadas_hoy || [];
@@ -1215,7 +1238,7 @@ function apexEstadoDiaAutorizado(data) {
     var hoy = String(data.hoy || '').slice(0, 10);
     var diaActivacion = String(data.fechaDia || data.fecha || '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(hoy)) {
-        hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        hoy = apexFechaLima(new Date());
     }
     // La fecha de activación de hoy y la ausencia de pausa son la fuente estable.
     // `autorizadas` es un campo antiguo que puede quedar FALSE después de pausar.
@@ -1440,7 +1463,7 @@ function completarTareaDiaria(index) {
         return;
     }
 
-    var hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    var hoy = apexFechaLima(new Date());
     var completadas = completadasAntes.concat(index);
     user.tareas_completadas_hoy = completadas;
     user.ultima_fecha_tareas = hoy;
@@ -2419,7 +2442,10 @@ function cargarConfiguracionTareasRemota(){var tok=localStorage.getItem('apex_to
       var x=await r.json();
       if(!r.ok||!x.user) throw Error(x.error||'No se pudo verificar el usuario');
       if (apexGuardandoProgresoTareas) return;
-      user=Object.assign(user||{},x.user);
+      var remoto = Object.assign({}, x.user);
+      if (Object.prototype.hasOwnProperty.call(remoto, 'tareas_completadas_hoy')) remoto.tareas_completadas_hoy = apexListaTareasCompletadas(remoto.tareas_completadas_hoy);
+      if (Object.prototype.hasOwnProperty.call(remoto, 'ultima_fecha_tareas')) remoto.ultima_fecha_tareas = apexFechaLima(remoto.ultima_fecha_tareas) || null;
+      user=Object.assign(user||{},remoto);
       localStorage.setItem('apex_user',JSON.stringify(user));
       sessionStorage.setItem('apex_user',JSON.stringify(user));
       if(typeof renderDashboard==='function') renderDashboard();
