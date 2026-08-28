@@ -1450,8 +1450,6 @@ function completarTareaDiaria(index) {
 
     renderTareas();
     renderDashboard();
-    showAlert(completadasCount === 5 ? '🎉 ¡Completaste todas las tareas de hoy!' : '✅ Tarea completada', 'success');
-
     guardarProgresoTareasRemoto(completadas, hoy, user.racha_dias || 0).then(function() {
         showAlert(completadasCount === 5 ? '🎉 ¡Completaste todas las tareas de hoy!' : '✅ Tarea completada', 'success');
     }).catch(function(error) {
