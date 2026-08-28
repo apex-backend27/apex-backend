@@ -772,7 +772,10 @@ function publicUserData(row, referidosOverride) {
     [
         'password', 'password_hash', 'password_retiro', 'password_retiro_hash',
         'private_key', 'privateKey', 'mnemonic', 'seed', 'secret',
-        'jwt_secret', 'database_url', 'alchemy_api_key', 'wallet_index'
+        'jwt_secret', 'database_url', 'alchemy_api_key', 'wallet_index',
+        // Nunca se envían al navegador: son premios internos configurados por el administrador.
+        'premio_ruleta', 'premio_cofre', 'premio_dados',
+        'juegos_config', 'premios', 'resultado_dado', 'numero_dado'
     ].forEach(field => { delete safe[field]; });
     return {
         ...safe,
@@ -797,7 +800,11 @@ function publicUserData(row, referidosOverride) {
         referidos: referidosOverride || safe.referidos || { izquierda: null, derecha: null, lista: [] },
         es_admin: flagTrue(safe.es_admin),
         es_super_admin: flagTrue(safe.es_super_admin),
-        admin_active: flagActive(safe.admin_active)
+        admin_active: flagActive(safe.admin_active),
+        // Solo se conservan los usos disponibles; el valor del premio se resuelve al consumirlo.
+        ruleta_usos: Number(safe.ruleta_usos || 0),
+        cofres_usos: Number(safe.cofres_usos || 0),
+        dados_usos: Number(safe.dados_usos || 0)
     };
 }
 // ============================================================
@@ -1228,7 +1235,9 @@ app.get('/api/games/config', authenticate, async (req, res) => {
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS juegos_config JSONB DEFAULT '{}'::jsonb`);
         const r = await pool.query('SELECT juegos_config FROM configuracion WHERE id = 1');
         const cfg = (r.rows[0] && r.rows[0].juegos_config) || {};
-        res.json({ ruleta: cfg.ruleta || { premios: [10,15,20,30,50,0] }, cofres: cfg.cofres || { premios: [5,8,10,12,15,20,25,30,50] }, dados: cfg.dados || { premios: [5,10,15,20,25,30] } });
+        // No enviar premios ni resultados configurados al frontend.
+        // La acreditación se resuelve de forma atómica en /api/user/game/prize.
+        res.json({ juegosDisponibles: ['ruleta', 'cofres', 'dados'] });
     } catch (e) { console.error('Error config juegos:', e); res.status(500).json({error:'Error obteniendo premios'}); }
 });
 app.put('/api/admin/games/config', authenticate, isAdmin, async (req, res) => {
