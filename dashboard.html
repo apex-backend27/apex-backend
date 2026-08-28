@@ -635,7 +635,7 @@ function inicializarTareasPorDefecto() {
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
-var STORAGE_KEY = 'apex_users';
+var STORAGE_KEY = 'apex_dashboard_user';
 var REMEMBER_KEY = 'apex_remember';
 var PREMIOS_RULETA_KEY = 'apex_premios_ruleta';
 var PREMIOS_COFRES_KEY = 'apex_premios_cofres';
@@ -722,15 +722,17 @@ function formatDateTime(d) {
 }
 
 function getUsers() {
-    try {
-        var data = localStorage.getItem(STORAGE_KEY);
-        if (data) return JSON.parse(data);
-    } catch(e) {}
-    return [];
+    if (!user) return [];
+    return [user];
 }
 
 function saveUsers(users) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+    var current = Array.isArray(users) ? users.find(function(item) { return item && user && String(item.id) === String(user.id); }) : null;
+    if (current) {
+        user = Object.assign(user, current);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    }
 }
 
 function getPremiosRuleta() {

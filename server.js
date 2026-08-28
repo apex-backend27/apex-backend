@@ -939,26 +939,22 @@ app.post('/api/me/deposits/sync', authenticate, async (req, res) => {
   }
 });
 
-app.get('/api/user/:id', async (req, res) => {
+app.get('/api/user/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     if (!/^\d+$/.test(String(id))) {
       return res.status(404).json({ error: 'Ruta de usuario no válida' });
     }
-    
-    const result = await pool.query(
-      'SELECT id, telefono, nombre, apellido, es_admin, codigo_referido, polygon_address, balance, puntos, plan FROM users WHERE id = $1',
-      [id]
-    );
-    
+    if (String(req.userId) !== String(id)) {
+      return res.status(403).json({ error: 'No tienes permiso para consultar esta cuenta' });
+    }
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    
-    res.json(result.rows[0]);
-    
+    res.json(publicUserData(result.rows[0]));
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error en consulta de usuario:', error);
     res.status(500).json({ error: 'Error en el servidor' });
   }
 });
