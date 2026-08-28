@@ -1940,7 +1940,9 @@ app.post('/api/admin/user/:id/points', authenticate, isAdmin, async (req, res) =
 app.post('/api/user/withdraw', authenticate, async (req, res) => {
     const { amount, password, address } = req.body || {};
     const value = Number(amount);
+    const withdrawalPassword = String(password ?? '').trim();
     if (!Number.isFinite(value) || value <= 0) return res.status(400).json({error:'El monto debe ser mayor que cero'});
+    if (!/^[0-9]{6}$/.test(withdrawalPassword)) return res.status(400).json({error:'La contraseña de retiro debe contener exactamente 6 dígitos'});
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -1958,7 +1960,7 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
             return res.status(409).json({error:'Ya tienes un retiro pendiente. Podrás solicitar otro cuando el administrador lo apruebe o lo rechace.'});
         }
         const stored=u.password_retiro_hash || u.password_retiro;
-        const valid=stored ? (String(stored).startsWith('$2') ? await bcrypt.compare(String(password||''),String(stored)) : String(password||'')===String(stored)) : false;
+        const valid=stored ? (String(stored).startsWith('$2') ? await bcrypt.compare(withdrawalPassword,String(stored)) : withdrawalPassword===String(stored).trim()) : false;
         if (!valid) { await client.query('ROLLBACK'); return res.status(401).json({error:'Contraseña incorrecta'}); }
         const configResult = await client.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
         const config = configResult.rows[0] || {};

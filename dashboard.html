@@ -2315,7 +2315,7 @@ function apexWithdrawalConfirmDialog(amount, commissionRate){
     function close(result){modal.remove();resolve(result);}
     modal.querySelector('.modal-close').onclick=function(){close(null)};
     modal.querySelector('#apexWithdrawalCancel').onclick=function(){close(null)};
-    modal.querySelector('#apexWithdrawalConfirm').onclick=function(){var value=String(password.value||'').trim();if(!/^\\d{6}$/.test(value)){error.textContent='La contraseña debe contener exactamente 6 dígitos.';password.focus();return;}close({password:value,fee:fee,net:net});};
+    modal.querySelector('#apexWithdrawalConfirm').onclick=function(){var value=String(password.value||'').trim();if(!/^[0-9]{6}$/.test(value)){error.textContent='La contraseña debe contener exactamente 6 dígitos.';password.focus();return;}close({password:value,fee:fee,net:net});};
     password.focus();
   });
 }
