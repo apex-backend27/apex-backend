@@ -505,7 +505,7 @@ html{background:var(--mx-bg)!important}body{background:radial-gradient(circle at
                     <div style="font-size:13px; color:#26354d; font-weight:700; margin-bottom:6px;">🔗 Tu Link de Referido</div>
                     <div style="font-size:12px;color:#2f4563;margin-bottom:8px;">Código: <strong id="referralCodeVisible">APEX000</strong></div>
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                    <span style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;" id="referralLinkDisplay">https://apex-frontend-b803.onrender.com/index.html?ref=APEX000</span>
+                    <span style="flex:1; font-size:13px; color:#000; font-family:monospace; word-break:break-all;" id="referralLinkDisplay">https://myapex.vip/?ref=APEX000</span>
                     <button onclick="copyReferralLink()" style="background:#000; color:#fff; border:none; padding:6px 14px; border-radius:8px; font-size:11px; font-weight:600; cursor:pointer;">📋 Copiar</button>
                 </div>
             </div>
@@ -1700,9 +1700,9 @@ function renderTree() {
     }
 
     var html = '';
-    var baseUrl = window.location.origin + window.location.pathname.replace('dashboard.html', '');
-        var codigoCanonico = String(user.codigo_referido || '').trim().toUpperCase() || 'APEX000';
-    var referralLink = baseUrl + 'index.html?ref=' + encodeURIComponent(codigoCanonico);
+    var baseUrl = window.location.origin + '/';
+    var codigoCanonico = String(user.codigo_referido || '').trim().toUpperCase() || 'APEX000';
+    var referralLink = baseUrl + '?ref=' + encodeURIComponent(codigoCanonico);
     var linkDisplay = document.getElementById('referralLinkDisplay');
     if (linkDisplay) linkDisplay.textContent = referralLink;
     var codeDisplay = document.getElementById('referralCodeVisible');

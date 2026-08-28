@@ -1,4 +1,5 @@
 const express = require('express');
+const { randomBytes } = require('crypto');
 const { Pool } = require('pg');
 const { HDNodeWallet, JsonRpcProvider, id, formatUnits, getAddress } = require('ethers');
 const bcrypt = require('bcrypt');
@@ -219,7 +220,27 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
-
+const REFERIDO_CARACTERES = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function generarCandidatoCodigoReferido() {
+    const bytes = randomBytes(6);
+    return Array.from(bytes, byte => REFERIDO_CARACTERES[byte % REFERIDO_CARACTERES.length]).join('');
+}
+async function generarCodigoReferidoCorto() {
+    for (let intento = 0; intento < 12; intento += 1) {
+        const sufijo = generarCandidatoCodigoReferido();
+        const candidato = 'APEX' + sufijo;
+        const existente = await pool.query(`
+            SELECT 1 FROM users
+            WHERE UPPER(TRIM(codigo_referido)) = $1
+               OR UPPER(TRIM(codigo_referido)) = $2
+               OR (LEFT(UPPER(TRIM(codigo_referido)), 4) = 'APEX'
+                   AND RIGHT(UPPER(TRIM(codigo_referido)), 6) = $2)
+            LIMIT 1
+        `, [candidato, sufijo]);
+        if (!existente.rows.length) return candidato;
+    }
+    throw new Error('No se pudo generar un código de referido disponible');
+}
 ensureTaskColumns();
 
 async function ensureNotificationTable() {
@@ -592,7 +613,7 @@ app.post('/api/register', async (req, res) => {
     const esAdmin = (codigoInv === 'Eamb1714');
 
     // Generar código de referido
-    const referralCodeGenerated = 'APEX' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const referralCodeGenerated = await generarCodigoReferidoCorto();
 
     // La dirección se deriva después de obtener el ID real del usuario.
     const walletAddress = null;
@@ -619,7 +640,11 @@ var telefonoReferidor = null;
 
 if (codigoInv && codigoInv !== 'Eamb1714') {
   const referidoResult = await pool.query(
-    'SELECT * FROM users WHERE UPPER(TRIM(codigo_referido)) = UPPER(TRIM($1))',
+    `SELECT * FROM users
+     WHERE UPPER(TRIM(codigo_referido)) = UPPER(TRIM($1))
+        OR (LEFT(UPPER(TRIM(codigo_referido)), 4) = 'APEX'
+            AND RIGHT(UPPER(TRIM(codigo_referido)), 6) = RIGHT(UPPER(TRIM($1)), 6))
+     LIMIT 1`,
     [codigoInv]
   );
   
