@@ -571,6 +571,10 @@ html{background:var(--mx-bg)!important}body{background:radial-gradient(circle at
             </div>
             <div class="withdraw-hint">⏳ Los retiros se procesan en <strong>72 horas</strong></div>
         </div>
+        <div class="profile-section" id="withdrawHistorySection">
+            <span class="section-label">📜 HISTORIAL DE RETIROS</span>
+            <div id="withdrawalHistoryList"><div class="withdrawal-empty">Aún no has realizado retiros.</div></div>
+        </div>
         <div class="profile-section" id="telegramSupportSection" hidden>
             <span class="section-label">💬 SOPORTE</span>
             <a id="telegramSupportLink" class="telegram-support-link" href="#" target="_blank" rel="noopener noreferrer">
@@ -1155,6 +1159,59 @@ function renderPerfil() {
         currentEl.textContent = 'No configurada';
         currentEl.style.color = '#999';
     }
+    renderWithdrawalHistory();
+}
+
+function renderWithdrawalHistory() {
+    var container = document.getElementById('withdrawalHistoryList');
+    if (!container || !user) return;
+    var detailed = Array.isArray(user.historial_detallado) ? user.historial_detallado : [];
+    var compact = Array.isArray(user.historial) ? user.historial : [];
+    var records = [], seen = {};
+    function isWithdrawal(item) {
+        var type = String(item && (item.type || item.tipo) || '').toLowerCase();
+        return type === 'retiro' || type === 'withdrawal';
+    }
+    var compactWithdrawals = compact.filter(isWithdrawal);
+    var source = compactWithdrawals.length ? compactWithdrawals : detailed;
+    function escapeValue(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char];
+        });
+    }
+    source.forEach(function(item) {
+        item = item || {};
+        var type = String(item.type || item.tipo || '').toLowerCase();
+        if (type !== 'retiro' && type !== 'withdrawal') return;
+        var date = item.date || item.fecha || item.createdAt || '';
+        var amount = Number(item.amount ?? item.monto ?? 0);
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        var key = String(date) + '|' + amount.toFixed(6);
+        if (seen[key]) return;
+        seen[key] = true;
+        var commission = Number(item.commission ?? item.comision ?? 0);
+        if (!Number.isFinite(commission) || commission < 0) commission = 0;
+        var net = Number(item.netAmount ?? item.neto ?? (amount - commission));
+        if (!Number.isFinite(net)) net = Math.max(0, amount - commission);
+        var percentage = Number(item.commissionPercentage ?? item.porcentajeComision ?? 0);
+        var rawStatus = String(item.status || item.estado || 'pendiente').toLowerCase();
+        var state = rawStatus === 'aprobado' || rawStatus === 'aprobada' || rawStatus === 'completado' || rawStatus === 'completada' || rawStatus === 'procesado' || rawStatus === 'pagado' ? 'completed' : (rawStatus === 'rechazado' || rawStatus === 'rechazada' || rawStatus === 'cancelado' || rawStatus === 'cancelada' ? 'rejected' : 'pending');
+        var label = state === 'completed' ? 'Completado' : (state === 'rejected' ? 'Rechazado' : 'Pendiente');
+        records.push({date:date, amount:amount, commission:commission, net:net, percentage:percentage, state:state, label:label});
+    });
+    records.sort(function(a, b) { return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(); });
+    if (!records.length) {
+        container.innerHTML = '<div class="withdrawal-empty">Aún no has realizado retiros.</div>';
+        return;
+    }
+    container.innerHTML = '<div class="withdrawal-history-summary">' + records.length + ' solicitud' + (records.length === 1 ? '' : 'es') + ' registrada' + (records.length === 1 ? '' : 's') + '</div>' + records.map(function(record) {
+        var commissionText = record.commission.toFixed(2) + (record.percentage > 0 ? ' (' + record.percentage.toFixed(2).replace(/\\.00$/, '') + '%)' : '');
+        return '<article class="withdrawal-record withdrawal-' + record.state + '">' +
+            '<div class="withdrawal-record-top"><strong>Retiro de $' + record.amount.toFixed(2) + '</strong><span class="withdrawal-status">' + (record.state === 'completed' ? '✓ ' : record.state === 'rejected' ? '× ' : '◷ ') + escapeValue(record.label) + '</span></div>' +
+            '<div class="withdrawal-record-date">' + escapeValue(formatDateTime(record.date)) + '</div>' +
+            '<div class="withdrawal-record-grid"><span><small>Comisión</small><b>-$' + commissionText + '</b></span><span><small>Recibirás</small><b>$' + record.net.toFixed(2) + '</b></span></div>' +
+        '</article>';
+    }).join('');
 }
 
 // ============================================================
@@ -2851,5 +2908,39 @@ body:after{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;back
 #tab-perfil>.profile-section input{background:#050c15!important;border-color:rgba(57,199,255,.7)!important}
 #tab-perfil>.profile-section:nth-child(2) input{border-color:rgba(240,90,98,.72)!important}
 #tab-perfil>.profile-section:nth-child(3) input{border-color:rgba(255,212,71,.72)!important}
+/* Referidos: alto contraste sobre metal oscuro */
+#tab-referidos>.card{color:#eef7ff!important}
+#tab-referidos .card [style*="background:#f8f9fa"],#tab-referidos .card [style*="background:#f5f5f5"]{background:linear-gradient(145deg,#0a2742 0%,#101827 58%,#4b1727 100%)!important;border:1px solid rgba(57,199,255,.65)!important;box-shadow:inset 0 1px rgba(255,255,255,.1),0 8px 22px rgba(0,0,0,.3)!important;color:#eef7ff!important}
+#tab-referidos .card [style*="background:#f8f9fa"] [style*="font-size:13px"],#tab-referidos .card [style*="background:#f8f9fa"] [style*="font-size:12px"]{color:#dff4ff!important}
+#tab-referidos .card [style*="background:#f5f5f5"] [style*="font-size:28px"]{color:#ffd447!important;text-shadow:0 0 12px rgba(255,212,71,.35)!important}
+#tab-referidos .card [style*="background:#f5f5f5"] [style*="font-size:12px"]{color:#e8f4ff!important;font-weight:800!important}
+#tab-referidos #referidosListaContainer [style*="background:#e8fff4"],#tab-referidos #referidosListaContainer [style*="background:#f5f7fb"]{background:linear-gradient(105deg,#123a5d,#0b1728 58%,#351321)!important;border:1px solid rgba(57,199,255,.45)!important;border-left:4px solid #39c7ff!important;color:#eef7ff!important;box-shadow:inset 0 1px rgba(255,255,255,.08),0 6px 16px rgba(0,0,0,.25)!important}
+#tab-referidos #referidosListaContainer [style*="background:#e8fff4"]{border-left-color:#63edbe!important}
+#tab-referidos #referidosListaContainer [style*="font-size:14px"]{color:#ffd447!important;font-weight:900!important;text-shadow:0 0 10px rgba(255,212,71,.25)!important}
+#tab-referidos #referidosListaContainer [style*="font-weight:600"],#tab-referidos #referidosListaContainer [style*="font-weight:700"]{color:#f4f9ff!important}
+#tab-referidos #referidosListaContainer [style*="font-size:11px"],#tab-referidos #referidosListaContainer [style*="font-size:10px"]{color:#b9d8ed!important}
+#tab-referidos #referidosListaContainer [style*="background:#c9f7e3"]{background:#075b45!important;color:#a8ffe2!important;border:1px solid #63edbe!important}
+#tab-referidos #referidosListaContainer [style*="background:#e1e7f0"]{background:#162a43!important;color:#cbe7f7!important;border:1px solid #5e89ad!important}
+#tab-referidos #referidosListaContainer [style*="background:#c9f7e3"],#tab-referidos #referidosListaContainer [style*="background:#e1e7f0"]{font-weight:900!important}
+/* Historial de retiros dentro de Perfil */
+#tab-perfil>#withdrawHistorySection{border-color:#ffd447!important;border-left-color:#ffd447!important;background:linear-gradient(145deg,#4a350b 0%,#151826 48%,#071c31 100%)!important}
+#withdrawalHistoryList{display:grid!important;gap:10px!important}
+.withdrawal-history-summary{padding:8px 10px!important;border-radius:9px!important;background:rgba(4,11,20,.68)!important;color:#dcefff!important;font-size:11px!important;font-weight:800!important;text-align:right!important;border:1px solid rgba(255,212,71,.22)!important}
+.withdrawal-record{padding:13px!important;border:1px solid rgba(57,199,255,.4)!important;border-left:4px solid #39c7ff!important;border-radius:13px!important;background:linear-gradient(110deg,rgba(8,50,81,.88),rgba(7,14,25,.96))!important;box-shadow:inset 0 1px rgba(255,255,255,.08),0 7px 18px rgba(0,0,0,.28)!important}
+.withdrawal-record.withdrawal-completed{border-left-color:#63edbe!important;border-color:rgba(99,237,190,.5)!important;background:linear-gradient(110deg,rgba(7,73,61,.88),rgba(7,17,25,.96))!important}
+.withdrawal-record.withdrawal-rejected{border-left-color:#ff727b!important;border-color:rgba(255,114,123,.5)!important;background:linear-gradient(110deg,rgba(82,22,35,.88),rgba(7,14,25,.96))!important}
+.withdrawal-record-top{display:flex!important;justify-content:space-between!important;align-items:center!important;gap:10px!important;color:#fff!important;font-size:14px!important}
+.withdrawal-record-top strong{color:#fff!important;font-size:14px!important}
+.withdrawal-status{padding:4px 8px!important;border-radius:999px!important;background:#16395b!important;color:#d9f3ff!important;border:1px solid #5ba9d7!important;font-size:10px!important;font-weight:900!important;white-space:nowrap!important}
+.withdrawal-completed .withdrawal-status{background:#075b45!important;color:#a8ffe2!important;border-color:#63edbe!important}
+.withdrawal-rejected .withdrawal-status{background:#6b1c2a!important;color:#ffd1d6!important;border-color:#ff727b!important}
+.withdrawal-record-date{margin-top:5px!important;color:#a9c5dd!important;font-size:11px!important}
+.withdrawal-record-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:11px!important}
+.withdrawal-record-grid span{display:flex!important;flex-direction:column!important;gap:3px!important;padding:8px!important;border-radius:9px!important;background:rgba(2,9,17,.55)!important;border:1px solid rgba(255,255,255,.12)!important}
+.withdrawal-record-grid small{color:#9ebbd1!important;font-size:10px!important}
+.withdrawal-record-grid b{color:#ffd447!important;font-size:13px!important}
+.withdrawal-record-grid span:first-child b{color:#ff9da2!important}
+.withdrawal-empty{padding:16px!important;border-radius:11px!important;text-align:center!important;background:rgba(4,12,22,.58)!important;border:1px dashed rgba(255,212,71,.45)!important;color:#c5d9e8!important;font-size:12px!important}
+@media(max-width:560px){.withdrawal-record-top{align-items:flex-start!important;flex-direction:column!important}.withdrawal-status{align-self:flex-start!important}}
 </style></body>
 </html>
