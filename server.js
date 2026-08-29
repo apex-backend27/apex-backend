@@ -590,8 +590,8 @@ app.post('/api/register', async (req, res) => {
     const { telefono, nombre, apellido, password, passRetiro, codigoInv } = req.body;
     
     // Validaciones
-    if (!telefono || !nombre || !apellido || !password || !passRetiro) {
-      return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+    if (!telefono || !nombre || !apellido || !password || !passRetiro || !String(codigoInv || '').trim()) {
+      return res.status(400).json({ error: 'Todos los campos y un código de referido válido son obligatorios' });
     }
     if (password.length < 6) {
       return res.status(400).json({ error: 'La contraseña debe tener mínimo 6 caracteres' });
@@ -609,8 +609,8 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ error: '⚠️ Este teléfono ya está registrado' });
     }
 
-    // Determinar si es administrador
-    const esAdmin = (codigoInv === 'Eamb1714');
+    // Los registros normales nunca reciben permisos administrativos.
+    const esAdmin = false;
 
     // Generar código de referido
     const referralCodeGenerated = await generarCodigoReferidoCorto();
@@ -638,7 +638,7 @@ let fechasInvito = {
 };
 var telefonoReferidor = null;
 
-if (codigoInv && codigoInv !== 'Eamb1714') {
+if (String(codigoInv || '').trim()) {
   const referidoResult = await pool.query(
     `SELECT * FROM users
      WHERE UPPER(TRIM(codigo_referido)) = UPPER(TRIM($1))
@@ -648,6 +648,10 @@ if (codigoInv && codigoInv !== 'Eamb1714') {
     [codigoInv]
   );
   
+  if (referidoResult.rows.length === 0) {
+    return res.status(400).json({ error: 'El código de referido no es válido' });
+  }
+
   if (referidoResult.rows.length > 0) {
     const referido = referidoResult.rows[0];
     telefonoReferidor = referido.telefono;
