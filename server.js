@@ -1256,7 +1256,8 @@ app.put('/api/admin/games/config', authenticate, isAdmin, async (req, res) => {
 // ============================================================
 // BIBLIOTECA DE 500 MINI JUEGOS / 100 PAQUETES DIARIOS
 // ============================================================
-const MINI_GAME_TYPES = ['captcha','sequence','target','reaction','pair','count','oddone','order','color','math','pattern','memorypos','tap','safe','connect','quiz','compare','slider','sort','chase'];
+// Mecánicas actualmente renderizadas y validadas por el dashboard. Cada paquete usa las cinco, con 100 variantes de contenido para evitar fallback y repeticiones aparentes.
+const MINI_GAME_TYPES = ['captcha','sequence','target','reaction','pair'];
 const MINI_GAME_ICONS = ['🚀','💎','⚡','🌟','🎯','🪙','🧠','🏆','🔷','🛡️','🔢','🔍','📈','🎨','🧩','🧭','🔗','❓','⚖️','🎚️'];
 function construirBibliotecaMiniJuegos(){
     const lista=[];
@@ -1274,6 +1275,30 @@ function construirPaquetesMiniJuegos(){
     return paquetes;
 }
 
+function construirTareasDePaquete(paquete, base){
+    return paquete.juegos.map((j,i)=>Object.assign({},base[i]||{},j,{id:'tarea_'+(i+1),nombre:j.nombre,descripcion:j.descripcion,tipo_interactivo:j.tipo_interactivo,icono:j.icono,activo:true}));
+}
+
+async function avanzarPaqueteAutomaticoSiCorresponde(row, hoyLima, diaHabilitadoHoy){
+    const activo=row && row.minijuegos_activo && typeof row.minijuegos_activo==='object' ? row.minijuegos_activo : {};
+    if (diaHabilitadoHoy!==true || activo.activo!==true || activo.automatico===false || activo.fecha===hoyLima) return row;
+    const paquetes=construirPaquetesMiniJuegos();
+    const actualId=Math.max(1,Math.min(100,Number(activo.paqueteId)||1));
+    const siguienteId=actualId>=100?1:actualId+1;
+    const paquete=paquetes[siguienteId-1];
+    const baseResult=await pool.query('SELECT tareas_config FROM configuracion WHERE id=1');
+    const base=Array.isArray(baseResult.rows[0]&&baseResult.rows[0].tareas_config)?baseResult.rows[0].tareas_config:[];
+    const tareas=construirTareasDePaquete(paquete,base);
+    const payload={activo:true,automatico:true,paqueteId:siguienteId,fecha:hoyLima,tareas,rotacionAnterior:actualId};
+    const updated=await pool.query(`UPDATE configuracion SET minijuegos_activo=$1,tareas_config=$2,tareas_activacion=NOW(),tareas_activacion_dia=$3::date,tareas_pausadas=FALSE,tareas_autorizadas=TRUE,updated_at=NOW() WHERE id=1 AND minijuegos_activo->>'fecha'=$4 RETURNING minijuegos_activo,tareas_config,tareas_activacion`,[JSON.stringify(payload),JSON.stringify(tareas),hoyLima,String(activo.fecha||'')]);
+    if (!updated.rows.length) {
+        const reread=await pool.query('SELECT minijuegos_activo,tareas_config,tareas_activacion FROM configuracion WHERE id=1');
+        return reread.rows[0]||row;
+    }
+    await pool.query(`UPDATE users SET tareas_completadas_hoy='[]'::jsonb,ultima_fecha_tareas=$1,cobro_tareas_fecha=NULL,cobro_tareas_monto=0`,[hoyLima]);
+    return updated.rows[0];
+}
+
 app.get('/api/admin/minigames/library', authenticate, isAdmin, async (req,res)=>{
     try{const paquetes=construirPaquetesMiniJuegos();const r=await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);const q=await pool.query('SELECT minijuegos_activo FROM configuracion WHERE id=1');const activo=q.rows[0]&&q.rows[0].minijuegos_activo||{};res.json({total:500,totalPaquetes:100,paquetes,activo});}
     catch(e){console.error('Error biblioteca mini juegos:',e);res.status(500).json({error:'No se pudo cargar la biblioteca'});}
@@ -1289,8 +1314,8 @@ app.put('/api/admin/minigames/activate', authenticate, isAdmin, async (req,res)=
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE`);
         const q=await pool.query('SELECT tareas_config FROM configuracion WHERE id=1');const base=Array.isArray(q.rows[0]&&q.rows[0].tareas_config)?q.rows[0].tareas_config:[];
-        const tareas=paquete.juegos.map((j,i)=>Object.assign({},base[i]||{},j,{id:'tarea_'+(i+1),nombre:j.nombre,descripcion:j.descripcion,tipo_interactivo:j.tipo_interactivo,icono:j.icono,activo:true}));
-        const fecha=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima'}).format(new Date());const payload={activo:true,paqueteId,fecha,tareas};
+        const tareas=construirTareasDePaquete(paquete,base);
+        const fecha=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Lima'}).format(new Date());const payload={activo:true,automatico:true,paqueteId,fecha,tareas,rotacionAnterior:null};
         const r=await pool.query(`INSERT INTO configuracion(id,minijuegos_activo,tareas_config,tareas_activacion,tareas_pausadas,tareas_autorizadas,updated_at) VALUES(1,$1,$2,NOW(),FALSE,TRUE,NOW()) ON CONFLICT(id) DO UPDATE SET minijuegos_activo=$1,tareas_config=$2,tareas_activacion=NOW(),tareas_pausadas=FALSE,tareas_autorizadas=TRUE,updated_at=NOW() RETURNING minijuegos_activo,tareas_config,tareas_activacion`,[JSON.stringify(payload),JSON.stringify(tareas)]);
         res.json({message:'Paquete '+paqueteId+' activado para hoy',paqueteId,activo:r.rows[0].minijuegos_activo,tareas:r.rows[0].tareas_config});
     }catch(e){console.error('Error activando paquete:',e);res.status(500).json({error:'No se pudo activar el paquete'});}
@@ -1311,6 +1336,9 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         const diasActivos = normalizarDiasActivos(row.tareas_dias_activos);
         const diaSemanaActual = obtenerDiaSemanaLima();
         const diaHabilitadoHoy = diasActivos.includes(diaSemanaActual);
+        const rowConRotacion = await avanzarPaqueteAutomaticoSiCorresponde(row, hoyLima, diaHabilitadoHoy);
+        if (rowConRotacion && rowConRotacion.minijuegos_activo) row.minijuegos_activo = rowConRotacion.minijuegos_activo;
+        if (rowConRotacion && rowConRotacion.tareas_config) row.tareas_config = rowConRotacion.tareas_config;
         const paqueteActivo = row.minijuegos_activo && row.minijuegos_activo.activo === true && row.minijuegos_activo.fecha === hoyLima;
         const tareasBase = (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5);
         const tareasConfiguradas = paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length
@@ -1337,8 +1365,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             diaSemanaActual,
             diaHabilitadoHoy,
             horaCobro: row.hora_cobro || '20:00',
-            hora_cobro: row.hora_cobro || '20:00',
-            paqueteMiniJuegos: paqueteActivo ? row.minijuegos_activo.paqueteId : null
+            hora_cobro: row.hora_cobro || '20:00'
         });
     } catch (error) {
         console.error('Error obteniendo configuración de tareas:', error);
