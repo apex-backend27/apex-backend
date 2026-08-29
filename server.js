@@ -1573,16 +1573,6 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
         
         console.log('👤 Admin check:', adminCheck.rows[0]);
         
-        // ✅ FORZAR: Si el usuario es 999999999, siempre es admin
-        if (adminCheck.rows[0]?.telefono === '999999999') {
-            // Actualizar en la base de datos
-            await pool.query(
-                'UPDATE users SET es_admin = true, es_super_admin = true WHERE id = $1',
-                [decoded.userId]
-            );
-            adminCheck.rows[0].es_admin = true;
-            adminCheck.rows[0].es_super_admin = true;
-        }
         
         if (!adminCheck.rows[0]?.es_admin) {
             console.log('❌ Acceso denegado para usuario:', adminCheck.rows[0]?.telefono);
