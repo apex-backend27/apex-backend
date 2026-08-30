@@ -1476,6 +1476,31 @@ app.put('/api/admin/tasks/schedule', authenticate, isAdmin, async (req, res) => 
         res.status(500).json({ error: 'No se pudieron guardar los días activos' });
     }
 });
+app.post('/api/user/redeem', authenticate, async (req,res)=>{
+    const client=await pool.connect();
+    try{
+        await client.query('BEGIN');
+        const cq=await client.query('SELECT catalogos_config FROM configuracion WHERE id=1');
+        const cfg=(cq.rows[0]&&cq.rows[0].catalogos_config)||{};
+        const id=String(req.body&& (req.body.canjeId||req.body.id||req.body.codigo)||'');
+        const canjes=Array.isArray(cfg.canjes)?cfg.canjes:[];
+        const canje=canjes.find(x=>String(x&& (x.id||x.codigo)||'')===id);
+        if(!canje) throw new Error('Canje no encontrado');
+        const costo=Number(canje.costoPuntos||0), monto=Number(canje.montoUSDT||canje.monto||canje.amount||0);
+        if(!Number.isFinite(costo)||costo<=0||!Number.isFinite(monto)||monto<=0) throw new Error('Canje inválido');
+        const uq=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);
+        if(!uq.rows.length) throw new Error('Usuario no encontrado');
+        const u=uq.rows[0], puntos=Number(u.puntos||0);
+        if(puntos<costo) return (await client.query('ROLLBACK'),res.status(409).json({error:'Puntos insuficientes',puntos:puntos,costo:costo}));
+        const fecha=new Date().toISOString();
+        const hd=Array.isArray(u.historial_detallado)?u.historial_detallado:[];
+        const cr=Array.isArray(u.canjes_realizados)?u.canjes_realizados:[];
+        const item={tipo:'canje',concepto:'Canje: '+(canje.nombre||canje.titulo||'Canje'),monto:monto,puntos:costo,fecha:fecha,estado:'acreditado'};
+        const saved=await client.query(`UPDATE users SET puntos=COALESCE(puntos,0)-$1,balance=COALESCE(balance,0)+$2,total_ganado=COALESCE(total_ganado,0)+$2,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,CURRENT_DATE)<$3::date THEN $2 ELSE COALESCE(ganado_semanal,0)+$2 END,ganado_semanal_inicio=$3::date,historial_detallado=$4::jsonb,canjes_realizados=$5::jsonb WHERE id=$6 RETURNING *`,[costo,monto,inicioSemanaLima(new Date()),JSON.stringify(hd.concat(item)),JSON.stringify(cr.concat({nombre:canje.nombre||canje.titulo||'Canje',puntos:costo,monto:monto,fecha:fecha,estado:'aprobado'})),req.userId]);
+        await client.query('COMMIT');
+        res.json({message:'Canje acreditado',premio:monto,puntosDescontados:costo,user:publicUserData(saved.rows[0])});
+    }catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message||'No se pudo procesar el canje'});}finally{client.release();}
+});
 app.get('/api/catalogs/config', authenticate, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const r=await pool.query('SELECT catalogos_config FROM configuracion WHERE id=1');const c=(r.rows[0]&&r.rows[0].catalogos_config)||{};res.json({canjes:Array.isArray(c.canjes)?c.canjes:[],logros:Array.isArray(c.logros)?c.logros:[],cupones:Array.isArray(c.cupones)?c.cupones:[]})}catch(e){res.status(500).json({error:'Error obteniendo catálogos'})}});
 app.put('/api/admin/catalogs/config', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const c={canjes:Array.isArray(req.body.canjes)?req.body.canjes:[],logros:Array.isArray(req.body.logros)?req.body.logros:[],cupones:Array.isArray(req.body.cupones)?req.body.cupones:[]};const r=await pool.query(`INSERT INTO configuracion(id,catalogos_config,updated_at) VALUES(1,$1,NOW()) ON CONFLICT(id) DO UPDATE SET catalogos_config=$1,updated_at=NOW() RETURNING catalogos_config`,[JSON.stringify(c)]);res.json({message:'Catálogos guardados',config:r.rows[0].catalogos_config})}catch(e){console.error(e);res.status(500).json({error:'Error guardando catálogos'})}});
 
