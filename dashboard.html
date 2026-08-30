@@ -49,7 +49,7 @@
   function calculate(){
     if(!window.user)return;
     var start=startOfWeekLima(),total=0,week=0;
-    historyList().forEach(function(item){var type=String(item&&(item.tipo||item.type||'')).toLowerCase(),status=String(item&&(item.estado||item.status||'')).toLowerCase(),amount=Number(item&&(item.monto??item.amount??0)),date=new Date(item&&(item.fecha||item.date||''));if(!Number.isFinite(amount)||amount<=0||status==='rechazado'||!['tareas_cobro','produccion','ganancia','juego','actividad'].includes(type))return;total+=amount;if(!Number.isNaN(date.getTime())&&date.getTime()>=start)week+=amount;});
+    historyList().forEach(function(item){var type=String(item&&(item.tipo||item.type||'')).toLowerCase(),status=String(item&&(item.estado||item.status||'')).toLowerCase(),amount=Number(item&&(item.monto??item.amount??0)),date=new Date(item&&(item.fecha||item.date||''));if(!Number.isFinite(amount)||amount<=0||status==='rechazado'||!['tareas_cobro','produccion','ganancia','juego','actividad','canje'].includes(type))return;total+=amount;if(!Number.isNaN(date.getTime())&&date.getTime()>=start)week+=amount;});
     var totalEl=document.getElementById('gananciaTotal'),weekEl=document.getElementById('gananciaSemanal');if(totalEl)totalEl.textContent='$'+total.toFixed(2);if(weekEl)weekEl.textContent='$'+week.toFixed(2);
   }
   window.calcularGanancias=calculate;
