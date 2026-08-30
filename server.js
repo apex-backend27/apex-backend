@@ -95,7 +95,10 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS wallet_index INTEGER,
             ADD COLUMN IF NOT EXISTS wallet_created_at TIMESTAMP,
             ADD COLUMN IF NOT EXISTS admin_permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
-            ADD COLUMN IF NOT EXISTS admin_active BOOLEAN NOT NULL DEFAULT TRUE
+            ADD COLUMN IF NOT EXISTS admin_active BOOLEAN NOT NULL DEFAULT TRUE,
+            ADD COLUMN IF NOT EXISTS total_ganado NUMERIC(18,6) NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS ganado_semanal NUMERIC(18,6) NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS ganado_semanal_inicio DATE DEFAULT CURRENT_DATE
         `);
         await pool.query(`
             ALTER TABLE configuracion
@@ -808,7 +811,10 @@ function publicUserData(row, referidosOverride) {
         // Solo se conservan los usos disponibles; el valor del premio se resuelve al consumirlo.
         ruleta_usos: Number(safe.ruleta_usos || 0),
         cofres_usos: Number(safe.cofres_usos || 0),
-        dados_usos: Number(safe.dados_usos || 0)
+        dados_usos: Number(safe.dados_usos || 0),
+        total_ganado: Number(safe.total_ganado || 0),
+        ganado_semanal: Number(safe.ganado_semanal || 0),
+        ganado_semanal_inicio: safe.ganado_semanal_inicio || null
     };
 }
 // ============================================================
@@ -1254,16 +1260,16 @@ app.put('/api/admin/games/config', authenticate, isAdmin, async (req, res) => {
 });
 
 // ============================================================
-// BIBLIOTECA DE 500 MINI JUEGOS / 100 PAQUETES DIARIOS
+// BIBLIOTECA DE 450 MINI JUEGOS / 90 PAQUETES DIARIOS
 // ============================================================
 // Mecánicas actualmente renderizadas y validadas por el dashboard. Cada paquete usa las cinco, con 100 variantes de contenido para evitar fallback y repeticiones aparentes.
-const MINI_GAME_TYPES = ['captcha','sequence','target','reaction','pair'];
+const MINI_GAME_TYPES = ['captcha','sequence','target','reaction','pair','count','oddone','order','color','math','pattern','memorypos','tap','safe','connect','quiz','compare','slider','sort','chase'];
 const MINI_GAME_ICONS = ['🚀','💎','⚡','🌟','🎯','🪙','🧠','🏆','🔷','🛡️','🔢','🔍','📈','🎨','🧩','🧭','🔗','❓','⚖️','🎚️'];
 function construirBibliotecaMiniJuegos(){
     const lista=[];
     const nombres={captcha:'Código de acceso',sequence:'Secuencia relámpago',target:'Objetivo oculto',reaction:'Pulso de reflejos',pair:'Parejas de memoria',count:'Cuenta exacta',oddone:'Encuentra el diferente',order:'Orden numérico',color:'Color correcto',math:'Cálculo rápido',pattern:'Patrón lógico',memorypos:'Memoria de posición',tap:'Toques precisos',safe:'Zona segura',connect:'Conecta iguales',quiz:'Pregunta relámpago',compare:'El mayor gana',slider:'Barra de precisión',sort:'Clasificación rápida',chase:'Persigue el objetivo'};
     const ayuda={captcha:['Escribe el código que aparece en pantalla.','El código generado que se muestra al usuario.'],sequence:['Memoriza la secuencia y repítela en el mismo orden.','La misma secuencia de 4 emojis, sin cambiar el orden.'],target:['Encuentra y pulsa el símbolo objetivo entre los distractores.','El símbolo indicado en la parte superior del reto.'],reaction:['Espera la señal verde y pulsa el botón cuando aparezca.','Pulsar únicamente después de que la señal se vuelva verde.'],pair:['Descubre dos cartas y encuentra una pareja de emojis iguales.','Dos cartas que tengan exactamente el mismo emoji.'],count:['Cuenta los símbolos solicitados y escribe el total.','El número exacto de símbolos mostrados.'],oddone:['Encuentra el único símbolo diferente en la cuadrícula.','La posición marcada como diferente.'],order:['Pulsa los números en orden ascendente.','La secuencia de menor a mayor.'],color:['Pulsa el recuadro del color solicitado.','El recuadro que coincide con el color indicado.'],math:['Resuelve la operación que aparece.','El resultado exacto de la operación.'],pattern:['Completa el patrón seleccionando el elemento que falta.','La opción que continúa correctamente el patrón.'],memorypos:['Memoriza dónde aparece el símbolo y selecciónalo después.','La misma posición donde apareció el símbolo.'],tap:['Pulsa los objetivos luminosos antes de que desaparezcan.','Completar los tres toques correctos.'],safe:['Elige una zona segura entre las opciones.','La casilla marcada como zona segura.'],connect:['Relaciona el símbolo con su pareja equivalente.','La pareja que contiene el mismo símbolo.'],quiz:['Responde la pregunta seleccionando una opción.','La opción correcta de la pregunta.'],compare:['Selecciona el número mayor.','El número de mayor valor.'],slider:['Detén la barra en la zona objetivo.','El indicador dentro de la zona verde.'],sort:['Selecciona los elementos del menor al mayor.','El orden ascendente completo.'],chase:['Pulsa el objetivo que aparece en la zona de juego.','El objetivo resaltado antes de cambiar de posición.']};
-    for(let i=1;i<=500;i++){
+    for(let i=1;i<=450;i++){
         const tipo=MINI_GAME_TYPES[(i-1)%MINI_GAME_TYPES.length],variante=Math.floor((i-1)/MINI_GAME_TYPES.length)+1,info=ayuda[tipo];
         lista.push({id:i,nombre:nombres[tipo]+' #'+variante,descripcion:'Reto interactivo '+i+' de la biblioteca APEX',icono:MINI_GAME_ICONS[(i-1)%MINI_GAME_ICONS.length],tipo_interactivo:tipo,variante:variante,instruccion:info[0],respuesta:info[1]});
     }
@@ -1271,7 +1277,7 @@ function construirBibliotecaMiniJuegos(){
 }
 function construirPaquetesMiniJuegos(){
     const biblioteca=construirBibliotecaMiniJuegos(),paquetes=[];
-    for(let p=1;p<=100;p++) paquetes.push({id:p,nombre:'Paquete '+p,juegos:biblioteca.slice((p-1)*5,p*5)});
+    for(let p=1;p<=90;p++) paquetes.push({id:p,nombre:'Paquete '+p,juegos:biblioteca.slice((p-1)*5,p*5)});
     return paquetes;
 }
 
@@ -1283,8 +1289,8 @@ async function avanzarPaqueteAutomaticoSiCorresponde(row, hoyLima, diaHabilitado
     const activo=row && row.minijuegos_activo && typeof row.minijuegos_activo==='object' ? row.minijuegos_activo : {};
     if (diaHabilitadoHoy!==true || activo.activo!==true || activo.automatico===false || activo.fecha===hoyLima) return row;
     const paquetes=construirPaquetesMiniJuegos();
-    const actualId=Math.max(1,Math.min(100,Number(activo.paqueteId)||1));
-    const siguienteId=actualId>=100?1:actualId+1;
+    const actualId=Math.max(1,Math.min(90,Number(activo.paqueteId)||1));
+    const siguienteId=actualId>=90?1:actualId+1;
     const paquete=paquetes[siguienteId-1];
     const baseResult=await pool.query('SELECT tareas_config FROM configuracion WHERE id=1');
     const base=Array.isArray(baseResult.rows[0]&&baseResult.rows[0].tareas_config)?baseResult.rows[0].tareas_config:[];
@@ -1300,7 +1306,7 @@ async function avanzarPaqueteAutomaticoSiCorresponde(row, hoyLima, diaHabilitado
 }
 
 app.get('/api/admin/minigames/library', authenticate, isAdmin, async (req,res)=>{
-    try{const paquetes=construirPaquetesMiniJuegos();const r=await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);const q=await pool.query('SELECT minijuegos_activo FROM configuracion WHERE id=1');const activo=q.rows[0]&&q.rows[0].minijuegos_activo||{};res.json({total:500,totalPaquetes:100,paquetes,activo});}
+    try{const paquetes=construirPaquetesMiniJuegos();const r=await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);const q=await pool.query('SELECT minijuegos_activo FROM configuracion WHERE id=1');const activo=q.rows[0]&&q.rows[0].minijuegos_activo||{};res.json({total:450,totalPaquetes:90,paquetes,activo});}
     catch(e){console.error('Error biblioteca mini juegos:',e);res.status(500).json({error:'No se pudo cargar la biblioteca'});}
 });
 app.get('/api/tasks/minigames', authenticate, async (req,res)=>{
@@ -1309,7 +1315,7 @@ app.get('/api/tasks/minigames', authenticate, async (req,res)=>{
 });
 app.put('/api/admin/minigames/activate', authenticate, isAdmin, async (req,res)=>{
     try{
-        const paqueteId=Math.max(1,Math.min(100,Number(req.body.paqueteId||0)));if(!Number.isInteger(paqueteId))return res.status(400).json({error:'Paquete inválido'});
+        const paqueteId=Math.max(1,Math.min(90,Number(req.body.paqueteId||0)));if(!Number.isInteger(paqueteId))return res.status(400).json({error:'Paquete inválido'});
         const paquetes=construirPaquetesMiniJuegos(),paquete=paquetes[paqueteId-1];
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE`);
@@ -1449,7 +1455,7 @@ app.post('/api/user/game/prize', authenticate, async (req,res)=>{
   const prizeField={ruleta:'premio_ruleta',cofre:'premio_cofre',dados:'premio_dados'}[game];
   if(!usage||!prizeField||!Number.isFinite(requestedAmount)||requestedAmount<0) return res.status(400).json({error:'Premio inválido'});
   const client=await pool.connect();
-  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const amount=Number(u[prizeField]||0); const usos=Number(u[usage]||0); if(amount<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'Esta actividad no tiene un premio configurado por el administrador'});} if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const item={tipo:'juego',juego:game,monto:amount,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), historial_detallado=$2::jsonb WHERE id=$3 RETURNING *`,[amount,JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); try { await crearNotificacion({ userId: req.userId, tipo: 'actividad', titulo: 'Premio acreditado', descripcion: `Ganaste ${amount.toFixed(2)} USDT en ${game}`, accion: 'informativa', entidadId: `${game}:${new Date().toISOString().slice(0,10)}:${Date.now()}`, metadata: { game, amount } }); } catch (notificationError) { console.error('No se pudo crear notificación de premio:', notificationError.message); } res.json({message:'Premio acreditado',premio:amount,user:publicUserData(out.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
+  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const amount=Number(u[prizeField]||0); const usos=Number(u[usage]||0); if(amount<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'Esta actividad no tiene un premio configurado por el administrador'});} if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const nombresJuego={ruleta:'Máquina de bolas',cofre:'Cofre del tesoro',dados:'Dados'}; const nombreJuego=nombresJuego[game]||game; const item={tipo:'juego',juego:game,actividad:nombreJuego,concepto:`Premio de ${nombreJuego}`,monto:amount,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const hoy=normalizarFechaLima(new Date()); const inicioSemana=normalizarFechaLima(new Date(Date.now()-((new Date().getDay()+6)%7)*86400000)); const semanalInicio=normalizarFechaLima(u.ganado_semanal_inicio)||inicioSemana; const semanal=semanalInicio<inicioSemana?amount:Number(u.ganado_semanal||0)+amount; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=$2, ganado_semanal_inicio=$3, historial_detallado=$4::jsonb WHERE id=$5 RETURNING *`,[amount,semanal,inicioSemana,JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); try { await crearNotificacion({ userId: req.userId, tipo: 'actividad', titulo: 'Premio acreditado', descripcion: `Ganaste ${amount.toFixed(2)} USDT en ${game}`, accion: 'informativa', entidadId: `${game}:${new Date().toISOString().slice(0,10)}:${Date.now()}`, metadata: { game, amount } }); } catch (notificationError) { console.error('No se pudo crear notificación de premio:', notificationError.message); } res.json({message:'Premio acreditado',premio:amount,user:publicUserData(out.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
 });
 
 // ============================================================
@@ -1525,9 +1531,9 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         }
         const recompensa = Number((diario * porcentaje).toFixed(2));
         const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
-        historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas ${Math.round(porcentaje * 100)}%`, monto: recompensa, fecha: new Date().toISOString(), estado: 'aprobado' });
+        historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas ${Math.round(porcentaje * 100)}%`, actividad: 'Tareas diarias', monto: recompensa, fecha: new Date().toISOString(), estado: 'aprobado' });
         const updated = await client.query(
-            `UPDATE users SET balance = COALESCE(balance, 0) + $1, cobro_tareas_fecha = $2, cobro_tareas_monto = $1, historial_detallado = $3 WHERE id = $4 AND (cobro_tareas_fecha IS NULL OR cobro_tareas_fecha <> $2) RETURNING *`,
+            `UPDATE users SET balance = COALESCE(balance, 0) + $1, total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio, CURRENT_DATE) < $2::date - ((EXTRACT(ISODOW FROM $2::date)::int)-1) THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END, ganado_semanal_inicio=$2::date - ((EXTRACT(ISODOW FROM $2::date)::int)-1), cobro_tareas_fecha = $2, cobro_tareas_monto = $1, historial_detallado = $3 WHERE id = $4 AND (cobro_tareas_fecha IS NULL OR cobro_tareas_fecha <> $2) RETURNING *`,
             [recompensa, hoy, JSON.stringify(historial), req.userId]
         );
         if (!updated.rows.length) {
@@ -2093,7 +2099,7 @@ app.post('/api/admin/user/:id/task/assign', authenticate, isAdmin, async (req,re
     finally { client.release(); }
 });
 app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req,res)=>{
- const client=await pool.connect(); try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],i=Number(req.body.index),ts=Array.isArray(u.tareas_asignadas)?u.tareas_asignadas:[],t=ts[i];if(!t)throw new Error('Tarea no encontrada');if(t.estado==='aprobada')throw new Error('Tarea ya aprobada');t.estado='aprobada';t.fechaAprobacion=new Date().toISOString();if(req.body.nota!==undefined)t.notaAdmin=String(req.body.nota);const qty=Number(t.cantidad||0),points=t.tipo_recompensa==='usdt'?0:qty,money=t.tipo_recompensa==='usdt'?qty:0;const h=Array.isArray(u.historial_detallado)?u.historial_detallado:[];h.push({tipo:'tarea',concepto:'Tarea aprobada: '+(t.tareaNombre||t.nombre||'Actividad'),puntos:points,monto:money,nota:t.notaAdmin||null,fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET tareas_asignadas=$1,puntos=COALESCE(puntos,0)+$2,balance=COALESCE(balance,0)+$3,historial_detallado=$4 WHERE id=$5 RETURNING *',[JSON.stringify(ts),points,money,JSON.stringify(h),req.params.id]);await client.query('COMMIT');res.json({message:'Tarea aprobada',user:publicUserData(r.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}
+ const client=await pool.connect(); try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],i=Number(req.body.index),ts=Array.isArray(u.tareas_asignadas)?u.tareas_asignadas:[],t=ts[i];if(!t)throw new Error('Tarea no encontrada');if(t.estado==='aprobada')throw new Error('Tarea ya aprobada');t.estado='aprobada';t.fechaAprobacion=new Date().toISOString();if(req.body.nota!==undefined)t.notaAdmin=String(req.body.nota);const qty=Number(t.cantidad||0),points=t.tipo_recompensa==='usdt'?0:qty,money=t.tipo_recompensa==='usdt'?qty:0;const h=Array.isArray(u.historial_detallado)?u.historial_detallado:[];h.push({tipo:'tarea',concepto:'Tarea aprobada: '+(t.tareaNombre||t.nombre||'Actividad'),actividad:t.tareaNombre||t.nombre||'Actividad',puntos:points,monto:money,nota:t.notaAdmin||null,fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET tareas_asignadas=$1,puntos=COALESCE(puntos,0)+$2,balance=COALESCE(balance,0)+$3,total_ganado=COALESCE(total_ganado,0)+$3,ganado_semanal=COALESCE(ganado_semanal,0)+$3,ganado_semanal_inicio=COALESCE(ganado_semanal_inicio,CURRENT_DATE),historial_detallado=$4 WHERE id=$5 RETURNING *',[JSON.stringify(ts),points,money,JSON.stringify(h),req.params.id]);await client.query('COMMIT');res.json({message:'Tarea aprobada',user:publicUserData(r.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}
 });
 app.post('/api/admin/user/:id/task/reject', authenticate, isAdmin, async (req,res)=>{try{const q=await pool.query('SELECT tareas_asignadas FROM users WHERE id=$1',[req.params.id]);if(!q.rows.length)return res.status(404).json({error:'Usuario no encontrado'});const ts=q.rows[0].tareas_asignadas||[],t=ts[Number(req.body.index)];if(!t)return res.status(404).json({error:'Tarea no encontrada'});t.estado='rechazada';t.fechaRechazo=new Date().toISOString();t.notaAdmin=String(req.body.nota||'');const r=await pool.query('UPDATE users SET tareas_asignadas=$1 WHERE id=$2 RETURNING *',[JSON.stringify(ts),req.params.id]);res.json({message:'Tarea rechazada',user:publicUserData(r.rows[0])});}catch(e){res.status(500).json({error:'Error procesando tarea'})}});
 app.post('/api/admin/user/:id/withdraw/approve', authenticate, isAdmin, async (req,res)=>{const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],h=Array.isArray(u.historial)?u.historial:[];const requestedDate=String(req.body.fecha||'');let i=Number(req.body.index);if(requestedDate){const found=h.findIndex(function(item){return item&&item.type==='retiro'&&item.status==='pendiente'&&String(item.date)===requestedDate});if(found>=0)i=found}const w=h[i];if(!w||w.type!=='retiro'||w.status!=='pendiente')throw new Error('Retiro pendiente no encontrado');w.status='aprobado';w.approvedAt=new Date().toISOString();w.nota_admin=String(req.body.nota||'');w.direccion_envio=w.address||u.direccion_retiro||null;const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'retiro',concepto:'Retiro aprobado'+(w.nota_admin?'. Nota: '+w.nota_admin:''),monto:Number(w.amount||0),comision:Number(w.commission||0),neto:Number(w.netAmount||w.amount||0),fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET historial=$1,historial_detallado=$2 WHERE id=$3 RETURNING *',[JSON.stringify(h),JSON.stringify(d),req.params.id]);await client.query('COMMIT');res.json({message:'Retiro aprobado',user:publicUserData(r.rows[0])})}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}});
