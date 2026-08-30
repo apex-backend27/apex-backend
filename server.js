@@ -55,6 +55,54 @@ function normalizarFechaLima(value) {
     partes.forEach(p => { if (p.type !== 'literal') out[p.type] = p.value; });
     return out.year && out.month && out.day ? `${out.year}-${out.month}-${out.day}` : null;
 }
+const INGRESO_TIPOS = new Set(['ganancia','produccion','actividad','juego','tarea','tareas_cobro','canje','cupon','logro','bono','recompensa','premio']);
+function montoIngreso(item) {
+    if (!item || typeof item !== 'object') return 0;
+    const tipo = String(item.tipo || item.type || item.category || '').trim().toLowerCase();
+    const estado = String(item.estado || item.status || '').trim().toLowerCase();
+    if (!INGRESO_TIPOS.has(tipo)) return 0;
+    if (['rechazado','rechazada','cancelado','cancelada','anulado','anulada'].includes(estado)) return 0;
+    const n = Number(item.monto ?? item.amount ?? item.valor ?? item.recompensa ?? item.premio ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function inicioSemanaLima(date = new Date()) {
+    const fecha = normalizarFechaLima(date);
+    const [y,m,d] = fecha.split('-').map(Number);
+    const utc = new Date(Date.UTC(y, m - 1, d));
+    const dia = utc.getUTCDay();
+    utc.setUTCDate(utc.getUTCDate() - dia);
+    return utc.toISOString().slice(0,10);
+}
+function fechaItemLima(item) {
+    return normalizarFechaLima(item && (item.fecha || item.date || item.createdAt || item.timestamp));
+}
+function calcularAcumuladosDesdeHistorial(userRow, now = new Date()) {
+    const detallado = Array.isArray(userRow.historial_detallado) ? userRow.historial_detallado : [];
+    const legado = Array.isArray(userRow.historial) ? userRow.historial : [];
+    const vistos = new Set();
+    const lista = detallado.concat(legado).filter(item => { const clave = String(item?.id ?? item?.fecha ?? item?.date ?? '') + '|' + String(item?.concepto ?? item?.description ?? '') + '|' + String(item?.monto ?? item?.amount ?? ''); if (vistos.has(clave)) return false; vistos.add(clave); return true; });
+    const inicio = inicioSemanaLima(now);
+    let generado = 0, semanal = 0;
+    for (const item of lista) {
+        const monto = montoIngreso(item);
+        if (!monto) continue;
+        generado += monto;
+        const fecha = fechaItemLima(item);
+        if (fecha && fecha >= inicio) semanal += monto;
+    }
+    return { total: Math.round(generado * 100) / 100, semana: Math.round(semanal * 100) / 100, inicio };
+}
+async function reconciliarAcumulados(userId, clientOrPool = pool) {
+    const q = await clientOrPool.query('SELECT total_ganado, ganado_semanal, historial_detallado FROM users WHERE id = $1', [userId]);
+    if (!q.rows.length) return null;
+    const row = q.rows[0], calc = calcularAcumuladosDesdeHistorial(row);
+    const totalActual = Number(row.total_ganado || 0);
+    const semanaActual = Number(row.ganado_semanal || 0);
+    const total = Math.max(Number.isFinite(totalActual) ? totalActual : 0, calc.total);
+    const semana = calc.semana;
+    const updated = await clientOrPool.query('UPDATE users SET total_ganado=$1, ganado_semanal=$2, ganado_semanal_inicio=$3 WHERE id=$4 RETURNING *', [total, semana, calc.inicio, userId]);
+    return updated.rows[0] || null;
+}
 async function ensureTaskColumns() {
     try {
         await pool.query(`
@@ -872,6 +920,8 @@ app.get('/api/verify', authenticate, async (req, res) => {
         }
         
                 const userData = result.rows[0];
+        const reconciledUser = await reconciliarAcumulados(req.userId);
+        if (reconciledUser) Object.assign(userData, reconciledUser);
         const withdrawalConfigResult = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url FROM configuracion WHERE id = 1');
         const withdrawalConfigRow = withdrawalConfigResult.rows[0] || {};
         const withdrawalConfig = {
@@ -1097,6 +1147,8 @@ app.put('/api/user/update', async (req, res) => {
         
         // ✅ Enviar TODOS los campos del usuario
         const userData = result.rows[0];
+        const reconciledUser = await reconciliarAcumulados(userId);
+        if (reconciledUser) Object.assign(userData, reconciledUser);
         res.json({ 
             message: 'Usuario actualizado exitosamente', 
             user: {
@@ -1456,7 +1508,7 @@ app.post('/api/user/game/prize', authenticate, async (req,res)=>{
   const prizeField={ruleta:'premio_ruleta',cofre:'premio_cofre',dados:'premio_dados'}[game];
   if(!usage||!prizeField||!Number.isFinite(requestedAmount)||requestedAmount<0) return res.status(400).json({error:'Premio inválido'});
   const client=await pool.connect();
-  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const amount=Number(u[prizeField]||0); const usos=Number(u[usage]||0); if(amount<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'Esta actividad no tiene un premio configurado por el administrador'});} if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const nombresJuego={ruleta:'Máquina de bolas',cofre:'Cofre del tesoro',dados:'Dados'}; const nombreJuego=nombresJuego[game]||game; const item={tipo:'juego',juego:game,actividad:nombreJuego,concepto:`Premio de ${nombreJuego}`,monto:amount,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const hoy=normalizarFechaLima(new Date()); const inicioSemana=normalizarFechaLima(new Date(Date.now()-((obtenerDiaSemanaLima(new Date())+6)%7)*86400000)); const semanalInicio=normalizarFechaLima(u.ganado_semanal_inicio)||inicioSemana; const semanal=semanalInicio<inicioSemana?amount:Number(u.ganado_semanal||0)+amount; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=$2, ganado_semanal_inicio=$3, historial_detallado=$4::jsonb WHERE id=$5 RETURNING *`,[amount,semanal,inicioSemana,JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); try { await crearNotificacion({ userId: req.userId, tipo: 'actividad', titulo: 'Premio acreditado', descripcion: `Ganaste ${amount.toFixed(2)} USDT en ${game}`, accion: 'informativa', entidadId: `${game}:${new Date().toISOString().slice(0,10)}:${Date.now()}`, metadata: { game, amount } }); } catch (notificationError) { console.error('No se pudo crear notificación de premio:', notificationError.message); } res.json({message:'Premio acreditado',premio:amount,user:publicUserData(out.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
+  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const amount=Number(u[prizeField]||0); const usos=Number(u[usage]||0); if(amount<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'Esta actividad no tiene un premio configurado por el administrador'});} if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const nombresJuego={ruleta:'Máquina de bolas',cofre:'Cofre del tesoro',dados:'Dados'}; const nombreJuego=nombresJuego[game]||game; const item={tipo:'juego',juego:game,actividad:nombreJuego,concepto:`Premio de ${nombreJuego}`,monto:amount,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const hoy=normalizarFechaLima(new Date()); const inicioSemana=normalizarFechaLima(new Date(Date.now()-((obtenerDiaSemanaLima(new Date())+6)%7)*86400000)); const semanalInicio=normalizarFechaLima(u.ganado_semanal_inicio)||inicioSemana; const semanal=semanalInicio<inicioSemana?amount:Number(u.ganado_semanal||0)+amount; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=$2, ganado_semanal_inicio=$3, historial_detallado=$4::jsonb WHERE id=$5 RETURNING *`,[amount,semanal,inicioSemana,JSON.stringify(hist.concat(item)),req.userId]); await reconciliarAcumulados(req.userId, client); await client.query('COMMIT'); try { await crearNotificacion({ userId: req.userId, tipo: 'actividad', titulo: 'Premio acreditado', descripcion: `Ganaste ${amount.toFixed(2)} USDT en ${game}`, accion: 'informativa', entidadId: `${game}:${new Date().toISOString().slice(0,10)}:${Date.now()}`, metadata: { game, amount } }); } catch (notificationError) { console.error('No se pudo crear notificación de premio:', notificationError.message); } res.json({message:'Premio acreditado',premio:amount,user:publicUserData(out.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
 });
 
 // ============================================================
@@ -1541,9 +1593,10 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(409).json({ error: 'El cobro de hoy ya fue realizado' });
         }
+        await reconciliarAcumulados(req.userId, client);
+        const saved = await client.query('SELECT * FROM users WHERE id = $1',[req.userId]);
         await client.query('COMMIT');
-        const saved = updated.rows[0];
-        res.json({ message: 'Cobro realizado', recompensa, porcentaje: Math.round(porcentaje * 100), user: publicUserData(saved) });
+        res.json({ message: 'Cobro realizado', recompensa, porcentaje: Math.round(porcentaje * 100), user: publicUserData(saved.rows[0]) });
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error en cobro diario:', error);
@@ -2100,7 +2153,7 @@ app.post('/api/admin/user/:id/task/assign', authenticate, isAdmin, async (req,re
     finally { client.release(); }
 });
 app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req,res)=>{
- const client=await pool.connect(); try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],i=Number(req.body.index),ts=Array.isArray(u.tareas_asignadas)?u.tareas_asignadas:[],t=ts[i];if(!t)throw new Error('Tarea no encontrada');if(t.estado==='aprobada')throw new Error('Tarea ya aprobada');t.estado='aprobada';t.fechaAprobacion=new Date().toISOString();if(req.body.nota!==undefined)t.notaAdmin=String(req.body.nota);const qty=Number(t.cantidad||0),points=t.tipo_recompensa==='usdt'?0:qty,money=t.tipo_recompensa==='usdt'?qty:0;const h=Array.isArray(u.historial_detallado)?u.historial_detallado:[];h.push({tipo:'tarea',concepto:'Tarea aprobada: '+(t.tareaNombre||t.nombre||'Actividad'),actividad:t.tareaNombre||t.nombre||'Actividad',puntos:points,monto:money,nota:t.notaAdmin||null,fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET tareas_asignadas=$1,puntos=COALESCE(puntos,0)+$2,balance=COALESCE(balance,0)+$3,total_ganado=COALESCE(total_ganado,0)+$3,ganado_semanal=COALESCE(ganado_semanal,0)+$3,ganado_semanal_inicio=COALESCE(ganado_semanal_inicio,CURRENT_DATE),historial_detallado=$4 WHERE id=$5 RETURNING *',[JSON.stringify(ts),points,money,JSON.stringify(h),req.params.id]);await client.query('COMMIT');res.json({message:'Tarea aprobada',user:publicUserData(r.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}
+ const client=await pool.connect(); try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],i=Number(req.body.index),ts=Array.isArray(u.tareas_asignadas)?u.tareas_asignadas:[],t=ts[i];if(!t)throw new Error('Tarea no encontrada');if(t.estado==='aprobada')throw new Error('Tarea ya aprobada');t.estado='aprobada';t.fechaAprobacion=new Date().toISOString();if(req.body.nota!==undefined)t.notaAdmin=String(req.body.nota);const qty=Number(t.cantidad||0),points=t.tipo_recompensa==='usdt'?0:qty,money=t.tipo_recompensa==='usdt'?qty:0;const h=Array.isArray(u.historial_detallado)?u.historial_detallado:[];h.push({tipo:'tarea',concepto:'Tarea aprobada: '+(t.tareaNombre||t.nombre||'Actividad'),actividad:t.tareaNombre||t.nombre||'Actividad',puntos:points,monto:money,nota:t.notaAdmin||null,fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET tareas_asignadas=$1,puntos=COALESCE(puntos,0)+$2,balance=COALESCE(balance,0)+$3,total_ganado=COALESCE(total_ganado,0)+$3,ganado_semanal=COALESCE(ganado_semanal,0)+$3,ganado_semanal_inicio=COALESCE(ganado_semanal_inicio,CURRENT_DATE),historial_detallado=$4 WHERE id=$5 RETURNING *',[JSON.stringify(ts),points,money,JSON.stringify(h),req.params.id]);await reconciliarAcumulados(req.params.id, client);await client.query('COMMIT');res.json({message:'Tarea aprobada',user:publicUserData(r.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}
 });
 app.post('/api/admin/user/:id/task/reject', authenticate, isAdmin, async (req,res)=>{try{const q=await pool.query('SELECT tareas_asignadas FROM users WHERE id=$1',[req.params.id]);if(!q.rows.length)return res.status(404).json({error:'Usuario no encontrado'});const ts=q.rows[0].tareas_asignadas||[],t=ts[Number(req.body.index)];if(!t)return res.status(404).json({error:'Tarea no encontrada'});t.estado='rechazada';t.fechaRechazo=new Date().toISOString();t.notaAdmin=String(req.body.nota||'');const r=await pool.query('UPDATE users SET tareas_asignadas=$1 WHERE id=$2 RETURNING *',[JSON.stringify(ts),req.params.id]);res.json({message:'Tarea rechazada',user:publicUserData(r.rows[0])});}catch(e){res.status(500).json({error:'Error procesando tarea'})}});
 app.post('/api/admin/user/:id/withdraw/approve', authenticate, isAdmin, async (req,res)=>{const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],h=Array.isArray(u.historial)?u.historial:[];const requestedDate=String(req.body.fecha||'');let i=Number(req.body.index);if(requestedDate){const found=h.findIndex(function(item){return item&&item.type==='retiro'&&item.status==='pendiente'&&String(item.date)===requestedDate});if(found>=0)i=found}const w=h[i];if(!w||w.type!=='retiro'||w.status!=='pendiente')throw new Error('Retiro pendiente no encontrado');w.status='aprobado';w.approvedAt=new Date().toISOString();w.nota_admin=String(req.body.nota||'');w.direccion_envio=w.address||u.direccion_retiro||null;const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'retiro',concepto:'Retiro aprobado'+(w.nota_admin?'. Nota: '+w.nota_admin:''),monto:Number(w.amount||0),comision:Number(w.commission||0),neto:Number(w.netAmount||w.amount||0),fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET historial=$1,historial_detallado=$2 WHERE id=$3 RETURNING *',[JSON.stringify(h),JSON.stringify(d),req.params.id]);await client.query('COMMIT');res.json({message:'Retiro aprobado',user:publicUserData(r.rows[0])})}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}});
