@@ -1493,12 +1493,11 @@ app.post('/api/user/redeem', authenticate, async (req,res)=>{
         const u=uq.rows[0], puntos=Number(u.puntos||0);
         if(puntos<costo) return (await client.query('ROLLBACK'),res.status(409).json({error:'Puntos insuficientes',puntos:puntos,costo:costo}));
         const fecha=new Date().toISOString();
-        const hd=Array.isArray(u.historial_detallado)?u.historial_detallado:[];
         const cr=Array.isArray(u.canjes_realizados)?u.canjes_realizados:[];
-        const item={tipo:'canje',concepto:'Canje: '+(canje.nombre||canje.titulo||'Canje'),monto:monto,puntos:costo,fecha:fecha,estado:'acreditado'};
-        const saved=await client.query(`UPDATE users SET puntos=COALESCE(puntos,0)-$1,balance=COALESCE(balance,0)+$2,total_ganado=COALESCE(total_ganado,0)+$2,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,CURRENT_DATE)<$3::date THEN $2 ELSE COALESCE(ganado_semanal,0)+$2 END,ganado_semanal_inicio=$3::date,historial_detallado=$4::jsonb,canjes_realizados=$5::jsonb WHERE id=$6 RETURNING *`,[costo,monto,inicioSemanaLima(new Date()),JSON.stringify(hd.concat(item)),JSON.stringify(cr.concat({nombre:canje.nombre||canje.titulo||'Canje',puntos:costo,monto:monto,fecha:fecha,estado:'aprobado'})),req.userId]);
+        const solicitud={nombre:canje.nombre||canje.titulo||'Canje',puntos:costo,monto:monto,fecha:fecha,estado:'pendiente'};
+        const saved=await client.query(`UPDATE users SET puntos=COALESCE(puntos,0)-$1,canjes_realizados=$2::jsonb WHERE id=$3 RETURNING *`,[costo,JSON.stringify(cr.concat(solicitud)),req.userId]);
         await client.query('COMMIT');
-        res.json({message:'Canje acreditado',premio:monto,puntosDescontados:costo,user:publicUserData(saved.rows[0])});
+        res.json({message:'Solicitud de canje enviada',premio:monto,puntosDescontados:costo,pendienteAprobacion:true,user:publicUserData(saved.rows[0])});
     }catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message||'No se pudo procesar el canje'});}finally{client.release();}
 });
 app.get('/api/catalogs/config', authenticate, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const r=await pool.query('SELECT catalogos_config FROM configuracion WHERE id=1');const c=(r.rows[0]&&r.rows[0].catalogos_config)||{};res.json({canjes:Array.isArray(c.canjes)?c.canjes:[],logros:Array.isArray(c.logros)?c.logros:[],cupones:Array.isArray(c.cupones)?c.cupones:[]})}catch(e){res.status(500).json({error:'Error obteniendo catálogos'})}});
@@ -1882,7 +1881,7 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
                 'canjes_realizados', 'cupones_asignados', 'logros_asignados', 'logros_reclamados',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
                 'nombre', 'apellido', 'password_hash', 'password_retiro_hash', 'plan_amount', 'daily_earnings',
-                'es_admin', 'es_super_admin'];
+                'es_admin', 'es_super_admin', 'total_ganado', 'ganado_semanal', 'ganado_semanal_inicio'];
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
                 if (typeof value === 'object' && value !== null) {
