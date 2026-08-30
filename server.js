@@ -60,48 +60,25 @@ function montoIngreso(item) {
     if (!item || typeof item !== 'object') return 0;
     const tipo = String(item.tipo || item.type || item.category || '').trim().toLowerCase();
     const estado = String(item.estado || item.status || '').trim().toLowerCase();
-    if (!INGRESO_TIPOS.has(tipo)) return 0;
-    if (['rechazado','rechazada','cancelado','cancelada','anulado','anulada'].includes(estado)) return 0;
+    if (!INGRESO_TIPOS.has(tipo) || ['rechazado','rechazada','cancelado','cancelada','anulado','anulada'].includes(estado)) return 0;
     const n = Number(item.monto ?? item.amount ?? item.valor ?? item.recompensa ?? item.premio ?? 0);
     return Number.isFinite(n) && n > 0 ? n : 0;
 }
 function inicioSemanaLima(date = new Date()) {
-    const fecha = normalizarFechaLima(date);
-    const [y,m,d] = fecha.split('-').map(Number);
-    const utc = new Date(Date.UTC(y, m - 1, d));
-    const dia = utc.getUTCDay();
-    utc.setUTCDate(utc.getUTCDate() - dia);
-    return utc.toISOString().slice(0,10);
+    const fecha = normalizarFechaLima(date); const [y,m,d] = fecha.split('-').map(Number);
+    const utc = new Date(Date.UTC(y,m-1,d)); utc.setUTCDate(utc.getUTCDate()-utc.getUTCDay()); return utc.toISOString().slice(0,10);
 }
-function fechaItemLima(item) {
-    return normalizarFechaLima(item && (item.fecha || item.date || item.createdAt || item.timestamp));
-}
-function calcularAcumuladosDesdeHistorial(userRow, now = new Date()) {
-    const detallado = Array.isArray(userRow.historial_detallado) ? userRow.historial_detallado : [];
-    const legado = Array.isArray(userRow.historial) ? userRow.historial : [];
-    const vistos = new Set();
-    const lista = detallado.concat(legado).filter(item => { const clave = String(item?.id ?? item?.fecha ?? item?.date ?? '') + '|' + String(item?.concepto ?? item?.description ?? '') + '|' + String(item?.monto ?? item?.amount ?? ''); if (vistos.has(clave)) return false; vistos.add(clave); return true; });
-    const inicio = inicioSemanaLima(now);
-    let generado = 0, semanal = 0;
-    for (const item of lista) {
-        const monto = montoIngreso(item);
-        if (!monto) continue;
-        generado += monto;
-        const fecha = fechaItemLima(item);
-        if (fecha && fecha >= inicio) semanal += monto;
-    }
-    return { total: Math.round(generado * 100) / 100, semana: Math.round(semanal * 100) / 100, inicio };
+function calcularAcumuladosDesdeHistorial(row, now = new Date()) {
+    const detallado=Array.isArray(row.historial_detallado)?row.historial_detallado:[], legado=Array.isArray(row.historial)?row.historial:[], seen=new Set();
+    const lista=detallado.concat(legado).filter(item=>{const k=String(item?.id??item?.fecha??item?.date??'')+'|'+String(item?.concepto??item?.description??'')+'|'+String(item?.monto??item?.amount??'');if(seen.has(k))return false;seen.add(k);return true;});
+    const inicio=inicioSemanaLima(now); let total=0,semana=0;
+    for(const item of lista){const m=montoIngreso(item);if(!m)continue;total+=m;const f=normalizarFechaLima(item.fecha||item.date||item.createdAt);if(f&&f>=inicio)semana+=m;}
+    return {total:Math.round(total*100)/100,semana:Math.round(semana*100)/100,inicio};
 }
 async function reconciliarAcumulados(userId, clientOrPool = pool) {
-    const q = await clientOrPool.query('SELECT total_ganado, ganado_semanal, historial_detallado FROM users WHERE id = $1', [userId]);
-    if (!q.rows.length) return null;
-    const row = q.rows[0], calc = calcularAcumuladosDesdeHistorial(row);
-    const totalActual = Number(row.total_ganado || 0);
-    const semanaActual = Number(row.ganado_semanal || 0);
-    const total = Math.max(Number.isFinite(totalActual) ? totalActual : 0, calc.total);
-    const semana = calc.semana;
-    const updated = await clientOrPool.query('UPDATE users SET total_ganado=$1, ganado_semanal=$2, ganado_semanal_inicio=$3 WHERE id=$4 RETURNING *', [total, semana, calc.inicio, userId]);
-    return updated.rows[0] || null;
+    const q=await clientOrPool.query('SELECT total_ganado,ganado_semanal,historial,historial_detallado FROM users WHERE id=$1',[userId]); if(!q.rows.length)return null;
+    const row=q.rows[0],calc=calcularAcumuladosDesdeHistorial(row),stored=Number(row.total_ganado||0),total=Math.max(Number.isFinite(stored)?stored:0,calc.total);
+    const u=await clientOrPool.query('UPDATE users SET total_ganado=$1,ganado_semanal=$2,ganado_semanal_inicio=$3 WHERE id=$4 RETURNING *',[total,calc.semana,calc.inicio,userId]); return u.rows[0]||null;
 }
 async function ensureTaskColumns() {
     try {
@@ -1594,7 +1571,7 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             return res.status(409).json({ error: 'El cobro de hoy ya fue realizado' });
         }
         await reconciliarAcumulados(req.userId, client);
-        const saved = await client.query('SELECT * FROM users WHERE id = $1',[req.userId]);
+        const saved = await client.query('SELECT * FROM users WHERE id=$1',[req.userId]);
         await client.query('COMMIT');
         res.json({ message: 'Cobro realizado', recompensa, porcentaje: Math.round(porcentaje * 100), user: publicUserData(saved.rows[0]) });
     } catch (error) {
