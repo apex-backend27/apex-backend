@@ -224,6 +224,22 @@ function permisoRequeridoParaRuta(req) {
     if (/user|usuario/i.test(path)) return 'usuarios';
     return null;
 }
+async function notificarAdministradores({tipo, titulo, descripcion, entidadId, metadata = {}}) {
+    try {
+        await crearNotificacion({
+            userId: null,
+            tipo: String(tipo || 'solicitud'),
+            titulo: String(titulo || 'Nueva solicitud'),
+            descripcion: String(descripcion || ''),
+            accion: 'revisar',
+            entidadId: entidadId == null ? null : String(entidadId),
+            metadata
+        });
+    } catch (error) {
+        console.error('No se pudo notificar a los administradores:', error.message);
+    }
+}
+
 const isAdmin = async (req, res, next) => {
     if (!req.user || !flagTrue(req.user.es_admin) || !flagActive(req.user.admin_active)) {
         return res.status(403).json({ error: 'Acceso denegado. Se requieren privilegios de administrador.' });
@@ -897,6 +913,10 @@ app.get('/api/verify', authenticate, async (req, res) => {
         }
         
                 const userData = result.rows[0];
+        if (Array.isArray(updates.tareas_asignadas)) {
+            const pendientes = updates.tareas_asignadas.filter(t => ['completada','completado','pendiente'].includes(String(t?.estado || '').toLowerCase()));
+            if (pendientes.length) await notificarAdministradores({ tipo: 'tarea', titulo: 'Nueva actividad pendiente de aprobación', descripcion: `${userData.nombre || ''} ${userData.apellido || ''} envió ${pendientes.length} actividad(es) para revisión`, entidadId: `tarea:${userId}:${Date.now()}`, metadata: { userId, cantidad: pendientes.length } });
+        }
         const reconciledUser = await reconciliarAcumulados(req.userId);
         if (reconciledUser) Object.assign(userData, reconciledUser);
         const withdrawalConfigResult = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url FROM configuracion WHERE id = 1');
@@ -1500,8 +1520,72 @@ app.post('/api/user/redeem', authenticate, async (req,res)=>{
         res.json({message:'Solicitud de canje enviada',premio:monto,puntosDescontados:costo,pendienteAprobacion:true,user:publicUserData(saved.rows[0])});
     }catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message||'No se pudo procesar el canje'});}finally{client.release();}
 });
+function normalizarTipoRecompensa(value) {
+    const v = String(value || '').trim().toLowerCase();
+    if (v.includes('cofre')) return 'cofres_usos';
+    if (v.includes('ruleta')) return 'ruleta_usos';
+    if (v.includes('dado')) return 'dados_usos';
+    if (v.includes('usdt') || v.includes('usd') || v.includes('saldo') || v.includes('dinero')) return 'usdt';
+    return 'puntos';
+}
+function normalizarCatalogo(catalogo, tipo, index) {
+    const x = catalogo && typeof catalogo === 'object' ? {...catalogo} : {};
+    x.id = String(x.id || x.codigo || `${tipo}_${index + 1}`);
+    x.nombre = String(x.nombre || x.titulo || `${tipo} ${index + 1}`).trim();
+    x.descripcion = String(x.descripcion || '').trim();
+    if (tipo === 'logro') {
+        x.meta = Math.max(1, Math.floor(Number(x.meta ?? x.objetivo ?? x.meta_cantidad ?? 1)) || 1);
+        x.tipo_recompensa = normalizarTipoRecompensa(x.tipo_recompensa || x.tipoRecompensa || x.recompensa_tipo);
+        x.recompensa = Math.max(0, Number(x.recompensa ?? x.cantidad ?? x.premio ?? 0) || 0);
+        x.dias_vigencia = Math.max(0, Math.floor(Number(x.dias_vigencia ?? x.diasVigencia ?? x.dias ?? 0)) || 0);
+    }
+    if (tipo === 'cupon') {
+        x.codigo = String(x.codigo || x.id).trim().toUpperCase();
+        x.tipo = normalizarTipoRecompensa(x.tipo_recompensa || x.tipo || x.beneficio);
+        x.valor = Math.max(0, Number(x.valor ?? x.monto ?? x.amount ?? 0) || 0);
+        x.dias_vigencia = Math.max(1, Math.floor(Number(x.dias_vigencia ?? x.dias ?? 7)) || 7);
+        x.max_usos = Math.max(1, Math.floor(Number(x.max_usos ?? x.limite_usos ?? 1)) || 1);
+        x.activo = x.activo !== false;
+    }
+    return x;
+}
+function normalizarCatalogos(body) {
+    return {
+        canjes: (Array.isArray(body.canjes) ? body.canjes : []).map((x,i) => normalizarCatalogo(x,'canje',i)),
+        logros: (Array.isArray(body.logros) ? body.logros : []).map((x,i) => normalizarCatalogo(x,'logro',i)),
+        cupones: (Array.isArray(body.cupones) ? body.cupones : []).map((x,i) => normalizarCatalogo(x,'cupon',i))
+    };
+}
+
+app.post('/api/user/coupons/use', authenticate, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const q = await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE', [req.userId]);
+        if (!q.rows.length) throw new Error('Usuario no encontrado');
+        const u=q.rows[0], code=String(req.body.codigo || req.body.cuponId || '').trim().toUpperCase();
+        if (!code) throw new Error('Código de cupón requerido');
+        const cRow=await client.query('SELECT catalogos_config FROM configuracion WHERE id=1');
+        const catalogs=normalizarCatalogos(cRow.rows[0]?.catalogos_config || {});
+        const coupon=catalogs.cupones.find(x=>x.codigo===code || x.id===code);
+        if (!coupon || coupon.activo===false) throw new Error('Cupón inválido o inactivo');
+        const assigned=Array.isArray(u.cupones_asignados)?u.cupones_asignados:[];
+        const ai=assigned.findIndex(x=>String(x?.codigo||x?.cuponId||x?.id||'').toUpperCase()===code && !x.usado);
+        if (ai<0) throw new Error('No tienes este cupón disponible');
+        const item=assigned[ai]; item.usado=true; item.usado_en=new Date().toISOString();
+        const value=Number(coupon.valor||0), type=normalizarTipoRecompensa(coupon.tipo);
+        let balance=0,points=0,usage={};
+        if(type==='usdt') balance=value; else if(type==='puntos') points=Math.floor(value); else usage[type]=Math.floor(value);
+        const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];
+        hist.push({tipo:'cupon',concepto:`Cupón utilizado: ${coupon.nombre}`,monto:balance,puntos:points,fecha:new Date().toISOString(),estado:'acreditado'});
+        const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,cupones_asignados=$3::jsonb,ruleta_usos=COALESCE(ruleta_usos,0)+$4,cofres_usos=COALESCE(cofres_usos,0)+$5,dados_usos=COALESCE(dados_usos,0)+$6,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,$8::date)=$8::date THEN COALESCE(ganado_semanal,0)+$1 ELSE $1 END,ganado_semanal_inicio=$8::date,historial_detallado=$7::jsonb WHERE id=$9 RETURNING *`,[balance,points,JSON.stringify(assigned),usage.ruleta_usos||0,usage.cofres_usos||0,usage.dados_usos||0,JSON.stringify(hist),inicioSemanaLima(new Date()),req.userId]);
+        await client.query('COMMIT');
+        res.json({message:'Cupón utilizado correctamente',beneficio:{tipo:type,valor},user:publicUserData(out.rows[0])});
+    } catch(e) { try{await client.query('ROLLBACK')}catch(_){} res.status(400).json({error:e.message}); } finally { client.release(); }
+});
+
 app.get('/api/catalogs/config', authenticate, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const r=await pool.query('SELECT catalogos_config FROM configuracion WHERE id=1');const c=(r.rows[0]&&r.rows[0].catalogos_config)||{};res.json({canjes:Array.isArray(c.canjes)?c.canjes:[],logros:Array.isArray(c.logros)?c.logros:[],cupones:Array.isArray(c.cupones)?c.cupones:[]})}catch(e){res.status(500).json({error:'Error obteniendo catálogos'})}});
-app.put('/api/admin/catalogs/config', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const c={canjes:Array.isArray(req.body.canjes)?req.body.canjes:[],logros:Array.isArray(req.body.logros)?req.body.logros:[],cupones:Array.isArray(req.body.cupones)?req.body.cupones:[]};const r=await pool.query(`INSERT INTO configuracion(id,catalogos_config,updated_at) VALUES(1,$1,NOW()) ON CONFLICT(id) DO UPDATE SET catalogos_config=$1,updated_at=NOW() RETURNING catalogos_config`,[JSON.stringify(c)]);res.json({message:'Catálogos guardados',config:r.rows[0].catalogos_config})}catch(e){console.error(e);res.status(500).json({error:'Error guardando catálogos'})}});
+app.put('/api/admin/catalogs/config', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS catalogos_config JSONB DEFAULT '{}'::jsonb`);const c=normalizarCatalogos(req.body || {});const r=await pool.query(`INSERT INTO configuracion(id,catalogos_config,updated_at) VALUES(1,$1,NOW()) ON CONFLICT(id) DO UPDATE SET catalogos_config=$1,updated_at=NOW() RETURNING catalogos_config`,[JSON.stringify(c)]);res.json({message:'Catálogos guardados',config:r.rows[0].catalogos_config})}catch(e){console.error(e);res.status(500).json({error:'Error guardando catálogos'})}});
 
 app.post('/api/user/game/prize', authenticate, async (req,res)=>{
   const game=String(req.body.game||'').toLowerCase(); const requestedAmount=Number(req.body.amount||0);
@@ -2185,8 +2269,49 @@ app.post('/api/admin/user/:id/task/assign', authenticate, isAdmin, async (req,re
     } catch (e) { try { await client.query('ROLLBACK'); } catch (_) {} console.error('Error asignando tarea:', e); res.status(400).json({error:e.message}); }
     finally { client.release(); }
 });
-app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req,res)=>{
- const client=await pool.connect(); try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],i=Number(req.body.index),ts=Array.isArray(u.tareas_asignadas)?u.tareas_asignadas:[],t=ts[i];if(!t)throw new Error('Tarea no encontrada');if(t.estado==='aprobada')throw new Error('Tarea ya aprobada');t.estado='aprobada';t.fechaAprobacion=new Date().toISOString();if(req.body.nota!==undefined)t.notaAdmin=String(req.body.nota);const rewardType=String(t.tipo_recompensa||t.tipo||t.recompensa_tipo||'puntos').trim().toLowerCase(),qty=Number(t.cantidad??t.monto??t.montoUSDT??t.recompensa??t.puntos??0),points=rewardType==='usdt'?0:qty,money=rewardType==='usdt'?qty:0;const h=Array.isArray(u.historial_detallado)?u.historial_detallado:[];h.push({tipo:'tarea',type:'tarea',concepto:'Tarea aprobada: '+(t.tareaNombre||t.nombre||'Actividad'),actividad:t.tareaNombre||t.nombre||'Actividad',puntos:points,monto:money,amount:money,nota:t.notaAdmin||null,fecha:new Date().toISOString(),estado:'aprobado',status:'aprobado'});const r=await client.query('UPDATE users SET tareas_asignadas=$1,puntos=COALESCE(puntos,0)+$2,balance=COALESCE(balance,0)+$3,total_ganado=COALESCE(total_ganado,0)+$3,ganado_semanal=COALESCE(ganado_semanal,0)+$3,ganado_semanal_inicio=COALESCE(ganado_semanal_inicio,CURRENT_DATE),historial_detallado=$4 WHERE id=$5 RETURNING *',[JSON.stringify(ts),points,money,JSON.stringify(h),req.params.id]);await reconciliarAcumulados(req.params.id, client);await client.query('COMMIT');res.json({message:'Tarea aprobada',user:publicUserData(r.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}
+app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const q = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.params.id]);
+        if (!q.rows.length) throw new Error('Usuario no encontrado');
+        const u = q.rows[0];
+        const tareas = Array.isArray(u.tareas_asignadas) ? u.tareas_asignadas : [];
+        const requestedId = req.body && (req.body.taskId || req.body.tareaId || req.body.id);
+        let index = Number.isInteger(Number(req.body && req.body.index)) ? Number(req.body.index) : -1;
+        if (requestedId != null && requestedId !== '') {
+            const found = tareas.findIndex(t => String(t && (t.id || t.tareaId || t.taskId)) === String(requestedId));
+            if (found >= 0) index = found;
+        }
+        const tarea = tareas[index];
+        if (!tarea) throw new Error('Tarea no encontrada');
+        const estado = String(tarea.estado || tarea.status || '').trim().toLowerCase();
+        if (['aprobada', 'aprobado'].includes(estado)) throw new Error('Tarea ya aprobada');
+        if (!['completada', 'completado', 'pendiente', 'enviada', ''].includes(estado)) throw new Error('La tarea no está pendiente de aprobación');
+
+        const rewardType = String(tarea.tipo_recompensa || tarea.tipoRecompensa || tarea.recompensa_tipo || tarea.tipo || 'puntos').trim().toLowerCase();
+        const quantity = Number(tarea.cantidad ?? tarea.monto ?? tarea.montoUSDT ?? tarea.recompensa ?? tarea.puntos ?? 0);
+        if (!Number.isFinite(quantity) || quantity < 0) throw new Error('Recompensa inválida');
+        const isMoney = ['usdt', 'usdt0', 'usd', 'dinero', 'saldo', 'monto', 'money'].includes(rewardType) || rewardType.includes('usdt');
+        const points = isMoney ? 0 : Math.floor(quantity);
+        const money = isMoney ? Number(quantity.toFixed(2)) : 0;
+        const now = new Date().toISOString();
+        tarea.estado = 'aprobada'; tarea.status = 'aprobado'; tarea.fechaAprobacion = now;
+        if (req.body.nota !== undefined) tarea.notaAdmin = String(req.body.nota);
+
+        const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
+        historial.push({ tipo: 'tarea', type: 'tarea', concepto: 'Tarea aprobada: ' + (tarea.tareaNombre || tarea.nombre || 'Actividad'), actividad: tarea.tareaNombre || tarea.nombre || 'Actividad', puntos, monto: money, amount: money, nota: tarea.notaAdmin || null, fecha: now, estado: 'aprobado', status: 'aprobado' });
+        const weekStart = inicioSemanaLima(new Date());
+        const oldWeekStart = normalizarFechaLima(u.ganado_semanal_inicio);
+        const oldWeekly = oldWeekStart === weekStart ? Number(u.ganado_semanal || 0) : 0;
+        const updated = await client.query(`UPDATE users SET tareas_asignadas=$1::jsonb, puntos=COALESCE(puntos,0)+$2, balance=COALESCE(balance,0)+$3, total_ganado=COALESCE(total_ganado,0)+$3, ganado_semanal=$4, ganado_semanal_inicio=$5::date, historial_detallado=$6::jsonb WHERE id=$7 RETURNING *`, [JSON.stringify(tareas), points, money, Number((oldWeekly + money).toFixed(2)), weekStart, JSON.stringify(historial), req.params.id]);
+        await client.query('COMMIT');
+        const saved = await pool.query('SELECT * FROM users WHERE id=$1', [req.params.id]);
+        res.json({ message: 'Tarea aprobada', user: publicUserData(saved.rows[0]) });
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        res.status(400).json({ error: error.message || 'No se pudo aprobar la tarea' });
+    } finally { client.release(); }
 });
 app.post('/api/admin/user/:id/task/reject', authenticate, isAdmin, async (req,res)=>{try{const q=await pool.query('SELECT tareas_asignadas FROM users WHERE id=$1',[req.params.id]);if(!q.rows.length)return res.status(404).json({error:'Usuario no encontrado'});const ts=q.rows[0].tareas_asignadas||[],t=ts[Number(req.body.index)];if(!t)return res.status(404).json({error:'Tarea no encontrada'});t.estado='rechazada';t.fechaRechazo=new Date().toISOString();t.notaAdmin=String(req.body.nota||'');const r=await pool.query('UPDATE users SET tareas_asignadas=$1 WHERE id=$2 RETURNING *',[JSON.stringify(ts),req.params.id]);res.json({message:'Tarea rechazada',user:publicUserData(r.rows[0])});}catch(e){res.status(500).json({error:'Error procesando tarea'})}});
 app.post('/api/admin/user/:id/withdraw/approve', authenticate, isAdmin, async (req,res)=>{const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],h=Array.isArray(u.historial)?u.historial:[];const requestedDate=String(req.body.fecha||'');let i=Number(req.body.index);if(requestedDate){const found=h.findIndex(function(item){return item&&item.type==='retiro'&&item.status==='pendiente'&&String(item.date)===requestedDate});if(found>=0)i=found}const w=h[i];if(!w||w.type!=='retiro'||w.status!=='pendiente')throw new Error('Retiro pendiente no encontrado');w.status='aprobado';w.approvedAt=new Date().toISOString();w.nota_admin=String(req.body.nota||'');w.direccion_envio=w.address||u.direccion_retiro||null;const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'retiro',concepto:'Retiro aprobado'+(w.nota_admin?'. Nota: '+w.nota_admin:''),monto:Number(w.amount||0),comision:Number(w.commission||0),neto:Number(w.netAmount||w.amount||0),fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET historial=$1,historial_detallado=$2 WHERE id=$3 RETURNING *',[JSON.stringify(h),JSON.stringify(d),req.params.id]);await client.query('COMMIT');res.json({message:'Retiro aprobado',user:publicUserData(r.rows[0])})}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}});
