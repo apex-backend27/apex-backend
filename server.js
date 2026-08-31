@@ -2265,7 +2265,18 @@ app.post('/api/admin/user/:id/task/assign', authenticate, isAdmin, async (req,re
         ts.push(tarea);
         const r = await client.query('UPDATE users SET tareas_asignadas=$1::jsonb WHERE id=$2 RETURNING *', [JSON.stringify(ts), u.id]);
         await client.query('COMMIT');
-        res.json({message:'Tarea asignada', user:r.rows[0], tarea});
+        try {
+            await crearNotificacion({
+                userId: u.id,
+                tipo: 'tarea',
+                titulo: 'Nueva actividad asignada',
+                descripcion: `El administrador te asignó la actividad: ${tarea.tareaNombre}`,
+                accion: 'informativa',
+                entidadId: `tarea-asignada:${u.id}:${tarea.tareaId}:${Date.now()}`,
+                metadata: { tareaId: tarea.tareaId, tareaNombre: tarea.tareaNombre, tipoRecompensa: tarea.tipo_recompensa, cantidad: tarea.cantidad }
+            });
+        } catch (notificationError) { console.error('No se pudo notificar la asignación de tarea:', notificationError.message); }
+        res.json({message:'Tarea asignada y notificada al usuario', user:r.rows[0], tarea, notificacionEnviada:true});
     } catch (e) { try { await client.query('ROLLBACK'); } catch (_) {} console.error('Error asignando tarea:', e); res.status(400).json({error:e.message}); }
     finally { client.release(); }
 });
@@ -2300,7 +2311,7 @@ app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req, 
         if (req.body.nota !== undefined) tarea.notaAdmin = String(req.body.nota);
 
         const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
-        historial.push({ tipo: 'tarea', type: 'tarea', concepto: 'Tarea aprobada: ' + (tarea.tareaNombre || tarea.nombre || 'Actividad'), actividad: tarea.tareaNombre || tarea.nombre || 'Actividad', puntos, monto: money, amount: money, nota: tarea.notaAdmin || null, fecha: now, estado: 'aprobado', status: 'aprobado' });
+        historial.push({ tipo: 'tarea', type: 'tarea', concepto: 'Tarea aprobada: ' + (tarea.tareaNombre || tarea.nombre || 'Actividad'), actividad: tarea.tareaNombre || tarea.nombre || 'Actividad', puntos: points, monto: money, amount: money, nota: tarea.notaAdmin || null, fecha: now, estado: 'aprobado', status: 'aprobado' });
         const weekStart = inicioSemanaLima(new Date());
         const oldWeekStart = normalizarFechaLima(u.ganado_semanal_inicio);
         const oldWeekly = oldWeekStart === weekStart ? Number(u.ganado_semanal || 0) : 0;
