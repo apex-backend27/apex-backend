@@ -1524,6 +1524,18 @@ function normalizarTipoRecompensa(value) {
     if (v.includes('usdt') || v.includes('usd') || v.includes('saldo') || v.includes('dinero')) return 'usdt';
     return 'puntos';
 }
+function normalizarTipoCupon(value) {
+    const v = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
+    if (v.includes('descuento') && v.includes('retiro')) return 'descuento_retiro';
+    if (v.includes('descuento') && v.includes('refer')) return 'descuento_referido';
+    if (v.includes('bono') && v.includes('deposit')) return 'bono_deposito';
+    if (v.includes('punto')) return 'puntos';
+    if (v.includes('usdt') || v.includes('usd') || v.includes('saldo') || v.includes('dinero')) return 'usdt';
+    if (v.includes('cofre')) return 'cofres_usos';
+    if (v.includes('ruleta')) return 'ruleta_usos';
+    if (v.includes('dado')) return 'dados_usos';
+    return 'puntos';
+}
 function normalizarCatalogo(catalogo, tipo, index) {
     const x = catalogo && typeof catalogo === 'object' ? {...catalogo} : {};
     x.id = String(x.id || x.codigo || `${tipo}_${index + 1}`);
@@ -1537,7 +1549,7 @@ function normalizarCatalogo(catalogo, tipo, index) {
     }
     if (tipo === 'cupon') {
         x.codigo = String(x.codigo || x.id).trim().toUpperCase();
-        x.tipo = normalizarTipoRecompensa(x.tipo_recompensa || x.tipo || x.beneficio);
+        x.tipo = normalizarTipoCupon(x.tipo_recompensa || x.tipo || x.beneficio);
         x.valor = Math.max(0, Number(x.valor ?? x.monto ?? x.amount ?? 0) || 0);
         x.dias_vigencia = Math.max(1, Math.floor(Number(x.dias_vigencia ?? x.dias ?? 7)) || 7);
         x.max_usos = Math.max(1, Math.floor(Number(x.max_usos ?? x.limite_usos ?? 1)) || 1);
@@ -1568,13 +1580,15 @@ app.post('/api/user/coupons/use', authenticate, async (req, res) => {
         const assigned=Array.isArray(u.cupones_asignados)?u.cupones_asignados:[];
         const ai=assigned.findIndex(x=>String(x?.codigo||x?.cuponId||x?.id||'').toUpperCase()===code && !x.usado);
         if (ai<0) throw new Error('No tienes este cupón disponible');
-        const item=assigned[ai]; item.usado=true; item.usado_en=new Date().toISOString();
-        const value=Number(coupon.valor||0), type=normalizarTipoRecompensa(coupon.tipo);
+        const item=assigned[ai]; item.usado=true; item.usado_en=new Date().toISOString(); item.beneficio_aplicado={tipo,valor};
+        const value=Number(coupon.valor||0), type=normalizarTipoCupon(coupon.tipo), benefit={tipo:type,valor:value,codigo:coupon.codigo,activadoEn:new Date().toISOString()};
         let balance=0,points=0,usage={};
-        if(type==='usdt') balance=value; else if(type==='puntos') points=Math.floor(value); else usage[type]=Math.floor(value);
+        if(type==='usdt') balance=value; else if(type==='puntos') points=Math.floor(value); else if(['ruleta_usos','cofres_usos','dados_usos'].includes(type)) usage[type]=Math.floor(value);
         const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];
-        hist.push({tipo:'cupon',concepto:`Cupón utilizado: ${coupon.nombre}`,monto:balance,puntos:points,fecha:new Date().toISOString(),estado:'acreditado'});
-        const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,cupones_asignados=$3::jsonb,ruleta_usos=COALESCE(ruleta_usos,0)+$4,cofres_usos=COALESCE(cofres_usos,0)+$5,dados_usos=COALESCE(dados_usos,0)+$6,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,$8::date)=$8::date THEN COALESCE(ganado_semanal,0)+$1 ELSE $1 END,ganado_semanal_inicio=$8::date,historial_detallado=$7::jsonb WHERE id=$9 RETURNING *`,[balance,points,JSON.stringify(assigned),usage.ruleta_usos||0,usage.cofres_usos||0,usage.dados_usos||0,JSON.stringify(hist),inicioSemanaLima(new Date()),req.userId]);
+        hist.push({tipo:'cupon',concepto:`Cupón utilizado: ${coupon.nombre}`,monto:balance,puntos:points,beneficio:benefit,fecha:new Date().toISOString(),estado:'acreditado'});
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bonusReferidoActivo JSONB DEFAULT NULL, ADD COLUMN IF NOT EXISTS bonusDepositoActivo JSONB DEFAULT NULL`);
+        const retiroActivo=type==='descuento_retiro'?JSON.stringify(benefit):JSON.stringify(u.descuentoRetiroActivo||null), referidoActivo=type==='descuento_referido'?JSON.stringify(benefit):JSON.stringify(u.bonusReferidoActivo||null), depositoActivo=type==='bono_deposito'?JSON.stringify(benefit):JSON.stringify(u.bonusDepositoActivo||null);
+        const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,cupones_asignados=$3::jsonb,ruleta_usos=COALESCE(ruleta_usos,0)+$4,cofres_usos=COALESCE(cofres_usos,0)+$5,dados_usos=COALESCE(dados_usos,0)+$6,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,$8::date)=$8::date THEN COALESCE(ganado_semanal,0)+$1 ELSE $1 END,ganado_semanal_inicio=$8::date,descuentoRetiroActivo=$10::jsonb,bonusReferidoActivo=$11::jsonb,bonusDepositoActivo=$12::jsonb,historial_detallado=$7::jsonb WHERE id=$9 RETURNING *`,[balance,points,JSON.stringify(assigned),usage.ruleta_usos||0,usage.cofres_usos||0,usage.dados_usos||0,JSON.stringify(hist),inicioSemanaLima(new Date()),req.userId,retiroActivo,referidoActivo,depositoActivo]);
         await client.query('COMMIT');
         res.json({message:'Cupón utilizado correctamente',beneficio:{tipo:type,valor},user:publicUserData(out.rows[0])});
     } catch(e) { try{await client.query('ROLLBACK')}catch(_){} res.status(400).json({error:e.message}); } finally { client.release(); }
@@ -2182,7 +2196,7 @@ app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
         if (balance < plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Saldo insuficiente' }); }
         if (u.plan && u.plan !== 'Sin plan' && Number(u.plan_amount || 0) >= plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Ya tienes este plan o uno superior' }); }
         const history = await registrarMovimiento(client, req.userId, 'compra_plan', -plan.amount, 'Compra del plan ' + req.body.plan, { plan: req.body.plan });
-        const updated = await client.query('UPDATE users SET balance = $1, plan = $2, plan_amount = $3, daily_earnings = $4, historial_detallado = $5 WHERE id = $6 RETURNING *', [balance - plan.amount, req.body.plan, plan.amount, plan.daily, JSON.stringify(history), req.userId]);
+        const updated = await client.query('UPDATE users SET balance = $1, plan = $2, plan_amount = $3, daily_earnings = $4, nivel_autorizado = 0, historial_detallado = $5 WHERE id = $6 RETURNING *', [balance - plan.amount, req.body.plan, plan.amount, plan.daily, JSON.stringify(history), req.userId]);
         await client.query('COMMIT');
         res.json({ message: 'Plan adquirido', user: updated.rows[0] });
     } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudo adquirir el plan' }); } finally { client.release(); }
@@ -2319,6 +2333,15 @@ app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req, 
         try { await client.query('ROLLBACK'); } catch (_) {}
         res.status(400).json({ error: error.message || 'No se pudo aprobar la tarea' });
     } finally { client.release(); }
+});
+app.delete('/api/admin/user/:id/assignments', authenticate, isAdmin, async (req,res)=>{
+    const type=String(req.body?.tipo||req.body?.type||'').toLowerCase();
+    const rawId=req.body?.id ?? req.body?.index;
+    const allowed={tarea:'tareas_asignadas',logro:'logros_asignados',cupon:'cupones_asignados'};
+    const field=allowed[type];
+    if(!field) return res.status(400).json({error:'Tipo de asignación inválido'});
+    const client=await pool.connect();
+    try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0];const list=Array.isArray(u[field])?u[field]:[];let idx=-1;if(type==='tarea'&&Number.isInteger(Number(rawId)))idx=Number(rawId);else idx=list.findIndex(x=>String(x?.id??x?.logroId??x?.cuponId??x?.codigo??x)===String(rawId));if(idx<0||idx>=list.length)throw new Error('Asignación no encontrada');const removed=list.splice(idx,1)[0];const r=await client.query(`UPDATE users SET ${field}=$1::jsonb WHERE id=$2 RETURNING *`,[JSON.stringify(list),u.id]);await client.query('COMMIT');res.json({message:'Asignación eliminada',tipo:type,removed,user:publicUserData(r.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message});}finally{client.release();}
 });
 app.post('/api/admin/user/:id/task/reject', authenticate, isAdmin, async (req,res)=>{try{const q=await pool.query('SELECT tareas_asignadas FROM users WHERE id=$1',[req.params.id]);if(!q.rows.length)return res.status(404).json({error:'Usuario no encontrado'});const ts=q.rows[0].tareas_asignadas||[],t=ts[Number(req.body.index)];if(!t)return res.status(404).json({error:'Tarea no encontrada'});t.estado='rechazada';t.fechaRechazo=new Date().toISOString();t.notaAdmin=String(req.body.nota||'');const r=await pool.query('UPDATE users SET tareas_asignadas=$1 WHERE id=$2 RETURNING *',[JSON.stringify(ts),req.params.id]);res.json({message:'Tarea rechazada',user:publicUserData(r.rows[0])});}catch(e){res.status(500).json({error:'Error procesando tarea'})}});
 app.post('/api/admin/user/:id/withdraw/approve', authenticate, isAdmin, async (req,res)=>{const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],h=Array.isArray(u.historial)?u.historial:[];const requestedDate=String(req.body.fecha||'');let i=Number(req.body.index);if(requestedDate){const found=h.findIndex(function(item){return item&&item.type==='retiro'&&item.status==='pendiente'&&String(item.date)===requestedDate});if(found>=0)i=found}const w=h[i];if(!w||w.type!=='retiro'||w.status!=='pendiente')throw new Error('Retiro pendiente no encontrado');w.status='aprobado';w.approvedAt=new Date().toISOString();w.nota_admin=String(req.body.nota||'');w.direccion_envio=w.address||u.direccion_retiro||null;const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'retiro',concepto:'Retiro aprobado'+(w.nota_admin?'. Nota: '+w.nota_admin:''),monto:Number(w.amount||0),comision:Number(w.commission||0),neto:Number(w.netAmount||w.amount||0),fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET historial=$1,historial_detallado=$2 WHERE id=$3 RETURNING *',[JSON.stringify(h),JSON.stringify(d),req.params.id]);await client.query('COMMIT');res.json({message:'Retiro aprobado',user:publicUserData(r.rows[0])})}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}});
