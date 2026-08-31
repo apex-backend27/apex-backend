@@ -913,10 +913,6 @@ app.get('/api/verify', authenticate, async (req, res) => {
         }
         
                 const userData = result.rows[0];
-        if (Array.isArray(updates.tareas_asignadas)) {
-            const pendientes = updates.tareas_asignadas.filter(t => ['completada','completado','pendiente'].includes(String(t?.estado || '').toLowerCase()));
-            if (pendientes.length) await notificarAdministradores({ tipo: 'tarea', titulo: 'Nueva actividad pendiente de aprobación', descripcion: `${userData.nombre || ''} ${userData.apellido || ''} envió ${pendientes.length} actividad(es) para revisión`, entidadId: `tarea:${userId}:${Date.now()}`, metadata: { userId, cantidad: pendientes.length } });
-        }
         const reconciledUser = await reconciliarAcumulados(req.userId);
         if (reconciledUser) Object.assign(userData, reconciledUser);
         const withdrawalConfigResult = await pool.query('SELECT minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url FROM configuracion WHERE id = 1');
