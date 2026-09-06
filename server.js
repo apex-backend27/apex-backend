@@ -836,7 +836,6 @@ function publicUserData(row, referidosOverride) {
         cuenta_habilitada: safe.cuenta_habilitada !== false,
         produccion_pausada: Boolean(safe.produccion_pausada),
         nivel_autorizado: Number(safe.nivel_autorizado || 0),
-        comision_retiro_porcentaje: safe.comision_retiro_porcentaje == null ? null : Number(safe.comision_retiro_porcentaje),
         historial: Array.isArray(safe.historial) ? safe.historial : [],
         historial_detallado: Array.isArray(safe.historial_detallado) ? safe.historial_detallado : [],
         tareas_asignadas: Array.isArray(safe.tareas_asignadas) ? safe.tareas_asignadas : [],
@@ -1379,8 +1378,8 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);
-        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE, ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb, ADD COLUMN IF NOT EXISTS tareas_fin_semana JSONB DEFAULT '[]'::jsonb, ADD COLUMN IF NOT EXISTS horarios_fin_semana JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_sorpresa JSONB DEFAULT '[]'::jsonb`);
-        const result = await pool.query('SELECT tareas_config, tareas_fin_semana, horarios_fin_semana, tareas_sorpresa, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, tareas_dias_activos, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE, ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
+        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, tareas_dias_activos, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
         const hoyLima = normalizarFechaLima(new Date());
         const fechaActivacion = row.tareas_activacion_dia ? String(row.tareas_activacion_dia).slice(0, 10) : (row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}/) ? String(row.tareas_activacion).slice(0, 10) : normalizarFechaLima(new Date(row.tareas_activacion))) : null);
@@ -1393,11 +1392,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         if (rowConRotacion && rowConRotacion.minijuegos_activo) row.minijuegos_activo = rowConRotacion.minijuegos_activo;
         if (rowConRotacion && rowConRotacion.tareas_config) row.tareas_config = rowConRotacion.tareas_config;
         const paqueteActivo = row.minijuegos_activo && row.minijuegos_activo.activo === true && row.minijuegos_activo.fecha === hoyLima;
-        const weekendConfig = row.tareas_fin_semana && typeof row.tareas_fin_semana === 'object' && !Array.isArray(row.tareas_fin_semana) ? row.tareas_fin_semana : {sabado:Array.isArray(row.tareas_fin_semana)?row.tareas_fin_semana:[],domingo:[]};
-        const diaFinSemana = diaSemanaActual === 6 ? 'sabado' : diaSemanaActual === 0 ? 'domingo' : null;
-        const tareasSemana = diaFinSemana && Array.isArray(weekendConfig[diaFinSemana]) ? weekendConfig[diaFinSemana] : [];
-        const esFinDeSemana = Boolean(diaFinSemana);
-        const tareasBase = (esFinDeSemana ? tareasSemana : (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto)).slice(0, 5);
+        const tareasBase = (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5);
         const tareasConfiguradas = paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length
             ? row.minijuegos_activo.tareas.slice(0, 5).map((j, i) => Object.assign({}, j, {
                 hora: tareasBase[i] && tareasBase[i].hora !== undefined ? tareasBase[i].hora : j.hora,
@@ -1422,10 +1417,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             diaSemanaActual,
             diaHabilitadoHoy,
             horaCobro: row.hora_cobro || '20:00',
-            hora_cobro: row.hora_cobro || '20:00',
-            tareasFinSemana: weekendConfig,
-            horariosFinSemana: row.horarios_fin_semana || {},
-            tareasSorpresa: Array.isArray(row.tareas_sorpresa) ? row.tareas_sorpresa : []
+            hora_cobro: row.hora_cobro || '20:00'
         });
     } catch (error) {
         console.error('Error obteniendo configuración de tareas:', error);
@@ -1489,8 +1481,6 @@ app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
     }
 });
 
-app.get('/api/admin/tasks/weekend', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_fin_semana JSONB DEFAULT '[]'::jsonb, ADD COLUMN IF NOT EXISTS horarios_fin_semana JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_sorpresa JSONB DEFAULT '[]'::jsonb`);const q=await pool.query('SELECT tareas_fin_semana,horarios_fin_semana,tareas_sorpresa FROM configuracion WHERE id=1');const r=q.rows[0]||{};res.json({tareasFinSemana:Array.isArray(r.tareas_fin_semana)?r.tareas_fin_semana:[],horariosFinSemana:r.horarios_fin_semana||{},tareasSorpresa:Array.isArray(r.tareas_sorpresa)?r.tareas_sorpresa:[]})}catch(e){res.status(500).json({error:'No se pudo obtener configuración de fin de semana'})}});
-app.put('/api/admin/tasks/weekend', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_fin_semana JSONB DEFAULT '[]'::jsonb, ADD COLUMN IF NOT EXISTS horarios_fin_semana JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_sorpresa JSONB DEFAULT '[]'::jsonb`);const tasks=Array.isArray(req.body.tareasFinSemana)?req.body.tareasFinSemana.slice(0,5):[],hours=req.body.horariosFinSemana&&typeof req.body.horariosFinSemana==='object'?req.body.horariosFinSemana:{},surprise=Array.isArray(req.body.tareasSorpresa)?req.body.tareasSorpresa:[];const q=await pool.query(`INSERT INTO configuracion(id,tareas_fin_semana,horarios_fin_semana,tareas_sorpresa,updated_at) VALUES(1,$1::jsonb,$2::jsonb,$3::jsonb,NOW()) ON CONFLICT(id) DO UPDATE SET tareas_fin_semana=$1::jsonb,horarios_fin_semana=$2::jsonb,tareas_sorpresa=$3::jsonb,updated_at=NOW() RETURNING tareas_fin_semana,horarios_fin_semana,tareas_sorpresa`,[JSON.stringify(tasks),JSON.stringify(hours),JSON.stringify(surprise)]);res.json({message:'Configuración de fin de semana guardada',tareasFinSemana:q.rows[0].tareas_fin_semana,horariosFinSemana:q.rows[0].horarios_fin_semana,tareasSorpresa:q.rows[0].tareas_sorpresa})}catch(e){console.error(e);res.status(500).json({error:'No se pudo guardar configuración de fin de semana'})}});
 app.put('/api/admin/tasks/schedule', authenticate, isAdmin, async (req, res) => {
     try {
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
@@ -1537,7 +1527,7 @@ function normalizarTipoRecompensa(value) {
 function normalizarTipoCupon(value) {
     const v = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
     if (v.includes('descuento') && v.includes('retiro')) return 'descuento_retiro';
-    if ((v.includes('descuento') || v.includes('bonus') || v.includes('bono')) && v.includes('refer')) return 'descuento_referido';
+    if (v.includes('descuento') && v.includes('refer')) return 'descuento_referido';
     if (v.includes('bono') && v.includes('deposit')) return 'bono_deposito';
     if (v.includes('punto')) return 'puntos';
     if (v.includes('usdt') || v.includes('usd') || v.includes('saldo') || v.includes('dinero')) return 'usdt';
@@ -1562,8 +1552,7 @@ function normalizarCatalogo(catalogo, tipo, index) {
         x.tipo = normalizarTipoCupon(x.tipo_recompensa || x.tipo || x.beneficio);
         x.valor = Math.max(0, Number(x.valor ?? x.monto ?? x.amount ?? 0) || 0);
         x.dias_vigencia = Math.max(1, Math.floor(Number(x.dias_vigencia ?? x.dias ?? 7)) || 7);
-        x.duracion = String(x.duracion || ((Number(x.max_usos) === 0) ? 'siempre' : 'unico')).toLowerCase() === 'siempre' ? 'siempre' : 'unico';
-        x.max_usos = x.duracion === 'siempre' ? 0 : 1;
+        x.max_usos = Math.max(1, Math.floor(Number(x.max_usos ?? x.limite_usos ?? 1)) || 1);
         x.activo = x.activo !== false;
     }
     return x;
@@ -1589,12 +1578,10 @@ app.post('/api/user/coupons/use', authenticate, async (req, res) => {
         const coupon=catalogs.cupones.find(x=>x.codigo===code || x.id===code);
         if (!coupon || coupon.activo===false) throw new Error('Cupón inválido o inactivo');
         const assigned=Array.isArray(u.cupones_asignados)?u.cupones_asignados:[];
-        const duration=String(coupon.duracion || (Number(coupon.max_usos) === 0 ? 'siempre' : 'unico')).toLowerCase() === 'siempre' ? 'siempre' : 'unico';
-        const ai=assigned.findIndex(x=>String(x?.codigo||x?.cuponId||x?.id||'').toUpperCase()===code && (duration==='siempre' || !x.usado));
+        const ai=assigned.findIndex(x=>String(x?.codigo||x?.cuponId||x?.id||'').toUpperCase()===code && !x.usado);
         if (ai<0) throw new Error('No tienes este cupón disponible');
-        const item=assigned[ai];
-        const value=Number(coupon.valor||0), type=normalizarTipoCupon(coupon.tipo), benefit={tipo:type,valor:value,codigo:coupon.codigo,duracion:duration,activadoEn:new Date().toISOString()};
-        item.usado = duration !== 'siempre'; item.usado_en = duration === 'siempre' ? null : new Date().toISOString(); item.duracion=duration; item.beneficio_aplicado=benefit;
+        const item=assigned[ai]; item.usado=true; item.usado_en=new Date().toISOString(); item.beneficio_aplicado={tipo,valor};
+        const value=Number(coupon.valor||0), type=normalizarTipoCupon(coupon.tipo), benefit={tipo:type,valor:value,codigo:coupon.codigo,activadoEn:new Date().toISOString()};
         let balance=0,points=0,usage={};
         if(type==='usdt') balance=value; else if(type==='puntos') points=Math.floor(value); else if(['ruleta_usos','cofres_usos','dados_usos'].includes(type)) usage[type]=Math.floor(value);
         const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];
@@ -1969,7 +1956,6 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
             return res.status(403).json({ error: 'Acceso denegado' });
         }
         
-        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT NULL');
         const userId = req.params.id;
         const updates = { ...req.body };
         if (updates.password) { updates.password_hash = await bcrypt.hash(String(updates.password), 10); delete updates.password; }
@@ -1989,7 +1975,7 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
                 'canjes_realizados', 'cupones_asignados', 'logros_asignados', 'logros_reclamados',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
                 'nombre', 'apellido', 'password_hash', 'password_retiro_hash', 'plan_amount', 'daily_earnings',
-                'comision_retiro_porcentaje', 'es_admin', 'es_super_admin', 'total_ganado', 'ganado_semanal', 'ganado_semanal_inicio'];
+                'es_admin', 'es_super_admin', 'total_ganado', 'ganado_semanal', 'ganado_semanal_inicio'];
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
                 if (typeof value === 'object' && value !== null) {
@@ -2166,7 +2152,6 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT NULL');
         const q = await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);
         if (!q.rows.length) throw new Error('Usuario no encontrado');
         const u=q.rows[0];
@@ -2186,21 +2171,15 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
         const configResult = await client.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
         const config = configResult.rows[0] || {};
         const minimoRetiro = Number(config.minimo_retiro ?? 10);
-        const globalComision = Number(config.comision_retiro_porcentaje ?? 23);
-        const individualComision = Number(u.comision_retiro_porcentaje);
-        const baseComision = Number.isFinite(individualComision) && individualComision >= 0 && individualComision <= 100 ? individualComision : globalComision;
-        const coupon = u.descuentoRetiroActivo && typeof u.descuentoRetiroActivo === 'object' ? u.descuentoRetiroActivo : null;
-        const descuento = coupon && String(coupon.tipo||'').toLowerCase() === 'descuento_retiro' ? Math.max(0, Math.min(100, Number(coupon.valor)||0)) : 0;
-        const comisionPorcentaje = Math.max(0, baseComision - descuento);
+        const comisionPorcentaje = Number(config.comision_retiro_porcentaje ?? 23);
         if (value < minimoRetiro) { await client.query('ROLLBACK'); return res.status(400).json({error:`El retiro mínimo es de ${minimoRetiro.toFixed(2)} USDT0`}); }
         const addr=String(address || u.direccion_retiro || '');
         if (!addr.startsWith('0x')) { await client.query('ROLLBACK'); return res.status(400).json({error:'Dirección de retiro no configurada'}); }
         if (Number(u.balance||0) < value) { await client.query('ROLLBACK'); return res.status(400).json({error:'Saldo insuficiente'}); }
-        const commission=value*(comisionPorcentaje/100), net=value-commission, item={type:'retiro',amount:value,commission,commissionPercentage:comisionPorcentaje,commissionBase:baseComision,discountApplied:descuento,netAmount:net,date:new Date().toISOString(),status:'pendiente',address:addr};
+        const commission=value*(comisionPorcentaje/100), net=value-commission, item={type:'retiro',amount:value,commission,commissionPercentage:comisionPorcentaje,netAmount:net,date:new Date().toISOString(),status:'pendiente',address:addr};
         const hist=Array.isArray(u.historial)?u.historial:[]; hist.push(item);
-        const detail=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; detail.push({tipo:'retiro',concepto:'Retiro de $'+value.toFixed(2),monto:value,comision:commission,comision_base:baseComision,descuento:descuento,neto:net,fecha:item.date,estado:'pendiente'});
-        const clearCoupon = coupon && String(coupon.duracion||'unico').toLowerCase() !== 'siempre';
-        const updated=await client.query('UPDATE users SET balance=balance-$1,historial=$2,historial_detallado=$3,descuentoRetiroActivo=CASE WHEN $5 THEN NULL ELSE descuentoRetiroActivo END WHERE id=$4 RETURNING balance,historial,historial_detallado',[value,JSON.stringify(hist),JSON.stringify(detail),req.userId,clearCoupon]);
+        const detail=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; detail.push({tipo:'retiro',concepto:'Retiro de $'+value.toFixed(2),monto:value,comision:commission,neto:net,fecha:item.date,estado:'pendiente'});
+        const updated=await client.query('UPDATE users SET balance=balance-$1,historial=$2,historial_detallado=$3 WHERE id=$4 RETURNING balance,historial,historial_detallado',[value,JSON.stringify(hist),JSON.stringify(detail),req.userId]);
         await client.query('COMMIT'); res.json({message:'Solicitud de retiro enviada',user:updated.rows[0]});
     } catch(e) { try{await client.query('ROLLBACK')}catch{}; console.error('Error retiro:',e); res.status(500).json({error:'Error en el servidor'}); } finally { client.release(); }
 });
@@ -2370,6 +2349,11 @@ app.post('/api/admin/user/:id/withdraw/reject', authenticate, isAdmin, async (re
 // ============================================================
 // INICIAR SERVIDOR
 // ============================================================
+app.post('/api/user/achievements/claim', authenticate, async (req,res)=>{
+  const logroId=String(req.body?.logroId||req.body?.id||'').trim(); if(!logroId)return res.status(400).json({error:'Logro requerido'});
+  const client=await pool.connect(); try{await client.query('BEGIN'); const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]); if(!q.rows.length)throw new Error('Usuario no encontrado'); const u=q.rows[0]; const assigned=Array.isArray(u.logros_asignados)?u.logros_asignados:[]; const index=assigned.findIndex(x=>String(x?.id??x?.logroId??x?.logro_id??x)===logroId); if(index<0)throw new Error('Logro no encontrado'); const logro=typeof assigned[index]==='object'?{...assigned[index]}:{id:logroId}; const reclaimed=Array.isArray(u.logros_reclamados)?u.logros_reclamados:[]; if(logro.reclamado||reclaimed.some(x=>String(typeof x==='object'?(x.id||x.logroId):x)===logroId))throw new Error('Este logro ya fue reclamado'); const tipo=String(logro.tipo||'').toLowerCase(); const isPlan=tipo==='plan'||/tener\s*plan/i.test(String(logro.nombre||'')); const completed=['completado','completada','completed'].includes(String(logro.estado||'').toLowerCase())||logro.completado===true||isPlan&&u.plan&& !/^sin[_ ]?plan$/i.test(String(u.plan)); if(!completed)throw new Error('El logro aún no está completado'); const reward=Math.max(0,Number(logro.recompensa??logro.cantidad??logro.premio??0)||0); if(reward<=0)throw new Error('El logro no tiene recompensa válida'); const rewardType=String(logro.recompensa_tipo||logro.tipo_recompensa||'puntos').toLowerCase(); logro.estado='reclamado'; logro.reclamado=true; logro.reclamadoEn=new Date().toISOString(); assigned[index]=logro; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,DATE '1900-01-01')<DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END,ganado_semanal_inicio=DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date,logros_asignados=$3::jsonb,logros_reclamados=$4::jsonb WHERE id=$5 RETURNING *`,[rewardType==='usdt'?reward:0,rewardType==='usdt'?0:Math.floor(reward),JSON.stringify(assigned),JSON.stringify(reclaimed.concat({id:logroId,nombre:logro.nombre||'',recompensa:reward,recompensa_tipo:rewardType,fecha:logro.reclamadoEn})),req.userId]); const item={tipo:'logro',concepto:`Recompensa de logro: ${logro.nombre||logroId}`,monto:rewardType==='usdt'?reward:0,puntos:rewardType==='usdt'?0:Math.floor(reward),fecha:logro.reclamadoEn,estado:'acreditado'}; const row=out.rows[0]; const hist=Array.isArray(row.historial_detallado)?row.historial_detallado:[]; const saved=await client.query('UPDATE users SET historial_detallado=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); res.json({message:'Recompensa reclamada',premio:reward,tipo_recompensa:rewardType,user:publicUserData(saved.rows[0])}); }catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('achievement claim',e);res.status(400).json({error:e.message||'No se pudo reclamar el logro'});}finally{client.release();}
+});
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor corriendo en puerto ${port}`);
 });
