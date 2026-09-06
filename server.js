@@ -1698,7 +1698,7 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Debes completar al menos una tarea antes de cobrar' });
         }
         const porcentaje = Math.min(completadas.length, total) / total;
-        const planDaily = { Trader: 6, Analista: 10, Gestor: 17, Master: 27, Elite: 42 };
+        const planDaily = { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 };
         const planNormalizado = normalizarPlan(u.plan);
         const diario = Number(u.daily_earnings || (planNormalizado ? planDaily[planNormalizado] : 0) || 0);
         const planText = String(u.plan || '').trim().toLowerCase();
@@ -2142,11 +2142,12 @@ app.delete('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
 // COMANDOS TRANSACCIONALES DEL SISTEMA APEX
 // ============================================================
 const PLANES_APEX = {
-    Trader: { amount: 250, daily: 6 },
-    Analista: { amount: 500, daily: 10 },
-    Gestor: { amount: 800, daily: 17 },
-    Master: { amount: 1200, daily: 27 },
-    Elite: { amount: 1800, daily: 42 }
+    Temporal: { amount: 200, daily: 5 },
+    Trader: { amount: 300, daily: 8 },
+    Analista: { amount: 500, daily: 13 },
+    Gestor: { amount: 800, daily: 17, comingSoon: true },
+    Master: { amount: 1200, daily: 27, comingSoon: true },
+    Elite: { amount: 1800, daily: 42, comingSoon: true }
 };
 
 async function registrarMovimiento(client, userId, tipo, monto, concepto, metadata = {}) {
@@ -2240,7 +2241,7 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
 
 app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
     const plan = PLANES_APEX[req.body.plan];
-    if (!plan) return res.status(400).json({ error: 'Plan inválido' });
+    if (!plan || plan.comingSoon) return res.status(400).json({ error: 'Este plan estará disponible próximamente' });
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
