@@ -1388,7 +1388,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         const autorizacionExplicita = row.tareas_autorizadas === true;
         const diasActivos = normalizarDiasActivos(row.tareas_dias_activos);
         const diaSemanaActual = obtenerDiaSemanaLima();
-        const diaHabilitadoHoy = diasActivos.includes(diaSemanaActual) || diaSemanaActual === 0 || diaSemanaActual === 6;
+        const diaHabilitadoHoy = diasActivos.includes(diaSemanaActual);
         const rowConRotacion = await avanzarPaqueteAutomaticoSiCorresponde(row, hoyLima, diaHabilitadoHoy);
         if (rowConRotacion && rowConRotacion.minijuegos_activo) row.minijuegos_activo = rowConRotacion.minijuegos_activo;
         if (rowConRotacion && rowConRotacion.tareas_config) row.tareas_config = rowConRotacion.tareas_config;
