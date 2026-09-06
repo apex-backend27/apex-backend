@@ -115,7 +115,6 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS racha_dias INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS cobro_tareas_fecha DATE,
             ADD COLUMN IF NOT EXISTS cobro_tareas_monto NUMERIC DEFAULT 0,
-            ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4),
             ADD COLUMN IF NOT EXISTS plan_activo BOOLEAN DEFAULT TRUE,
             ADD COLUMN IF NOT EXISTS nivel_autorizado INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS wallet_index INTEGER,
@@ -837,6 +836,7 @@ function publicUserData(row, referidosOverride) {
         cuenta_habilitada: safe.cuenta_habilitada !== false,
         produccion_pausada: Boolean(safe.produccion_pausada),
         nivel_autorizado: Number(safe.nivel_autorizado || 0),
+        comision_retiro_porcentaje: safe.comision_retiro_porcentaje == null ? null : Number(safe.comision_retiro_porcentaje),
         historial: Array.isArray(safe.historial) ? safe.historial : [],
         historial_detallado: Array.isArray(safe.historial_detallado) ? safe.historial_detallado : [],
         tareas_asignadas: Array.isArray(safe.tareas_asignadas) ? safe.tareas_asignadas : [],
@@ -1528,7 +1528,7 @@ function normalizarTipoRecompensa(value) {
 function normalizarTipoCupon(value) {
     const v = String(value || '').trim().toLowerCase().replace(/\s+/g, '_');
     if (v.includes('descuento') && v.includes('retiro')) return 'descuento_retiro';
-    if (v.includes('descuento') && v.includes('refer')) return 'descuento_referido';
+    if ((v.includes('descuento') || v.includes('bonus') || v.includes('bono')) && v.includes('refer')) return 'descuento_referido';
     if (v.includes('bono') && v.includes('deposit')) return 'bono_deposito';
     if (v.includes('punto')) return 'puntos';
     if (v.includes('usdt') || v.includes('usd') || v.includes('saldo') || v.includes('dinero')) return 'usdt';
@@ -1553,7 +1553,8 @@ function normalizarCatalogo(catalogo, tipo, index) {
         x.tipo = normalizarTipoCupon(x.tipo_recompensa || x.tipo || x.beneficio);
         x.valor = Math.max(0, Number(x.valor ?? x.monto ?? x.amount ?? 0) || 0);
         x.dias_vigencia = Math.max(1, Math.floor(Number(x.dias_vigencia ?? x.dias ?? 7)) || 7);
-        x.max_usos = Math.max(1, Math.floor(Number(x.max_usos ?? x.limite_usos ?? 1)) || 1);
+        x.duracion = String(x.duracion || ((Number(x.max_usos) === 0) ? 'siempre' : 'unico')).toLowerCase() === 'siempre' ? 'siempre' : 'unico';
+        x.max_usos = x.duracion === 'siempre' ? 0 : 1;
         x.activo = x.activo !== false;
     }
     return x;
@@ -1579,10 +1580,12 @@ app.post('/api/user/coupons/use', authenticate, async (req, res) => {
         const coupon=catalogs.cupones.find(x=>x.codigo===code || x.id===code);
         if (!coupon || coupon.activo===false) throw new Error('Cupón inválido o inactivo');
         const assigned=Array.isArray(u.cupones_asignados)?u.cupones_asignados:[];
-        const ai=assigned.findIndex(x=>String(x?.codigo||x?.cuponId||x?.id||'').toUpperCase()===code && !x.usado);
+        const duration=String(coupon.duracion || (Number(coupon.max_usos) === 0 ? 'siempre' : 'unico')).toLowerCase() === 'siempre' ? 'siempre' : 'unico';
+        const ai=assigned.findIndex(x=>String(x?.codigo||x?.cuponId||x?.id||'').toUpperCase()===code && (duration==='siempre' || !x.usado));
         if (ai<0) throw new Error('No tienes este cupón disponible');
-        const item=assigned[ai]; item.usado=true; item.usado_en=new Date().toISOString(); item.beneficio_aplicado={tipo,valor};
-        const value=Number(coupon.valor||0), type=normalizarTipoCupon(coupon.tipo), benefit={tipo:type,valor:value,codigo:coupon.codigo,activadoEn:new Date().toISOString()};
+        const item=assigned[ai];
+        const value=Number(coupon.valor||0), type=normalizarTipoCupon(coupon.tipo), benefit={tipo:type,valor:value,codigo:coupon.codigo,duracion:duration,activadoEn:new Date().toISOString()};
+        item.usado = duration !== 'siempre'; item.usado_en = duration === 'siempre' ? null : new Date().toISOString(); item.duracion=duration; item.beneficio_aplicado=benefit;
         let balance=0,points=0,usage={};
         if(type==='usdt') balance=value; else if(type==='puntos') points=Math.floor(value); else if(['ruleta_usos','cofres_usos','dados_usos'].includes(type)) usage[type]=Math.floor(value);
         const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];
@@ -1957,6 +1960,7 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
             return res.status(403).json({ error: 'Acceso denegado' });
         }
         
+        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT NULL');
         const userId = req.params.id;
         const updates = { ...req.body };
         if (updates.password) { updates.password_hash = await bcrypt.hash(String(updates.password), 10); delete updates.password; }
@@ -1976,7 +1980,7 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
                 'canjes_realizados', 'cupones_asignados', 'logros_asignados', 'logros_reclamados',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
                 'nombre', 'apellido', 'password_hash', 'password_retiro_hash', 'plan_amount', 'daily_earnings',
-                'es_admin', 'es_super_admin', 'total_ganado', 'ganado_semanal', 'ganado_semanal_inicio'];
+                'comision_retiro_porcentaje', 'es_admin', 'es_super_admin', 'total_ganado', 'ganado_semanal', 'ganado_semanal_inicio'];
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
                 if (typeof value === 'object' && value !== null) {
@@ -2047,37 +2051,45 @@ app.put('/api/admin/user/:id/activities', authenticate, isAdmin, async (req, res
 // ELIMINAR USUARIO (ADMIN)
 // ============================================================
 app.delete('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN');
-        const userId = Number(req.params.id);
-        if (!Number.isInteger(userId) || userId <= 0) throw new Error('Identificador de usuario inválido');
-        if (userId === Number(req.userId)) throw new Error('No puedes eliminarte a ti mismo');
-        const target = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId]);
-        if (!target.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Usuario no encontrado' }); }
-        await client.query('DELETE FROM polygon_deposits WHERE user_id = $1', [userId]);
-        await client.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
-        const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING *', [userId]);
-        await client.query('COMMIT');
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ error: 'Token no proporcionado' });
+        }
+        
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const adminCheck = await pool.query(
+            'SELECT es_admin FROM users WHERE id = $1',
+            [decoded.userId]
+        );
+        
+        if (!adminCheck.rows[0]?.es_admin) {
+            return res.status(403).json({ error: 'Acceso denegado' });
+        }
+        
+        const userId = req.params.id;
+        
+        // Verificar que no estemos eliminando al propio admin
+        if (parseInt(userId) === decoded.userId) {
+            return res.status(400).json({ error: 'No puedes eliminarte a ti mismo' });
+        }
+        
+        const result = await pool.query(
+            'DELETE FROM users WHERE id = $1 RETURNING *',
+            [userId]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
+        
         res.json({ message: 'Usuario eliminado', user: result.rows[0] });
+        
     } catch (error) {
-        try { await client.query('ROLLBACK'); } catch (_) {}
         console.error('Error al eliminar usuario:', error);
-        res.status(500).json({ error: 'Error en el servidor al eliminar un usuario' });
-    } finally { client.release(); }
+        res.status(500).json({ error: 'Error en el servidor' });
+    }
 });
-
-app.put('/api/admin/user/:id/commission', authenticate, isAdmin, async (req, res) => {
-    const percentage = Number(req.body.porcentaje);
-    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) return res.status(400).json({ error: 'El porcentaje debe estar entre 0 y 100' });
-    try {
-        const result = await pool.query('UPDATE users SET comision_retiro_porcentaje = $1 WHERE id = $2 RETURNING *', [percentage, req.params.id]);
-        if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
-        res.json({ message: 'Comisión actualizada', porcentaje: percentage, user: publicUserData(result.rows[0]) });
-    } catch (error) { console.error('Error actualizando comisión:', error); res.status(500).json({ error: 'No se pudo actualizar la comisión' }); }
-});
-
-
 
 
 // ============================================================
@@ -2145,6 +2157,7 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT NULL');
         const q = await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);
         if (!q.rows.length) throw new Error('Usuario no encontrado');
         const u=q.rows[0];
@@ -2164,20 +2177,24 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
         const configResult = await client.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
         const config = configResult.rows[0] || {};
         const minimoRetiro = Number(config.minimo_retiro ?? 10);
-        const comisionPorcentaje = Number(u.comision_retiro_porcentaje ?? config.comision_retiro_porcentaje ?? 23);
+        const globalComision = Number(config.comision_retiro_porcentaje ?? 23);
+        const individualComision = Number(u.comision_retiro_porcentaje);
+        const baseComision = Number.isFinite(individualComision) && individualComision >= 0 && individualComision <= 100 ? individualComision : globalComision;
+        const coupon = u.descuentoRetiroActivo && typeof u.descuentoRetiroActivo === 'object' ? u.descuentoRetiroActivo : null;
+        const descuento = coupon && String(coupon.tipo||'').toLowerCase() === 'descuento_retiro' ? Math.max(0, Math.min(100, Number(coupon.valor)||0)) : 0;
+        const comisionPorcentaje = Math.max(0, baseComision - descuento);
         if (value < minimoRetiro) { await client.query('ROLLBACK'); return res.status(400).json({error:`El retiro mínimo es de ${minimoRetiro.toFixed(2)} USDT0`}); }
         const addr=String(address || u.direccion_retiro || '');
         if (!addr.startsWith('0x')) { await client.query('ROLLBACK'); return res.status(400).json({error:'Dirección de retiro no configurada'}); }
         if (Number(u.balance||0) < value) { await client.query('ROLLBACK'); return res.status(400).json({error:'Saldo insuficiente'}); }
-        const commission=value*(comisionPorcentaje/100), net=value-commission, item={type:'retiro',amount:value,commission,commissionPercentage:comisionPorcentaje,netAmount:net,date:new Date().toISOString(),status:'pendiente',address:addr};
+        const commission=value*(comisionPorcentaje/100), net=value-commission, item={type:'retiro',amount:value,commission,commissionPercentage:comisionPorcentaje,commissionBase:baseComision,discountApplied:descuento,netAmount:net,date:new Date().toISOString(),status:'pendiente',address:addr};
         const hist=Array.isArray(u.historial)?u.historial:[]; hist.push(item);
-        const detail=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; detail.push({tipo:'retiro',concepto:'Retiro de $'+value.toFixed(2),monto:value,comision:commission,neto:net,fecha:item.date,estado:'pendiente'});
-        const updated=await client.query('UPDATE users SET balance=balance-$1,historial=$2,historial_detallado=$3 WHERE id=$4 RETURNING balance,historial,historial_detallado',[value,JSON.stringify(hist),JSON.stringify(detail),req.userId]);
+        const detail=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; detail.push({tipo:'retiro',concepto:'Retiro de $'+value.toFixed(2),monto:value,comision:commission,comision_base:baseComision,descuento:descuento,neto:net,fecha:item.date,estado:'pendiente'});
+        const clearCoupon = coupon && String(coupon.duracion||'unico').toLowerCase() !== 'siempre';
+        const updated=await client.query('UPDATE users SET balance=balance-$1,historial=$2,historial_detallado=$3,descuentoRetiroActivo=CASE WHEN $5 THEN NULL ELSE descuentoRetiroActivo END WHERE id=$4 RETURNING balance,historial,historial_detallado',[value,JSON.stringify(hist),JSON.stringify(detail),req.userId,clearCoupon]);
         await client.query('COMMIT'); res.json({message:'Solicitud de retiro enviada',user:updated.rows[0]});
     } catch(e) { try{await client.query('ROLLBACK')}catch{}; console.error('Error retiro:',e); res.status(500).json({error:'Error en el servidor'}); } finally { client.release(); }
 });
-
-app.post('/api/user/achievement/claim', authenticate, async (req,res)=>{const id=String(req.body.logroId||req.body.id||'');if(!id)return res.status(400).json({error:'Logro inválido'});const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw Error('Usuario no encontrado');const u=q.rows[0],assigned=Array.isArray(u.logros_asignados)?u.logros_asignados:[],claimed=Array.isArray(u.logros_reclamados)?u.logros_reclamados:[];if(claimed.some(x=>String(x?.logroId??x?.id??x)===id))throw Error('Este logro ya fue reclamado');const i=assigned.findIndex(x=>String(x?.logroId??x?.logro_id??x?.id??x)===id);if(i<0)throw Error('Logro no asignado');const a=assigned.splice(i,1)[0],type=String(a.recompensa_tipo||a.tipo_recompensa||'puntos').toLowerCase()==='usdt'?'usdt':'puntos',amount=Number(a.recompensa??a.cantidad??a.premio??0),now=new Date().toISOString();if(!Number.isFinite(amount)||amount<0)throw Error('Recompensa inválida');claimed.push({...a,id,logroId:id,estado:'reclamado',reclamado:true,fechaReclamacion:now});const h=Array.isArray(u.historial)?u.historial:[];h.push({type:'logro',concepto:'Recompensa por '+(a.nombre||'logro'),amount,rewardType:type,date:now,status:'completado'});const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'logro',concepto:'Recompensa por '+(a.nombre||'logro'),monto:amount,recompensa_tipo:type,fecha:now,estado:'completado'});const r=await client.query(`UPDATE users SET ${type==='usdt'?'balance=COALESCE(balance,0)+$1':'puntos=COALESCE(puntos,0)+$1'},logros_asignados=$2::jsonb,logros_reclamados=$3::jsonb,historial=$4::jsonb,historial_detallado=$5::jsonb WHERE id=$6 RETURNING *`,[amount,JSON.stringify(assigned),JSON.stringify(claimed),JSON.stringify(h),JSON.stringify(d),req.userId]);await client.query('COMMIT');res.json({message:'Logro reclamado',user:publicUserData(r.rows[0])})}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{client.release()}});
 
 app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
     const plan = PLANES_APEX[req.body.plan];
