@@ -1379,8 +1379,8 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);
-        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE, ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
-        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, tareas_dias_activos, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE, ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb, ADD COLUMN IF NOT EXISTS tareas_fin_semana JSONB DEFAULT '[]'::jsonb, ADD COLUMN IF NOT EXISTS horarios_fin_semana JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_sorpresa JSONB DEFAULT '[]'::jsonb`);
+        const result = await pool.query('SELECT tareas_config, tareas_fin_semana, horarios_fin_semana, tareas_sorpresa, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, tareas_dias_activos, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
         const hoyLima = normalizarFechaLima(new Date());
         const fechaActivacion = row.tareas_activacion_dia ? String(row.tareas_activacion_dia).slice(0, 10) : (row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}/) ? String(row.tareas_activacion).slice(0, 10) : normalizarFechaLima(new Date(row.tareas_activacion))) : null);
@@ -1393,7 +1393,11 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         if (rowConRotacion && rowConRotacion.minijuegos_activo) row.minijuegos_activo = rowConRotacion.minijuegos_activo;
         if (rowConRotacion && rowConRotacion.tareas_config) row.tareas_config = rowConRotacion.tareas_config;
         const paqueteActivo = row.minijuegos_activo && row.minijuegos_activo.activo === true && row.minijuegos_activo.fecha === hoyLima;
-        const tareasBase = (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5);
+        const weekendConfig = row.tareas_fin_semana && typeof row.tareas_fin_semana === 'object' && !Array.isArray(row.tareas_fin_semana) ? row.tareas_fin_semana : {sabado:Array.isArray(row.tareas_fin_semana)?row.tareas_fin_semana:[],domingo:[]};
+        const diaFinSemana = diaSemanaActual === 6 ? 'sabado' : diaSemanaActual === 0 ? 'domingo' : null;
+        const tareasSemana = diaFinSemana && Array.isArray(weekendConfig[diaFinSemana]) ? weekendConfig[diaFinSemana] : [];
+        const esFinDeSemana = Boolean(diaFinSemana);
+        const tareasBase = (esFinDeSemana ? tareasSemana : (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto)).slice(0, 5);
         const tareasConfiguradas = paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length
             ? row.minijuegos_activo.tareas.slice(0, 5).map((j, i) => Object.assign({}, j, {
                 hora: tareasBase[i] && tareasBase[i].hora !== undefined ? tareasBase[i].hora : j.hora,
@@ -1418,7 +1422,10 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             diaSemanaActual,
             diaHabilitadoHoy,
             horaCobro: row.hora_cobro || '20:00',
-            hora_cobro: row.hora_cobro || '20:00'
+            hora_cobro: row.hora_cobro || '20:00',
+            tareasFinSemana: weekendConfig,
+            horariosFinSemana: row.horarios_fin_semana || {},
+            tareasSorpresa: Array.isArray(row.tareas_sorpresa) ? row.tareas_sorpresa : []
         });
     } catch (error) {
         console.error('Error obteniendo configuración de tareas:', error);
@@ -1482,6 +1489,8 @@ app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
     }
 });
 
+app.get('/api/admin/tasks/weekend', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_fin_semana JSONB DEFAULT '[]'::jsonb, ADD COLUMN IF NOT EXISTS horarios_fin_semana JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_sorpresa JSONB DEFAULT '[]'::jsonb`);const q=await pool.query('SELECT tareas_fin_semana,horarios_fin_semana,tareas_sorpresa FROM configuracion WHERE id=1');const r=q.rows[0]||{};res.json({tareasFinSemana:Array.isArray(r.tareas_fin_semana)?r.tareas_fin_semana:[],horariosFinSemana:r.horarios_fin_semana||{},tareasSorpresa:Array.isArray(r.tareas_sorpresa)?r.tareas_sorpresa:[]})}catch(e){res.status(500).json({error:'No se pudo obtener configuración de fin de semana'})}});
+app.put('/api/admin/tasks/weekend', authenticate, isAdmin, async (req,res)=>{try{await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_fin_semana JSONB DEFAULT '[]'::jsonb, ADD COLUMN IF NOT EXISTS horarios_fin_semana JSONB DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS tareas_sorpresa JSONB DEFAULT '[]'::jsonb`);const tasks=Array.isArray(req.body.tareasFinSemana)?req.body.tareasFinSemana.slice(0,5):[],hours=req.body.horariosFinSemana&&typeof req.body.horariosFinSemana==='object'?req.body.horariosFinSemana:{},surprise=Array.isArray(req.body.tareasSorpresa)?req.body.tareasSorpresa:[];const q=await pool.query(`INSERT INTO configuracion(id,tareas_fin_semana,horarios_fin_semana,tareas_sorpresa,updated_at) VALUES(1,$1::jsonb,$2::jsonb,$3::jsonb,NOW()) ON CONFLICT(id) DO UPDATE SET tareas_fin_semana=$1::jsonb,horarios_fin_semana=$2::jsonb,tareas_sorpresa=$3::jsonb,updated_at=NOW() RETURNING tareas_fin_semana,horarios_fin_semana,tareas_sorpresa`,[JSON.stringify(tasks),JSON.stringify(hours),JSON.stringify(surprise)]);res.json({message:'Configuración de fin de semana guardada',tareasFinSemana:q.rows[0].tareas_fin_semana,horariosFinSemana:q.rows[0].horarios_fin_semana,tareasSorpresa:q.rows[0].tareas_sorpresa})}catch(e){console.error(e);res.status(500).json({error:'No se pudo guardar configuración de fin de semana'})}});
 app.put('/api/admin/tasks/schedule', authenticate, isAdmin, async (req, res) => {
     try {
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
