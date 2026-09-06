@@ -115,6 +115,7 @@ async function ensureTaskColumns() {
             ADD COLUMN IF NOT EXISTS racha_dias INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS cobro_tareas_fecha DATE,
             ADD COLUMN IF NOT EXISTS cobro_tareas_monto NUMERIC DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4),
             ADD COLUMN IF NOT EXISTS plan_activo BOOLEAN DEFAULT TRUE,
             ADD COLUMN IF NOT EXISTS nivel_autorizado INTEGER DEFAULT 0,
             ADD COLUMN IF NOT EXISTS wallet_index INTEGER,
@@ -836,7 +837,6 @@ function publicUserData(row, referidosOverride) {
         cuenta_habilitada: safe.cuenta_habilitada !== false,
         produccion_pausada: Boolean(safe.produccion_pausada),
         nivel_autorizado: Number(safe.nivel_autorizado || 0),
-        comision_retiro_porcentaje: safe.comision_retiro_porcentaje == null ? null : Number(safe.comision_retiro_porcentaje),
         historial: Array.isArray(safe.historial) ? safe.historial : [],
         historial_detallado: Array.isArray(safe.historial_detallado) ? safe.historial_detallado : [],
         tareas_asignadas: Array.isArray(safe.tareas_asignadas) ? safe.tareas_asignadas : [],
@@ -1379,8 +1379,8 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         await pool.query(`CREATE TABLE IF NOT EXISTS configuracion (id SERIAL PRIMARY KEY, tiempo_produccion INTEGER DEFAULT 10, puntos_por_codigo INTEGER DEFAULT 10, updated_at TIMESTAMP DEFAULT NOW())`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00'`);
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS minijuegos_activo JSONB DEFAULT '{}'::jsonb`);
-        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE, ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb, ADD COLUMN IF NOT EXISTS tareas_syd JSONB DEFAULT '[]'::jsonb`);
-        const result = await pool.query('SELECT tareas_config, tareas_syd, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, tareas_dias_activos, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
+        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE, ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
+        const result = await pool.query('SELECT tareas_config, tareas_activacion, tareas_activacion_dia, tareas_pausadas, tareas_autorizadas, tareas_dias_activos, hora_cobro, minijuegos_activo FROM configuracion WHERE id = 1');
         const row = result.rows[0] || {};
         const hoyLima = normalizarFechaLima(new Date());
         const fechaActivacion = row.tareas_activacion_dia ? String(row.tareas_activacion_dia).slice(0, 10) : (row.tareas_activacion ? (String(row.tareas_activacion).match(/^\d{4}-\d{2}-\d{2}/) ? String(row.tareas_activacion).slice(0, 10) : normalizarFechaLima(new Date(row.tareas_activacion))) : null);
@@ -1388,19 +1388,13 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
         const autorizacionExplicita = row.tareas_autorizadas === true;
         const diasActivos = normalizarDiasActivos(row.tareas_dias_activos);
         const diaSemanaActual = obtenerDiaSemanaLima();
-        const diaHabilitadoHoy = diasActivos.includes(diaSemanaActual) || diaSemanaActual === 0 || diaSemanaActual === 6;
+        const diaHabilitadoHoy = diasActivos.includes(diaSemanaActual);
         const rowConRotacion = await avanzarPaqueteAutomaticoSiCorresponde(row, hoyLima, diaHabilitadoHoy);
         if (rowConRotacion && rowConRotacion.minijuegos_activo) row.minijuegos_activo = rowConRotacion.minijuegos_activo;
         if (rowConRotacion && rowConRotacion.tareas_config) row.tareas_config = rowConRotacion.tareas_config;
         const paqueteActivo = row.minijuegos_activo && row.minijuegos_activo.activo === true && row.minijuegos_activo.fecha === hoyLima;
-        const esSabadoODomingo = diaSemanaActual === 6 || diaSemanaActual === 0;
-        const todasSyD = Array.isArray(row.tareas_syd) ? row.tareas_syd : [];
-        const diaSyD = diaSemanaActual === 6 ? 'sabado' : 'domingo';
-        const tareasSyD = todasSyD.filter(t => String(t.dia || 'ambos').toLowerCase() === diaSyD || String(t.dia || '').toLowerCase() === 'ambos');
-        const tareasBase = (esSabadoODomingo ? tareasSyD : (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto)).slice(0, 5);
-        const tareasConfiguradas = esSabadoODomingo
-            ? tareasBase
-            : paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length
+        const tareasBase = (Array.isArray(row.tareas_config) && row.tareas_config.length ? row.tareas_config : tareasPorDefecto).slice(0, 5);
+        const tareasConfiguradas = paqueteActivo && Array.isArray(row.minijuegos_activo.tareas) && row.minijuegos_activo.tareas.length
             ? row.minijuegos_activo.tareas.slice(0, 5).map((j, i) => Object.assign({}, j, {
                 hora: tareasBase[i] && tareasBase[i].hora !== undefined ? tareasBase[i].hora : j.hora,
                 minuto: tareasBase[i] && tareasBase[i].minuto !== undefined ? tareasBase[i].minuto : j.minuto,
@@ -1424,8 +1418,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             diaSemanaActual,
             diaHabilitadoHoy,
             horaCobro: row.hora_cobro || '20:00',
-            hora_cobro: row.hora_cobro || '20:00',
-            tareasSyD: Array.isArray(row.tareas_syd) ? row.tareas_syd : []
+            hora_cobro: row.hora_cobro || '20:00'
         });
     } catch (error) {
         console.error('Error obteniendo configuración de tareas:', error);
@@ -1489,28 +1482,6 @@ app.put('/api/admin/tasks/config', authenticate, isAdmin, async (req, res) => {
     }
 });
 
-app.get('/api/admin/tasks/syd', authenticate, isAdmin, async (req,res)=>{
-    try {
-        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_syd JSONB DEFAULT '[]'::jsonb`);
-        const q=await pool.query('SELECT tareas_syd FROM configuracion WHERE id=1');
-        res.json({tareas:Array.isArray(q.rows[0]?.tareas_syd)?q.rows[0].tareas_syd:[]});
-    } catch(e){ console.error(e); res.status(500).json({error:'No se pudieron cargar las tareas SyD'}); }
-});
-app.put('/api/admin/tasks/syd', authenticate, isAdmin, async (req,res)=>{
-    try {
-        await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_syd JSONB DEFAULT '[]'::jsonb`);
-        const raw=Array.isArray(req.body.tareas)?req.body.tareas:[];
-        const tareas=raw.slice(0,10).map((t,i)=>({
-            id:String(t.id||t.catalogoId||('syd_'+(i+1))), catalogoId:t.catalogoId||t.id||null,
-            nombre:String(t.nombre||('Tarea SyD '+(i+1))), descripcion:String(t.descripcion||''), icono:String(t.icono||'📋'),
-            tipo_interactivo:String(t.tipo_interactivo||''), dia:['sabado','domingo','ambos'].includes(String(t.dia||'').toLowerCase())?String(t.dia).toLowerCase():'ambos',
-            hora:Math.max(0,Math.min(23,Number(t.hora)||0)), minuto:Math.max(0,Math.min(59,Number(t.minuto)||0)),
-            duracionMinutos:Math.max(1,Math.min(10080,Number(t.duracionMinutos)||30)), activo:t.activo!==false
-        }));
-        const q=await pool.query(`INSERT INTO configuracion(id,tareas_syd,updated_at) VALUES(1,$1::jsonb,NOW()) ON CONFLICT(id) DO UPDATE SET tareas_syd=$1::jsonb,updated_at=NOW() RETURNING tareas_syd`,[JSON.stringify(tareas)]);
-        res.json({message:'Tareas SyD guardadas',tareas:q.rows[0].tareas_syd});
-    } catch(e){ console.error(e); res.status(500).json({error:'No se pudieron guardar las tareas SyD'}); }
-});
 app.put('/api/admin/tasks/schedule', authenticate, isAdmin, async (req, res) => {
     try {
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
@@ -1986,17 +1957,8 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
             return res.status(403).json({ error: 'Acceso denegado' });
         }
         
-        await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT NULL');
         const userId = req.params.id;
         const updates = { ...req.body };
-        if (Object.prototype.hasOwnProperty.call(updates, 'comision_retiro_porcentaje')) {
-            if (updates.comision_retiro_porcentaje === '' || updates.comision_retiro_porcentaje === null) updates.comision_retiro_porcentaje = null;
-            else {
-                const pct = Number(updates.comision_retiro_porcentaje);
-                if (!Number.isFinite(pct) || pct < 0 || pct > 100) return res.status(400).json({error:'El porcentaje debe estar entre 0 y 100'});
-                updates.comision_retiro_porcentaje = pct;
-            }
-        }
         if (updates.password) { updates.password_hash = await bcrypt.hash(String(updates.password), 10); delete updates.password; }
         if (updates.password_retiro) { updates.password_retiro_hash = await bcrypt.hash(String(updates.password_retiro), 10); delete updates.password_retiro; }
         
@@ -2014,7 +1976,7 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
                 'canjes_realizados', 'cupones_asignados', 'logros_asignados', 'logros_reclamados',
                 'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
                 'nombre', 'apellido', 'password_hash', 'password_retiro_hash', 'plan_amount', 'daily_earnings',
-                'comision_retiro_porcentaje', 'es_admin', 'es_super_admin', 'total_ganado', 'ganado_semanal', 'ganado_semanal_inicio'];
+                'es_admin', 'es_super_admin', 'total_ganado', 'ganado_semanal', 'ganado_semanal_inicio'];
             if (camposPermitidos.includes(key)) {
                 fields.push(`${key} = $${paramCount}`);
                 if (typeof value === 'object' && value !== null) {
@@ -2035,7 +1997,7 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
         
         const result = await pool.query(query, values);
         const savedUser = result.rows[0];
-        res.json({ message: 'Usuario actualizado', user: publicUserData(savedUser) });
+        res.json({ message: 'Usuario actualizado', user: savedUser });
         
     } catch (error) {
         console.error('Error al actualizar usuario:', error);
@@ -2085,45 +2047,37 @@ app.put('/api/admin/user/:id/activities', authenticate, isAdmin, async (req, res
 // ELIMINAR USUARIO (ADMIN)
 // ============================================================
 app.delete('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
+    const client = await pool.connect();
     try {
-        const token = req.headers.authorization?.split(' ')[1];
-        if (!token) {
-            return res.status(401).json({ error: 'Token no proporcionado' });
-        }
-        
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const adminCheck = await pool.query(
-            'SELECT es_admin FROM users WHERE id = $1',
-            [decoded.userId]
-        );
-        
-        if (!adminCheck.rows[0]?.es_admin) {
-            return res.status(403).json({ error: 'Acceso denegado' });
-        }
-        
-        const userId = req.params.id;
-        
-        // Verificar que no estemos eliminando al propio admin
-        if (parseInt(userId) === decoded.userId) {
-            return res.status(400).json({ error: 'No puedes eliminarte a ti mismo' });
-        }
-        
-        const result = await pool.query(
-            'DELETE FROM users WHERE id = $1 RETURNING *',
-            [userId]
-        );
-        
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Usuario no encontrado' });
-        }
-        
+        await client.query('BEGIN');
+        const userId = Number(req.params.id);
+        if (!Number.isInteger(userId) || userId <= 0) throw new Error('Identificador de usuario inválido');
+        if (userId === Number(req.userId)) throw new Error('No puedes eliminarte a ti mismo');
+        const target = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [userId]);
+        if (!target.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Usuario no encontrado' }); }
+        await client.query('DELETE FROM polygon_deposits WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+        const result = await client.query('DELETE FROM users WHERE id = $1 RETURNING *', [userId]);
+        await client.query('COMMIT');
         res.json({ message: 'Usuario eliminado', user: result.rows[0] });
-        
     } catch (error) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
         console.error('Error al eliminar usuario:', error);
-        res.status(500).json({ error: 'Error en el servidor' });
-    }
+        res.status(500).json({ error: 'Error en el servidor al eliminar un usuario' });
+    } finally { client.release(); }
 });
+
+app.put('/api/admin/user/:id/commission', authenticate, isAdmin, async (req, res) => {
+    const percentage = Number(req.body.porcentaje);
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) return res.status(400).json({ error: 'El porcentaje debe estar entre 0 y 100' });
+    try {
+        const result = await pool.query('UPDATE users SET comision_retiro_porcentaje = $1 WHERE id = $2 RETURNING *', [percentage, req.params.id]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        res.json({ message: 'Comisión actualizada', porcentaje: percentage, user: publicUserData(result.rows[0]) });
+    } catch (error) { console.error('Error actualizando comisión:', error); res.status(500).json({ error: 'No se pudo actualizar la comisión' }); }
+});
+
+
 
 
 // ============================================================
@@ -2191,7 +2145,6 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT NULL');
         const q = await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);
         if (!q.rows.length) throw new Error('Usuario no encontrado');
         const u=q.rows[0];
@@ -2211,9 +2164,7 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
         const configResult = await client.query('SELECT minimo_retiro, comision_retiro_porcentaje FROM configuracion WHERE id = 1');
         const config = configResult.rows[0] || {};
         const minimoRetiro = Number(config.minimo_retiro ?? 10);
-        const comisionGeneral = Number(config.comision_retiro_porcentaje ?? 23);
-        const comisionIndividual = u.comision_retiro_porcentaje == null ? NaN : Number(u.comision_retiro_porcentaje);
-        const comisionPorcentaje = Number.isFinite(comisionIndividual) && comisionIndividual >= 0 && comisionIndividual <= 100 ? comisionIndividual : comisionGeneral;
+        const comisionPorcentaje = Number(u.comision_retiro_porcentaje ?? config.comision_retiro_porcentaje ?? 23);
         if (value < minimoRetiro) { await client.query('ROLLBACK'); return res.status(400).json({error:`El retiro mínimo es de ${minimoRetiro.toFixed(2)} USDT0`}); }
         const addr=String(address || u.direccion_retiro || '');
         if (!addr.startsWith('0x')) { await client.query('ROLLBACK'); return res.status(400).json({error:'Dirección de retiro no configurada'}); }
@@ -2221,10 +2172,12 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
         const commission=value*(comisionPorcentaje/100), net=value-commission, item={type:'retiro',amount:value,commission,commissionPercentage:comisionPorcentaje,netAmount:net,date:new Date().toISOString(),status:'pendiente',address:addr};
         const hist=Array.isArray(u.historial)?u.historial:[]; hist.push(item);
         const detail=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; detail.push({tipo:'retiro',concepto:'Retiro de $'+value.toFixed(2),monto:value,comision:commission,neto:net,fecha:item.date,estado:'pendiente'});
-        const updated=await client.query('UPDATE users SET balance=balance-$1,historial=$2,historial_detallado=$3 WHERE id=$4 RETURNING *',[value,JSON.stringify(hist),JSON.stringify(detail),req.userId]);
-        await client.query('COMMIT'); res.json({message:'Solicitud de retiro enviada',user:publicUserData(updated.rows[0]),comisionPorcentaje,commission,net});
+        const updated=await client.query('UPDATE users SET balance=balance-$1,historial=$2,historial_detallado=$3 WHERE id=$4 RETURNING balance,historial,historial_detallado',[value,JSON.stringify(hist),JSON.stringify(detail),req.userId]);
+        await client.query('COMMIT'); res.json({message:'Solicitud de retiro enviada',user:updated.rows[0]});
     } catch(e) { try{await client.query('ROLLBACK')}catch{}; console.error('Error retiro:',e); res.status(500).json({error:'Error en el servidor'}); } finally { client.release(); }
 });
+
+app.post('/api/user/achievement/claim', authenticate, async (req,res)=>{const id=String(req.body.logroId||req.body.id||'');if(!id)return res.status(400).json({error:'Logro inválido'});const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw Error('Usuario no encontrado');const u=q.rows[0],assigned=Array.isArray(u.logros_asignados)?u.logros_asignados:[],claimed=Array.isArray(u.logros_reclamados)?u.logros_reclamados:[];if(claimed.some(x=>String(x?.logroId??x?.id??x)===id))throw Error('Este logro ya fue reclamado');const i=assigned.findIndex(x=>String(x?.logroId??x?.logro_id??x?.id??x)===id);if(i<0)throw Error('Logro no asignado');const a=assigned.splice(i,1)[0],type=String(a.recompensa_tipo||a.tipo_recompensa||'puntos').toLowerCase()==='usdt'?'usdt':'puntos',amount=Number(a.recompensa??a.cantidad??a.premio??0),now=new Date().toISOString();if(!Number.isFinite(amount)||amount<0)throw Error('Recompensa inválida');claimed.push({...a,id,logroId:id,estado:'reclamado',reclamado:true,fechaReclamacion:now});const h=Array.isArray(u.historial)?u.historial:[];h.push({type:'logro',concepto:'Recompensa por '+(a.nombre||'logro'),amount,rewardType:type,date:now,status:'completado'});const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'logro',concepto:'Recompensa por '+(a.nombre||'logro'),monto:amount,recompensa_tipo:type,fecha:now,estado:'completado'});const r=await client.query(`UPDATE users SET ${type==='usdt'?'balance=COALESCE(balance,0)+$1':'puntos=COALESCE(puntos,0)+$1'},logros_asignados=$2::jsonb,logros_reclamados=$3::jsonb,historial=$4::jsonb,historial_detallado=$5::jsonb WHERE id=$6 RETURNING *`,[amount,JSON.stringify(assigned),JSON.stringify(claimed),JSON.stringify(h),JSON.stringify(d),req.userId]);await client.query('COMMIT');res.json({message:'Logro reclamado',user:publicUserData(r.rows[0])})}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{client.release()}});
 
 app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
     const plan = PLANES_APEX[req.body.plan];
@@ -2376,27 +2329,6 @@ app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req, 
         res.status(400).json({ error: error.message || 'No se pudo aprobar la tarea' });
     } finally { client.release(); }
 });
-
-// ============================================================
-// LOGROS MANUALES: ASIGNAR, INFORMAR, VERIFICAR Y RECLAMAR
-// ============================================================
-app.post('/api/admin/user/:id/achievement/assign', authenticate, isAdmin, async (req,res)=>{
-    const client=await pool.connect();
-    try{await client.query('BEGIN');const key=String(req.params.id||'').trim();const q=await client.query('SELECT * FROM users WHERE id::text=$1 OR telefono=$1 LIMIT 1 FOR UPDATE',[key]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],a=req.body.logro||req.body;if(!a||!a.id)throw new Error('Logro inválido');const list=Array.isArray(u.logros_asignados)?u.logros_asignados:[];if(list.some(x=>String(x.logroId||x.id)===String(a.id)&&!['rechazado','reclamado'].includes(String(x.estado||''))))throw new Error('Este logro ya está asignado');const item={id:String(a.id),logroId:String(a.id),nombre:String(a.nombre||'Logro'),descripcion:String(a.descripcion||''),tipo:String(a.tipo||'referidos'),meta:String(a.tipo||'')==='plan'?null:Math.max(1,Number(a.meta)||1),recompensa_tipo:String(a.recompensa_tipo||a.tipo_recompensa||'puntos'),recompensa:Math.max(0,Number(a.recompensa||a.cantidad)||0),dias_vigencia:Math.max(1,Number(a.dias_vigencia||a.dias)||30),estado:'asignado',fechaAsignacion:new Date().toISOString()};list.push(item);const r=await client.query('UPDATE users SET logros_asignados=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(list),u.id]);await client.query('COMMIT');res.json({message:'Logro asignado',user:publicUserData(r.rows[0]),logro:item});}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{client.release()}
-});
-app.post('/api/user/achievement/report', authenticate, async (req,res)=>{
-    const client=await pool.connect();
-    try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],list=Array.isArray(u.logros_asignados)?u.logros_asignados:[],id=String(req.body.logroId||req.body.id||''),idx=list.findIndex(x=>String(x.logroId||x.id)===id);if(idx<0)throw new Error('Logro no encontrado');const l=list[idx],state=String(l.estado||'asignado');if(!['asignado','rechazado'].includes(state))throw new Error('Este logro ya fue informado o procesado');l.estado='informado';l.notaUsuario=String(req.body.nota||'').trim();l.fechaInformado=new Date().toISOString();list[idx]=l;const r=await client.query('UPDATE users SET logros_asignados=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(list),u.id]);await client.query('COMMIT');res.json({message:'Logro informado y pendiente de verificación',user:publicUserData(r.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{client.release()}
-});
-app.post('/api/admin/user/:id/achievement/review', authenticate, isAdmin, async (req,res)=>{
-    const client=await pool.connect();
-    try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id::text=$1 OR telefono=$1 LIMIT 1 FOR UPDATE',[String(req.params.id)]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],list=Array.isArray(u.logros_asignados)?u.logros_asignados:[],id=String(req.body.logroId||req.body.id||''),idx=list.findIndex(x=>String(x.logroId||x.id)===id);if(idx<0)throw new Error('Logro no encontrado');const l=list[idx];if(String(l.estado)!=='informado')throw new Error('El logro no está pendiente de verificación');const approved=req.body.aprobado===true;l.estado=approved?'verificado':'rechazado';l.notaAdmin=String(req.body.nota||'');l.fechaRevision=new Date().toISOString();list[idx]=l;const r=await client.query('UPDATE users SET logros_asignados=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(list),u.id]);await client.query('COMMIT');res.json({message:approved?'Logro verificado; el usuario ya puede reclamar':'Logro rechazado',user:publicUserData(r.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{client.release()}
-});
-app.post('/api/user/achievement/claim', authenticate, async (req,res)=>{
-    const client=await pool.connect();
-    try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],list=Array.isArray(u.logros_asignados)?u.logros_asignados:[],id=String(req.body.logroId||req.body.id||''),idx=list.findIndex(x=>String(x.logroId||x.id)===id);if(idx<0)throw new Error('Logro no encontrado');const l=list[idx];if(String(l.estado)!=='verificado')throw new Error('El logro todavía no ha sido verificado por el administrador');const type=String(l.recompensa_tipo||l.tipo_recompensa||'puntos').toLowerCase(),qty=Math.max(0,Number(l.recompensa||l.cantidad)||0),money=type.includes('usdt')?qty:0,points=type.includes('usdt')?0:Math.floor(qty),now=new Date().toISOString(),hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];l.estado='reclamado';l.fechaReclamado=now;list[idx]=l;hist.push({tipo:'logro',concepto:'Logro reclamado: '+l.nombre,monto:money,puntos:points,fecha:now,estado:'aprobado'});const weekStart=inicioSemanaLima(new Date()),oldStart=normalizarFechaLima(u.ganado_semanal_inicio),weekly=oldStart===weekStart?Number(u.ganado_semanal||0):0;const r=await client.query(`UPDATE users SET logros_asignados=$1::jsonb,balance=COALESCE(balance,0)+$2,puntos=COALESCE(puntos,0)+$3,total_ganado=COALESCE(total_ganado,0)+$2,ganado_semanal=$4,ganado_semanal_inicio=$5::date,historial_detallado=$6::jsonb WHERE id=$7 RETURNING *`,[JSON.stringify(list),money,points,Number((weekly+money).toFixed(2)),weekStart,JSON.stringify(hist),u.id]);await client.query('COMMIT');res.json({message:'Recompensa acreditada',user:publicUserData(r.rows[0]),recompensa:{tipo:type,cantidad:qty}});}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{client.release()}
-});
-
 app.delete('/api/admin/user/:id/assignments', authenticate, isAdmin, async (req,res)=>{
     const type=String(req.body?.tipo||req.body?.type||'').toLowerCase();
     const rawId=req.body?.id ?? req.body?.index;
@@ -2412,11 +2344,6 @@ app.post('/api/admin/user/:id/withdraw/reject', authenticate, isAdmin, async (re
 // ============================================================
 // INICIAR SERVIDOR
 // ============================================================
-app.post('/api/user/achievements/claim', authenticate, async (req,res)=>{
-  const logroId=String(req.body?.logroId||req.body?.id||'').trim(); if(!logroId)return res.status(400).json({error:'Logro requerido'});
-  const client=await pool.connect(); try{await client.query('BEGIN'); const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]); if(!q.rows.length)throw new Error('Usuario no encontrado'); const u=q.rows[0]; const assigned=Array.isArray(u.logros_asignados)?u.logros_asignados:[]; const index=assigned.findIndex(x=>String(x?.id??x?.logroId??x?.logro_id??x)===logroId); if(index<0)throw new Error('Logro no encontrado'); const logro=typeof assigned[index]==='object'?{...assigned[index]}:{id:logroId}; const reclaimed=Array.isArray(u.logros_reclamados)?u.logros_reclamados:[]; if(logro.reclamado||reclaimed.some(x=>String(typeof x==='object'?(x.id||x.logroId):x)===logroId))throw new Error('Este logro ya fue reclamado'); const tipo=String(logro.tipo||'').toLowerCase(); const isPlan=tipo==='plan'||/tener\s*plan/i.test(String(logro.nombre||'')); const completed=['completado','completada','completed'].includes(String(logro.estado||'').toLowerCase())||logro.completado===true||isPlan&&u.plan&& !/^sin[_ ]?plan$/i.test(String(u.plan)); if(!completed)throw new Error('El logro aún no está completado'); const reward=Math.max(0,Number(logro.recompensa??logro.cantidad??logro.premio??0)||0); if(reward<=0)throw new Error('El logro no tiene recompensa válida'); const rewardType=String(logro.recompensa_tipo||logro.tipo_recompensa||'puntos').toLowerCase(); logro.estado='reclamado'; logro.reclamado=true; logro.reclamadoEn=new Date().toISOString(); assigned[index]=logro; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,DATE '1900-01-01')<DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END,ganado_semanal_inicio=DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date,logros_asignados=$3::jsonb,logros_reclamados=$4::jsonb WHERE id=$5 RETURNING *`,[rewardType==='usdt'?reward:0,rewardType==='usdt'?0:Math.floor(reward),JSON.stringify(assigned),JSON.stringify(reclaimed.concat({id:logroId,nombre:logro.nombre||'',recompensa:reward,recompensa_tipo:rewardType,fecha:logro.reclamadoEn})),req.userId]); const item={tipo:'logro',concepto:`Recompensa de logro: ${logro.nombre||logroId}`,monto:rewardType==='usdt'?reward:0,puntos:rewardType==='usdt'?0:Math.floor(reward),fecha:logro.reclamadoEn,estado:'acreditado'}; const row=out.rows[0]; const hist=Array.isArray(row.historial_detallado)?row.historial_detallado:[]; const saved=await client.query('UPDATE users SET historial_detallado=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); res.json({message:'Recompensa reclamada',premio:reward,tipo_recompensa:rewardType,user:publicUserData(saved.rows[0])}); }catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('achievement claim',e);res.status(400).json({error:e.message||'No se pudo reclamar el logro'});}finally{client.release();}
-});
-
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor corriendo en puerto ${port}`);
 });
