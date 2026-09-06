@@ -2214,6 +2214,8 @@ app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
     } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudo adquirir el plan' }); } finally { client.release(); }
 });
 
+app.put('/api/admin/user/:id/commission', authenticate, isAdmin, async (req,res)=>{const percentage=Number(req.body.porcentaje);if(!Number.isFinite(percentage)||percentage<0||percentage>100)return res.status(400).json({error:'El porcentaje debe estar entre 0 y 100'});try{await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT NULL');const r=await pool.query('UPDATE users SET comision_retiro_porcentaje=$1 WHERE id=$2 RETURNING *',[percentage,req.params.id]);if(!r.rows.length)return res.status(404).json({error:'Usuario no encontrado'});res.json({message:'Comisión actualizada',porcentaje:percentage,user:publicUserData(r.rows[0])})}catch(e){console.error('Error actualizando comisión:',e);res.status(500).json({error:'No se pudo actualizar la comisión'})}});
+
 app.post('/api/admin/user/:id/pause', authenticate, isAdmin, async (req, res) => {
     const paused = req.body.paused !== false;
     const result = await pool.query('UPDATE users SET produccion_pausada = $1 WHERE id = $2 RETURNING *', [paused, req.params.id]);
