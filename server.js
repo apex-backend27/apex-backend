@@ -330,7 +330,7 @@ async function asegurarBilleteraUsuario(userId) {
 // ============================================================
 // MONITOR DE DEPÓSITOS USDT0 EN POLYGON MAINNET
 // ============================================================
-const DEPOSIT_MONITOR_VERSION = 'v17-skip-invalid-addresses-alchemy-idempotent';
+const DEPOSIT_MONITOR_VERSION = 'v18-erc20-raw-value-rpc-fallback';
 const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLowerCase();
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
@@ -357,6 +357,17 @@ async function rpcCall(method, params) {
     throw new Error(`${method}: ${lastError?.message || 'sin RPC disponible'}`);
 }
 function topicAddress(topic) { return getAddress('0x' + String(topic).slice(-40)).toLowerCase(); }
+function montoTransferenciaToken(transfer) {
+    const directo = Number(transfer?.value);
+    if (Number.isFinite(directo) && directo > 0) return directo;
+    const rawValue = transfer?.rawContract?.value;
+    if (typeof rawValue !== 'string' || !/^0x[0-9a-f]+$/i.test(rawValue)) return 0;
+    try {
+        const rawDecimal = String(transfer?.rawContract?.decimal || '');
+        const decimal = rawDecimal ? (rawDecimal.toLowerCase().startsWith('0x') ? parseInt(rawDecimal, 16) : parseInt(rawDecimal, 10)) : POLYGON_TOKEN_DECIMALS;
+        return Number(formatUnits(BigInt(rawValue), Number.isInteger(decimal) && decimal >= 0 && decimal <= 36 ? decimal : POLYGON_TOKEN_DECIMALS));
+    } catch (_) { return 0; }
+}
 async function rpcGetLogs(filter) {
     const payload = {
         jsonrpc: '2.0',
@@ -418,6 +429,20 @@ async function obtenerTransferenciasAlchemy(toAddress, fromBlock, toBlock) {
     }
     return transfers;
 }
+async function obtenerTransferenciasRpc(toAddress, fromBlock, toBlock) {
+    const transfers = [];
+    const maxRange = 1000;
+    const topicTo = '0x' + String(toAddress).replace(/^0x/i, '').padStart(64, '0');
+    for (let chunkStart = Math.max(0, fromBlock); chunkStart <= toBlock; chunkStart += maxRange) {
+        const chunkEnd = Math.min(toBlock, chunkStart + maxRange - 1);
+        const logs = await rpcGetLogs({ address: POLYGON_TOKEN_CONTRACT, topics: [POLYGON_TRANSFER_TOPIC, null, topicTo], fromBlock: chunkStart, toBlock: chunkEnd });
+        for (const log of logs) {
+            if (!log.transactionHash || typeof log.data !== 'string') continue;
+            transfers.push({ hash: log.transactionHash, value: null, rawContract: { value: log.data, address: POLYGON_TOKEN_CONTRACT, decimal: '0x6' } });
+        }
+    }
+    return transfers;
+}
 async function obtenerLogTransferVerificado(txHash, toAddress) {
     const receipt = await rpcCall('eth_getTransactionReceipt', [txHash]);
     if (!receipt || receipt.status !== '0x1' || !Array.isArray(receipt.logs)) return null;
@@ -437,7 +462,6 @@ async function obtenerLogTransferVerificado(txHash, toAddress) {
 async function monitorDepositosPolygon() {
     if (monitorRunning) return;
     monitorRunning = true;
-    if (!process.env.APEX_DEPOSIT_MNEMONIC) { monitorRunning = false; console.warn('Monitor Polygon detenido: falta APEX_DEPOSIT_MNEMONIC'); return; }
     try {
         await ensureTaskColumns();
         const latest = parseInt(await rpcCall('eth_blockNumber', []), 16);
@@ -453,13 +477,19 @@ async function monitorDepositosPolygon() {
             console.log(`Monitor Polygon: Transfers API hacia ${addressMap.size} dirección(es), rango ${fromBlock}-${toBlock}`);
             let detected = 0;
             for (const [address, userId] of addressMap.entries()) {
-                const transfers = await obtenerTransferenciasAlchemy(address, fromBlock, toBlock);
+                let transfers = [];
+                try { transfers = await obtenerTransferenciasAlchemy(address, fromBlock, toBlock); }
+                catch (error) { console.warn(`Monitor Polygon: Alchemy no disponible para ${address}: ${error.message}`); }
+                if (!transfers.length) {
+                    try { transfers = await obtenerTransferenciasRpc(address, fromBlock, toBlock); }
+                    catch (error) { console.warn(`Monitor Polygon: escaneo directo fallido para ${address}: ${error.message}`); }
+                }
                 for (const transfer of transfers) {
                     const txHash = transfer.hash;
                     if (!txHash) continue;
                     const verified = await obtenerLogTransferVerificado(txHash, address);
                     if (!verified) continue;
-                    const amount = Number(transfer.value || 0);
+                    const amount = montoTransferenciaToken(transfer);
                     if (!(amount > 0)) continue;
                     const inserted = await pool.query(`INSERT INTO polygon_deposits (tx_hash, log_index, user_id, token_contract, from_address, to_address, amount, block_number, confirmations, status, raw_log) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10::jsonb) ON CONFLICT (tx_hash, log_index) DO NOTHING RETURNING id`, [txHash, verified.logIndex, userId, POLYGON_TOKEN_CONTRACT, verified.from, verified.to, amount, verified.blockNumber, Math.max(0, latest - verified.blockNumber + 1), JSON.stringify({ blockHash: verified.blockHash, topics: verified.log.topics, data: verified.log.data, source: 'alchemy_getAssetTransfers' })]);
                     if (inserted.rows.length) { detected++; console.log(`Depósito detectado: ${amount} USDT0 para usuario ${userId}, tx ${txHash}, log_index ${verified.logIndex}`); }
@@ -487,7 +517,7 @@ app.get('/', (req, res) => {
   res.send('Servidor funcionando correctamente');
 });
 app.get('/api/deposit-monitor-status', (req, res) => {
-  res.json({ version: DEPOSIT_MONITOR_VERSION, rpc_mode: 'alchemy_getAssetTransfers_chunked_plus_eth_getTransactionReceipt', rpc_endpoints: POLYGON_RPC_URLS.map(x => { try { return new URL(x).host; } catch (_) { return 'invalid'; } }), batch_size: 500, lookback_blocks: Math.min(50000, Math.max(100, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 50000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 50000) : 50000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
+    res.json({ version: DEPOSIT_MONITOR_VERSION, mnemonic_configured: Boolean(process.env.APEX_DEPOSIT_MNEMONIC), rpc_mode: 'alchemy_getAssetTransfers_chunked_plus_eth_getTransactionReceipt_plus_eth_getLogs', rpc_endpoints: POLYGON_RPC_URLS.map(x => { try { return new URL(x).host; } catch (_) { return 'invalid'; } }), batch_size: 500, lookback_blocks: Math.min(50000, Math.max(100, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 50000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 50000) : 50000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
 });
 
 app.get('/test', (req, res) => {
