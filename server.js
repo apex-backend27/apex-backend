@@ -1825,7 +1825,7 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
             return res.status(403).json({ error: 'Acceso denegado' });
         }
         
-        const result = await pool.query('SELECT * FROM users ORDER BY id DESC');
+        const result = await pool.query('SELECT * FROM users ORDER BY id ASC');
         res.json(result.rows);
         
     } catch (error) {
