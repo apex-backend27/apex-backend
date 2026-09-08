@@ -84,7 +84,7 @@ async function reconciliarAcumulados(userId, clientOrPool = pool) {
     const semanal=storedWeek===calc.inicio ? Math.max(Number.isFinite(storedWeekly)?storedWeekly:0,calc.semana) : calc.semana;
     const u=await clientOrPool.query('UPDATE users SET total_ganado=$1,ganado_semanal=$2,ganado_semanal_inicio=$3 WHERE id=$4 RETURNING *',[total,semanal,calc.inicio,userId]); return u.rows[0]||null;
 }
-async function ensureTaskColumns() {
+async function ensureTaskColumnsInternal() {
     try {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS configuracion (
@@ -165,6 +165,14 @@ async function ensureTaskColumns() {
     } catch (error) {
         console.error('Error preparando columnas de tareas:', error.message);
     }
+}
+let ensureTaskColumnsInFlight = null;
+async function ensureTaskColumns() {
+    if (ensureTaskColumnsInFlight) return ensureTaskColumnsInFlight;
+    ensureTaskColumnsInFlight = ensureTaskColumnsInternal().finally(() => {
+        ensureTaskColumnsInFlight = null;
+    });
+    return ensureTaskColumnsInFlight;
 }
 
 // ============================================================
@@ -266,7 +274,12 @@ const requireSuperAdmin = [authenticate, async (req, res, next) => {
 // Conexión a NeonTech
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  max: 20,
+  connectionTimeoutMillis: 10000,
+  query_timeout: 15000,
+  statement_timeout: 15000,
+  idle_in_transaction_session_timeout: 30000
 });
 const REFERIDO_CARACTERES = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function generarCandidatoCodigoReferido() {
@@ -855,8 +868,6 @@ function publicUserData(row, referidosOverride) {
         'password', 'password_hash', 'password_retiro', 'password_retiro_hash',
         'private_key', 'privateKey', 'mnemonic', 'seed', 'secret',
         'jwt_secret', 'database_url', 'alchemy_api_key', 'wallet_index',
-        // Nunca se envían al navegador: son premios internos configurados por el administrador.
-        'premio_ruleta', 'premio_cofre', 'premio_dados',
         'juegos_config', 'premios', 'resultado_dado', 'numero_dado'
     ].forEach(field => { delete safe[field]; });
     return {
@@ -865,7 +876,7 @@ function publicUserData(row, referidosOverride) {
         puntos: Number(safe.puntos || 0),
         plan: safe.plan || 'Sin plan',
         plan_amount: Number(safe.plan_amount || 0),
-        daily_earnings: Number(safe.daily_earnings || 0),
+        daily_earnings: gananciaDiariaOficial(safe),
         plan_activo: safe.plan_activo !== false,
         cuenta_habilitada: safe.cuenta_habilitada !== false,
         produccion_pausada: Boolean(safe.produccion_pausada),
@@ -888,6 +899,9 @@ function publicUserData(row, referidosOverride) {
         ruleta_usos: Number(safe.ruleta_usos || 0),
         cofres_usos: Number(safe.cofres_usos || 0),
         dados_usos: Number(safe.dados_usos || 0),
+        premio_ruleta: Number(safe.premio_ruleta || 0),
+        premio_cofre: Number(safe.premio_cofre || 0),
+        premio_dados: Number(safe.premio_dados || 0),
         total_ganado: Number(safe.total_ganado || 0),
         ganado_semanal: Number(safe.ganado_semanal || 0),
         ganado_semanal_inicio: safe.ganado_semanal_inicio || null
@@ -1141,7 +1155,6 @@ app.put('/api/user/update', async (req, res) => {
                 'produccion_activa', 'produccion_inicio', 'produccion_duracion', 'tiempo_restante',
                 'recompensa_pendiente', 'puntosPendientes', 'codigo_usado', 'reclamado_hoy',
                 'fecha_produccion', 'codigos_usados_hoy', 'codigos_usados', 'ultimo_reinicio_codigos',
-                'ruleta_usos', 'cofres_usos', 'dados_usos', 'premio_ruleta', 'premio_cofre', 'premio_dados',
                 'cofres_abiertos', 'cupones_asignados', 'logros_asignados', 'logros_pendientes_aprobar',
                 'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
                 'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto',
@@ -2089,12 +2102,14 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
 // ASIGNAR ACTIVIDADES A USUARIO CON PLAN ACTIVO
 // ============================================================
 app.put('/api/admin/user/:id/activities', authenticate, isAdmin, async (req, res) => {
+    const client = await pool.connect();
     try {
+        await client.query('BEGIN');
         const token = req.headers.authorization?.split(' ')[1];
-        if (!token) return res.status(401).json({ error: 'Token no proporcionado' });
+        if (!token) { await client.query('ROLLBACK'); return res.status(401).json({ error: 'Token no proporcionado' }); }
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const admin = await pool.query('SELECT es_admin FROM users WHERE id = $1', [decoded.userId]);
-        if (!admin.rows[0]?.es_admin) return res.status(403).json({ error: 'Acceso denegado' });
+        if (!admin.rows[0]?.es_admin) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Acceso denegado' }); }
         const id = req.params.id;
         await pool.query(`ALTER TABLE users
             ADD COLUMN IF NOT EXISTS ruleta_usos INTEGER DEFAULT 0,
@@ -2103,23 +2118,29 @@ app.put('/api/admin/user/:id/activities', authenticate, isAdmin, async (req, res
             ADD COLUMN IF NOT EXISTS premio_ruleta NUMERIC DEFAULT 0,
             ADD COLUMN IF NOT EXISTS premio_cofre NUMERIC DEFAULT 0,
             ADD COLUMN IF NOT EXISTS premio_dados NUMERIC DEFAULT 0`);
+        const current = await client.query('SELECT * FROM users WHERE id::text=$1 OR telefono=$1 LIMIT 1 FOR UPDATE', [id]);
+        if (!current.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Usuario no encontrado' }); }
+        const existing = current.rows[0];
+        const valueOrExisting = (key, fallback) => Object.prototype.hasOwnProperty.call(req.body, key) ? req.body[key] : fallback;
         const values = [
-            Math.max(0, Math.floor(Number(req.body.ruleta_usos) || 0)),
-            Math.max(0, Math.floor(Number(req.body.cofres_usos) || 0)),
-            Math.max(0, Math.floor(Number(req.body.dados_usos) || 0)),
-            Math.max(0, Number(req.body.premio_ruleta) || 0),
-            Math.max(0, Number(req.body.premio_cofre) || 0),
-            Math.max(0, Number(req.body.premio_dados) || 0),
-            id
+            Math.max(0, Math.floor(Number(valueOrExisting('ruleta_usos', existing.ruleta_usos)) || 0)),
+            Math.max(0, Math.floor(Number(valueOrExisting('cofres_usos', existing.cofres_usos)) || 0)),
+            Math.max(0, Math.floor(Number(valueOrExisting('dados_usos', existing.dados_usos)) || 0)),
+            Math.max(0, Number(valueOrExisting('premio_ruleta', existing.premio_ruleta)) || 0),
+            Math.max(0, Number(valueOrExisting('premio_cofre', existing.premio_cofre)) || 0),
+            Math.max(0, Number(valueOrExisting('premio_dados', existing.premio_dados)) || 0),
+            existing.id
         ];
-        const result = await pool.query(`UPDATE users SET ruleta_usos=$1, cofres_usos=$2, dados_usos=$3,
-            premio_ruleta=$4, premio_cofre=$5, premio_dados=$6 WHERE (id::text=$7 OR telefono=$7) RETURNING *`, values);
-        if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const result = await client.query(`UPDATE users SET ruleta_usos=$1, cofres_usos=$2, dados_usos=$3,
+            premio_ruleta=$4, premio_cofre=$5, premio_dados=$6 WHERE id=$7 RETURNING *`, values);
+        if (!result.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Usuario no encontrado' }); }
+        await client.query('COMMIT');
         res.json({ message: 'Actividades asignadas', user: result.rows[0] });
     } catch (error) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
         console.error('Error asignando actividades:', error);
         res.status(500).json({ error: 'No se pudieron guardar las actividades' });
-    }
+    } finally { client.release(); }
 });
 
 // ============================================================
@@ -2190,6 +2211,38 @@ const PLANES_APEX = {
     Master: { amount: 1200, daily: 27, comingSoon: true },
     Elite: { amount: 1800, daily: 42, comingSoon: true }
 };
+
+function gananciaDiariaOficial(row) {
+    const nombre = String(row?.plan || '').trim().toLowerCase();
+    const porNombre = Object.keys(PLANES_APEX).find(plan => plan.toLowerCase() === nombre);
+    if (porNombre) return PLANES_APEX[porNombre].daily;
+    const monto = Number(row?.plan_amount || 0);
+    const porMonto = Object.keys(PLANES_APEX).find(plan => PLANES_APEX[plan].amount === monto);
+    return porMonto ? PLANES_APEX[porMonto].daily : Number(row?.daily_earnings || 0);
+}
+
+async function normalizarGananciasDiariasUsuarios() {
+    try {
+        const result = await pool.query(`
+            UPDATE users
+            SET daily_earnings = CASE
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'temporal' OR plan_amount = 200 THEN 5
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'trader' OR plan_amount = 300 THEN 8
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'analista' OR plan_amount = 500 THEN 13
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'gestor' OR plan_amount = 800 THEN 17
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'master' OR plan_amount = 1200 THEN 27
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'elite' OR plan_amount = 1800 THEN 42
+                ELSE daily_earnings
+            END
+            WHERE LOWER(TRIM(COALESCE(plan, ''))) IN ('temporal','trader','analista','gestor','master','elite')
+               OR plan_amount IN (200,300,500,800,1200,1800)
+        `);
+        console.log(`Ganancias diarias normalizadas: ${result.rowCount} usuario(s)`);
+    } catch (error) {
+        console.error('No se pudieron normalizar las ganancias diarias:', error.message);
+    }
+}
+normalizarGananciasDiariasUsuarios();
 
 async function registrarMovimiento(client, userId, tipo, monto, concepto, metadata = {}) {
     const r = await client.query('SELECT historial_detallado FROM users WHERE id = $1 FOR UPDATE', [userId]);
