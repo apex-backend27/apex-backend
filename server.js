@@ -76,9 +76,13 @@ function calcularAcumuladosDesdeHistorial(row, now = new Date()) {
     return {total:Math.round(total*100)/100,semana:Math.round(semana*100)/100,inicio};
 }
 async function reconciliarAcumulados(userId, clientOrPool = pool) {
-    const q=await clientOrPool.query('SELECT total_ganado,ganado_semanal,historial,historial_detallado FROM users WHERE id=$1',[userId]); if(!q.rows.length)return null;
-    const row=q.rows[0],calc=calcularAcumuladosDesdeHistorial(row),stored=Number(row.total_ganado||0),total=Math.max(Number.isFinite(stored)?stored:0,calc.total);
-    const u=await clientOrPool.query('UPDATE users SET total_ganado=$1,ganado_semanal=$2,ganado_semanal_inicio=$3 WHERE id=$4 RETURNING *',[total,calc.semana,calc.inicio,userId]); return u.rows[0]||null;
+    const q=await clientOrPool.query('SELECT total_ganado,ganado_semanal,ganado_semanal_inicio,historial,historial_detallado FROM users WHERE id=$1',[userId]); if(!q.rows.length)return null;
+    const row=q.rows[0],calc=calcularAcumuladosDesdeHistorial(row),stored=Number(row.total_ganado||0),storedWeekly=Number(row.ganado_semanal||0),storedWeek=normalizarFechaLima(row.ganado_semanal_inicio);
+    const total=Math.max(Number.isFinite(stored)?stored:0,calc.total);
+    // Nunca reducir un acumulado válido de la semana actual por un historial
+    // incompleto o por una actualización enviada con datos antiguos.
+    const semanal=storedWeek===calc.inicio ? Math.max(Number.isFinite(storedWeekly)?storedWeekly:0,calc.semana) : calc.semana;
+    const u=await clientOrPool.query('UPDATE users SET total_ganado=$1,ganado_semanal=$2,ganado_semanal_inicio=$3 WHERE id=$4 RETURNING *',[total,semanal,calc.inicio,userId]); return u.rows[0]||null;
 }
 async function ensureTaskColumns() {
     try {
@@ -1130,7 +1134,10 @@ app.put('/api/user/update', async (req, res) => {
         
         for (const [key, value] of Object.entries(updates)) {
             // ✅ AGREGAR 'codigos_usados_hoy' y 'ultimo_reinicio_codigos'
-            const camposPermitidos = ['balance', 'puntos', 'plan', 'plan_amount', 'daily_earnings', 
+            // Balance e historiales solo se modifican mediante rutas atómicas
+            // con bloqueo de fila. Aceptarlos aquí permitía sobrescribir datos
+            // recientes con una copia vieja del usuario.
+            const camposPermitidos = ['puntos', 'plan', 'plan_amount', 'daily_earnings',
                 'produccion_activa', 'produccion_inicio', 'produccion_duracion', 'tiempo_restante',
                 'recompensa_pendiente', 'puntosPendientes', 'codigo_usado', 'reclamado_hoy',
                 'fecha_produccion', 'codigos_usados_hoy', 'codigos_usados', 'ultimo_reinicio_codigos',
@@ -1139,7 +1146,7 @@ app.put('/api/user/update', async (req, res) => {
                 'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
                 'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto',
                 'canjes_realizados', 'logros_reclamados', 'referidos',
-                'referidos_directos', 'fechas_invito', 'historial', 'historial_detallado',
+                'referidos_directos', 'fechas_invito',
                 'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
                 'direccion_retiro', 'password_retiro',
                 'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado', 'es_admin', 'es_super_admin'
