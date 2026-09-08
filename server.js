@@ -1695,9 +1695,11 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
     try {
         await client.query('BEGIN');
         const result = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
-        if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        if (!result.rows.length) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Usuario no encontrado' });
+        }
         const u = result.rows[0];
-        await client.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00', ADD COLUMN IF NOT EXISTS tareas_dias_activos JSONB DEFAULT '[1,2,3,4,5]'::jsonb`);
         const cfgResult = await client.query('SELECT tareas_pausadas, tareas_activacion, tareas_activacion_dia, tareas_autorizadas, tareas_dias_activos, hora_cobro FROM configuracion WHERE id = 1');
         const hoyLima = normalizarFechaLima(new Date());
         const fechaValor = cfgResult.rows[0]?.tareas_activacion;
@@ -1757,7 +1759,7 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error en cobro diario:', error);
-        res.status(500).json({ error: 'Error al procesar el cobro diario' });
+        res.status(500).json({ error: error.message || 'Error al procesar el cobro diario' });
     } finally {
         client.release();
     }
@@ -2200,11 +2202,15 @@ app.post('/api/admin/user/:id/balance', authenticate, isAdmin, async (req, res) 
         const oldBalance = Number(current.rows[0].balance || 0);
         const newBalance = oldBalance + delta;
         if (newBalance < 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'El saldo no puede quedar negativo' }); }
-        const history = await registrarMovimiento(client, req.params.id, delta > 0 ? 'admin_saldo_agregado' : 'admin_saldo_retirado', delta, req.body.concepto || 'Ajuste administrativo', { adminId: req.userId });
+        // Un saldo agregado por administración cuenta como ingreso acreditado;
+        // usar "ganancia" mantiene sincronizados historial, total y semana.
+        const tipoMovimiento = delta > 0 ? 'ganancia' : 'admin_saldo_retirado';
+        const history = await registrarMovimiento(client, req.params.id, tipoMovimiento, delta, req.body.concepto || 'Ajuste administrativo', { adminId: req.userId, origen: delta > 0 ? 'admin_saldo_agregado' : 'admin_saldo_retirado' });
         const updated = await client.query('UPDATE users SET balance = $1, historial_detallado = $2 WHERE id = $3 RETURNING *', [newBalance, JSON.stringify(history), req.params.id]);
+        const reconciled = await reconciliarAcumulados(req.params.id, client);
         await client.query('COMMIT');
         try { await crearNotificacion({ userId: req.params.id, tipo: 'saldo', titulo: delta > 0 ? 'Saldo agregado por administración' : 'Saldo ajustado por administración', descripcion: `${delta > 0 ? '+' : ''}${delta.toFixed(2)} USDT. ${req.body.concepto || 'Ajuste administrativo'}`, accion: 'informativa', entidadId: `saldo:${req.userId}:${Date.now()}`, metadata: { delta, adminId: req.userId, oldBalance, newBalance } }); } catch (notificationError) { console.error('No se pudo crear notificación de saldo:', notificationError.message); }
-        res.json({ message: 'Saldo actualizado', user: updated.rows[0], oldBalance, newBalance });
+        res.json({ message: 'Saldo actualizado', user: reconciled || updated.rows[0], oldBalance, newBalance });
     } catch (error) { await client.query('ROLLBACK'); console.error(error); res.status(500).json({ error: 'No se pudo actualizar el saldo' }); } finally { client.release(); }
 });
 
