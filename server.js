@@ -1728,9 +1728,11 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Debes completar al menos una tarea antes de cobrar' });
         }
         const porcentaje = Math.min(completadas.length, total) / total;
-        const planDaily = { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 };
         const planNormalizado = normalizarPlan(u.plan);
-        const diario = Number(u.daily_earnings || (planNormalizado ? planDaily[planNormalizado] : 0) || 0);
+        // El catálogo oficial es la fuente de verdad. No usar daily_earnings
+        // almacenado porque puede contener valores antiguos o incorrectos.
+        const planConfig = planNormalizado ? PLANES_APEX[planNormalizado] : null;
+        const diario = Number(planConfig?.daily || 0);
         const planText = String(u.plan || '').trim().toLowerCase();
         const tienePlanActivo = (planText && planText !== 'sin plan' && diario > 0) || Boolean(planNormalizado);
         if (!tienePlanActivo || diario <= 0) {
@@ -1741,8 +1743,8 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
         historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas ${Math.round(porcentaje * 100)}%`, actividad: 'Tareas diarias', monto: recompensa, fecha: new Date().toISOString(), estado: 'aprobado' });
         const updated = await client.query(
-            `UPDATE users SET balance = COALESCE(balance, 0) + $1, total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio, CURRENT_DATE) < $2::date - ((EXTRACT(ISODOW FROM $2::date)::int)-1) THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END, ganado_semanal_inicio=$2::date - ((EXTRACT(ISODOW FROM $2::date)::int)-1), cobro_tareas_fecha = $2, cobro_tareas_monto = $1, historial_detallado = $3 WHERE id = $4 AND (cobro_tareas_fecha IS NULL OR cobro_tareas_fecha <> $2) RETURNING *`,
-            [recompensa, hoy, JSON.stringify(historial), req.userId]
+            `UPDATE users SET balance = COALESCE(balance, 0) + $1, daily_earnings = $2, total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio, CURRENT_DATE) < $3::date - ((EXTRACT(ISODOW FROM $3::date)::int)-1) THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END, ganado_semanal_inicio=$3::date - ((EXTRACT(ISODOW FROM $3::date)::int)-1), cobro_tareas_fecha = $3, cobro_tareas_monto = $1, historial_detallado = $4 WHERE id = $5 AND (cobro_tareas_fecha IS NULL OR cobro_tareas_fecha <> $3) RETURNING *`,
+            [recompensa, diario, hoy, JSON.stringify(historial), req.userId]
         );
         if (!updated.rows.length) {
             await client.query('ROLLBACK');
