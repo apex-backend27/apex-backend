@@ -1151,7 +1151,7 @@ app.put('/api/user/update', async (req, res) => {
             // Balance e historiales solo se modifican mediante rutas atómicas
             // con bloqueo de fila. Aceptarlos aquí permitía sobrescribir datos
             // recientes con una copia vieja del usuario.
-            const camposPermitidos = ['puntos', 'plan', 'plan_amount', 'daily_earnings',
+            const camposPermitidos = ['puntos',
                 'produccion_activa', 'produccion_inicio', 'produccion_duracion', 'tiempo_restante',
                 'recompensa_pendiente', 'puntosPendientes', 'codigo_usado', 'reclamado_hoy',
                 'fecha_produccion', 'codigos_usados_hoy', 'codigos_usados', 'ultimo_reinicio_codigos',
