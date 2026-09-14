@@ -190,11 +190,15 @@
   var MESSAGE='Privilegios insuficientes';
   function paused(){return !!(window.user&&window.user.produccion_pausada===true);}
   function refresh(){
+    if(!paused())return;
+    // Una pausa de producción no equivale a una cuenta inhabilitada.
+    // Se normaliza solo en memoria para que tareas, referidos y navegación sigan activos.
+    if(window.user)window.user.cuenta_habilitada=true;
     var b=document.getElementById('cobrarTareasBtn'),i=document.getElementById('cobroTareasInfo');
-    if(!b||!paused())return;
-    b.style.display='block';b.disabled=false;b.textContent='🔒 Cobrar tareas';b.title=MESSAGE;
-    b.onclick=function(e){if(e){e.preventDefault();e.stopImmediatePropagation();}if(typeof showAlert==='function')showAlert(MESSAGE,'warning');return false;};
+    if(b){b.style.display='block';b.disabled=false;b.textContent='🔒 Cobrar tareas';b.title=MESSAGE;
+      b.onclick=function(e){if(e){e.preventDefault();e.stopImmediatePropagation();}if(typeof showAlert==='function')showAlert(MESSAGE,'warning');return false;};}
     if(i)i.textContent=MESSAGE;
+    if(typeof window.renderTareas==='function')window.renderTareas();
   }
   var old=window.actualizarEstadoBotonCobro;
   if(typeof old==='function'&&!old.__claimOnly){window.actualizarEstadoBotonCobro=function(){old.apply(this,arguments);refresh();};window.actualizarEstadoBotonCobro.__claimOnly=true;}
