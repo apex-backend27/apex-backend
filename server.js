@@ -1282,30 +1282,38 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
         const storedPhones = (Array.isArray(stored.lista) ? stored.lista : []).map(x => x && x.id ? String(x.id) : null).filter(Boolean);
         [stored.izquierda, stored.derecha].forEach(x => { if (x) storedPhones.push(String(x)); });
         const result = await pool.query(`
-            WITH RECURSIVE red AS (
-                SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings,
-                       cuenta_habilitada, fecha_registro, referido_por, codigo_referido
-                FROM users
-                WHERE LOWER(TRIM(COALESCE(referido_por, ''))) IN (LOWER(TRIM($1)), LOWER(TRIM($2)))
-                   OR telefono = ANY($3::text[])
-                UNION
-                SELECT child.id, child.telefono, child.nombre, child.apellido, child.plan,
-                       child.plan_amount, child.daily_earnings, child.cuenta_habilitada,
-                       child.fecha_registro, child.referido_por, child.codigo_referido
-                FROM users child
-                JOIN red parent ON LOWER(TRIM(COALESCE(child.referido_por, ''))) IN (
-                    LOWER(TRIM(parent.telefono)), LOWER(TRIM(parent.codigo_referido))
-                )
-            )
             SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings,
-                   cuenta_habilitada, fecha_registro, referido_por, codigo_referido
-            FROM red
-            WHERE telefono <> $4
+                   cuenta_habilitada, fecha_registro, referido_por, codigo_referido, referidos
+            FROM users
             ORDER BY fecha_registro ASC NULLS LAST, id ASC
-        `, [u.telefono, u.codigo_referido || '', storedPhones, u.telefono]);
+        `);
+        const rows = result.rows || [];
+        const normalize = value => String(value || '').trim().toLowerCase();
+        const storedById = new Map((Array.isArray(stored.lista) ? stored.lista : [])
+            .filter(x => x && x.id).map(x => [normalize(x.id), x]));
+        const ownerKeys = new Set([normalize(u.telefono), normalize(u.codigo_referido)]);
+        const network = new Map();
+        const queue = rows.filter(r => ownerKeys.has(normalize(r.referido_por)) || storedById.has(normalize(r.telefono)));
+        queue.forEach(r => network.set(normalize(r.telefono), r));
+        for (const saved of storedById.values()) {
+            const key = normalize(saved.id);
+            if (!network.has(key)) { network.set(key, saved); queue.push(saved); }
+        }
+        for (let index = 0; index < queue.length; index++) {
+            const parent = queue[index];
+            const parentKeys = new Set([normalize(parent.telefono || parent.id), normalize(parent.codigo_referido), normalize(parent.codigo), normalize(parent.id)]);
+            const savedList = parent.referidos && typeof parent.referidos === 'object' && Array.isArray(parent.referidos.lista) ? parent.referidos.lista : [];
+            rows.forEach(child => {
+                const key = normalize(child.telefono);
+                const byRelation = parentKeys.has(normalize(child.referido_por));
+                const bySavedList = savedList.some(saved => normalize(saved && (saved.id || saved.telefono)) === key);
+                if (key && !network.has(key) && (byRelation || bySavedList)) { network.set(key, child); queue.push(child); }
+            });
+        }
+        const resultRows = Array.from(network.values()).filter(r => normalize(r.telefono) !== normalize(u.telefono));
         const byPhone = new Map();
         (Array.isArray(stored.lista) ? stored.lista : []).forEach(x => { if (x && x.id) byPhone.set(String(x.id), x); });
-        result.rows.forEach(r => byPhone.set(String(r.telefono), {
+        resultRows.forEach(r => byPhone.set(String(r.telefono || r.id), {
             id: r.telefono,
             telefono: r.telefono,
             nombre: [r.nombre, r.apellido].filter(Boolean).join(' '),
@@ -1318,6 +1326,7 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
             date: r.fecha_registro,
             referido_por: r.referido_por,
             codigo_referido: r.codigo_referido || null,
+            referidos: r.referidos && typeof r.referidos === 'object' ? r.referidos : null,
             activo: r.cuenta_habilitada !== false
         }));
         const networkList = Array.from(byPhone.values()).map(item => ({ ...item, hijos: [] }));
