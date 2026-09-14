@@ -1320,9 +1320,17 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
             codigo_referido: r.codigo_referido || null,
             activo: r.cuenta_habilitada !== false
         }));
+        const networkList = Array.from(byPhone.values()).map(item => ({ ...item, hijos: [] }));
+        const identifiers = item => [item.id, item.telefono, item.codigo_referido].filter(Boolean).map(normalize);
+        networkList.forEach(child => {
+            const parentRef = normalize(child.referido_por);
+            if (!parentRef) return;
+            const parent = networkList.find(candidate => identifiers(candidate).includes(parentRef));
+            if (parent && parent !== child) parent.hijos.push(child);
+        });
         res.json({
             codigo_referido: u.codigo_referido || null,
-            referidos: Array.from(byPhone.values()),
+            referidos: networkList,
             arbol: stored
         });
     } catch (error) {
