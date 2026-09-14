@@ -206,10 +206,17 @@
 </script>
 <script id="apex-atomic-plan-purchase-v1">
 (function(){
+  var previousBuy=window.buyPlan;
   async function atomicBuy(plan){
     var data=typeof getPlanData==='function'?getPlanData(plan):null;
     if(!data)return;
     var current=String(window.user&&user.plan||'Sin plan');
+    if(current!==''&&current.toLowerCase()!=='sin plan'&&current.toLowerCase()!=='ninguno'){
+      // Los upgrades conservan la validación existente: autorización del admin,
+      // nivel consecutivo y saldo suficiente.
+      if(typeof previousBuy==='function')return previousBuy(plan);
+      return showAlert('🔒 Necesitas autorización del administrador para subir de nivel','danger');
+    }
     if(current===plan)return showAlert('⚠️ Ya tienes este plan activo','warning');
     if(!confirm('¿Confirmar compra del plan '+plan+' por $'+Number(data.amount).toFixed(2)+'?'))return;
     try{
