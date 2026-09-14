@@ -350,3 +350,20 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   window.addEventListener('load',function(){setTimeout(load,300);});
 })();
 </script>
+<script id="apex-referrals-mirror-admin-v1">
+(function(){
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function itemNode(x,level){var name=x&& (x.nombre||x.name||x.telefono||x.id)||'Sin nombre',phone=x&& (x.telefono||x.id)||'',pl=x&&(x.plan||x.plan_nombre||x.plan_actual)||'Sin plan';return '<div style="display:flex;align-items:center;gap:10px;min-height:44px;margin:'+(level===1?'8px 0 0 10px':'4px 0 0 38px')+';padding:8px 10px;border-left:2px solid '+(level===1?'#27d3ff':'#8b5cf6')+';background:rgba(7,20,40,.55);border-radius:8px"><span style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center;border:2px solid '+(level===1?'#b36bff':'#27d3ff')+';color:#fff;font-size:10px;font-weight:800">'+esc(String(name).replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]/g,'').slice(0,2).toUpperCase()||'??')+'</span><div><div style="font-weight:800;color:#fff">'+esc(name)+' <span style="margin-left:5px;padding:3px 7px;border-radius:8px;background:#123f35;color:#6dffcf;font-size:10px">'+esc(pl)+'</span></div><div style="font-size:10px;color:#a9c5dd">'+esc(phone)+'</div></div></div>';}
+  function draw(){
+    var box=document.getElementById('referidosListaContainer');if(!box||!window.user)return;
+    var all=typeof getUsers==='function'?getUsers():[], direct=Array.isArray(user.referidos&&user.referidos.lista)?user.referidos.lista:[];
+    function findChildren(parent){var keys=[parent&&parent.codigo_referido,parent&&parent.codigo,parent&&parent.telefono,parent&&parent.id].filter(Boolean).map(String);return all.filter(function(x){return [x&&x.referido_por,x&&x.referidoPor,x&&x.codigo_referido_padre,x&&x.codigoReferidoPadre].filter(Boolean).map(String).some(function(v){return keys.indexOf(v)>=0;});});}
+    var rows='<div style="margin-bottom:14px"><div style="font-size:14px;font-weight:800;color:#ffd447;margin-bottom:8px">📋 Tus referidos</div>';
+    rows+=direct.length?direct.map(function(raw){var fresh=all.find(function(x){return String(x.telefono||x.id)===String(raw.id||raw.telefono);})||raw;var pl=fresh.plan||fresh.plan_nombre||fresh.plan_actual||'Sin plan';return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 12px;margin:6px 0;border:1px solid #39c7ff;border-radius:10px;background:#0b1d32;color:#eef7ff"><span><strong>'+esc(fresh.nombre||fresh.telefono||fresh.id)+'</strong><small style="display:block;color:#a9c5dd">📱 '+esc(fresh.telefono||fresh.id||'')+'</small></span><b style="color:#6dffcf">'+esc(pl)+'</b></div>';}).join(''):'<div style="color:#a9c5dd;padding:10px">Aún no tienes referidos.</div>';
+    rows+='</div><div class="apex-ref-tree apex-referrals-mirror-admin-v1"><h3>🌳 Árbol de referidos</h3><div style="text-align:center;padding:8px;color:#fff;font-weight:900">🔵 TÚ</div>';
+    rows+=direct.length?direct.map(function(raw){var parent=all.find(function(x){return String(x.telefono||x.id)===String(raw.id||raw.telefono);})||raw,children=findChildren(parent);return '<div>'+itemNode(parent,1)+(children.length?children.map(function(x){return itemNode(x,2);}).join(''):'<div style="color:#a9bcd0;font-size:12px;margin:8px 0 12px 40px">Sin invitados de este referido</div>')+'</div>';}).join(''):'<div style="color:#a9bcd0;font-size:12px">No tiene referidos registrados.</div>';
+    rows+='<div class="legend"><span>🟣 Nivel 1 · Invitados directos</span><span>🔵 Nivel 2 · Invitados de tus referidos</span></div></div>';box.innerHTML=rows;
+  }
+  window.renderTree=draw;var previousReferralLoad=window.cargarReferidosRemotos;if(typeof previousReferralLoad==='function'){window.cargarReferidosRemotos=function(){var result=previousReferralLoad.apply(this,arguments);return result&&typeof result.then==='function'?result.then(function(v){draw();return v;}):result;};}draw();window.addEventListener('load',function(){setTimeout(draw,400);});
+})();
+</script>
