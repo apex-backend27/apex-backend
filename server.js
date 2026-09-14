@@ -1275,83 +1275,67 @@ app.put('/api/user/tasks/progress', authenticate, async (req, res) => {
 // ============================================================
 app.get('/api/user/referrals', authenticate, async (req, res) => {
     try {
-        const owner = await pool.query('SELECT id, telefono, codigo_referido, referidos FROM users WHERE id = $1', [req.userId]);
-        if (!owner.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
-        const u = owner.rows[0];
-        const stored = u.referidos && typeof u.referidos === 'object' ? u.referidos : { izquierda: null, derecha: null, lista: [] };
-        const storedPhones = (Array.isArray(stored.lista) ? stored.lista : []).map(x => x && x.id ? String(x.id) : null).filter(Boolean);
-        [stored.izquierda, stored.derecha].forEach(x => { if (x) storedPhones.push(String(x)); });
-        const result = await pool.query(`
-            SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings,
-                   cuenta_habilitada, fecha_registro, referido_por, codigo_referido, referidos
-            FROM users
-            ORDER BY fecha_registro ASC NULLS LAST, id ASC
-        `);
-        const rows = result.rows || [];
-        const normalize = value => String(value || '').trim().toLowerCase();
-        const storedById = new Map((Array.isArray(stored.lista) ? stored.lista : [])
-            .filter(x => x && x.id).map(x => [normalize(x.id), x]));
-        const ownerKeys = new Set([normalize(u.telefono), normalize(u.codigo_referido)]);
-        const network = new Map();
-        const queue = rows.filter(r => ownerKeys.has(normalize(r.referido_por)) || storedById.has(normalize(r.telefono)));
-        queue.forEach(r => network.set(normalize(r.telefono), r));
-        for (const saved of storedById.values()) {
-            const key = normalize(saved.id);
-            if (!network.has(key)) { network.set(key, saved); queue.push(saved); }
-        }
+        const ownerQ = await pool.query('SELECT id, telefono, codigo_referido, referidos FROM users WHERE id = $1', [req.userId]);
+        if (!ownerQ.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const owner = ownerQ.rows[0];
+        const rowsQ = await pool.query(`SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings,
+            cuenta_habilitada, fecha_registro, referido_por, codigo_referido, referidos
+            FROM users ORDER BY fecha_registro ASC NULLS LAST, id ASC`);
+        const rows = rowsQ.rows || [];
+        const norm = value => String(value ?? '').trim().toLowerCase();
+        const rowByKey = new Map();
+        rows.forEach(row => [row.telefono, row.id, row.codigo_referido].filter(Boolean).forEach(key => rowByKey.set(norm(key), row)));
+        const savedList = value => value && typeof value === 'object' && Array.isArray(value.lista) ? value.lista : [];
+        const childSaved = value => {
+            if (!value || typeof value !== 'object') return [];
+            const out = [];
+            ['lista', 'hijos', 'children', 'referidos'].forEach(key => {
+                const part = key === 'referidos' ? savedList(value[key]) : (Array.isArray(value[key]) ? value[key] : []);
+                part.forEach(item => { if (item && typeof item === 'object') out.push(item); });
+            });
+            return out;
+        };
+        const record = (value, level, parent) => {
+            const key = norm(value && (value.telefono || value.id || value.codigo_referido));
+            const db = rowByKey.get(key) || {};
+            return { id: db.telefono || value.telefono || value.id, telefono: db.telefono || value.telefono || value.id,
+                nombre: [db.nombre || value.nombre, db.apellido || value.apellido].filter(Boolean).join(' ') || value.name || 'Sin nombre',
+                plan: db.plan || value.plan || value.plan_nombre || 'Sin plan', plan_amount: Number(db.plan_amount || value.plan_amount || 0),
+                daily_earnings: Number(db.daily_earnings || value.daily_earnings || 0), plan_nombre: db.plan || value.plan || null,
+                plan_actual: db.plan || value.plan || null, tienePlan: Boolean(db.plan || value.plan || Number(db.plan_amount || value.plan_amount || 0) > 0),
+                date: db.fecha_registro || value.date || null, referido_por: db.referido_por || value.referido_por || null,
+                codigo_referido: db.codigo_referido || value.codigo_referido || null, nivel: level,
+                activo: db.cuenta_habilitada !== false };
+        };
+        const nodes = new Map();
+        const ensure = (value, level, parent) => {
+            const key = norm(value && (value.telefono || value.id || value.codigo_referido));
+            if (!key || key === norm(owner.telefono)) return null;
+            let node = nodes.get(key);
+            if (!node) { node = record(value, level, parent); node.hijos = []; nodes.set(key, node); }
+            if (level < node.nivel) node.nivel = level;
+            if (parent && !parent.hijos.some(child => norm(child.id) === key)) parent.hijos.push(node);
+            return node;
+        };
+        const roots = [];
+        const ownerKeys = new Set([norm(owner.telefono), norm(owner.codigo_referido)]);
+        rows.filter(row => ownerKeys.has(norm(row.referido_por))).forEach(row => { const node = ensure(row, 1, null); if (node && !roots.includes(node)) roots.push(node); });
+        savedList(owner.referidos).forEach(item => { const node = ensure(item, 1, null); if (node && !roots.includes(node)) roots.push(node); });
+        const queue = roots.slice();
         for (let index = 0; index < queue.length; index++) {
             const parent = queue[index];
-            const parentKeys = new Set([normalize(parent.telefono || parent.id), normalize(parent.codigo_referido), normalize(parent.codigo), normalize(parent.id)]);
-            const savedList = parent.referidos && typeof parent.referidos === 'object' && Array.isArray(parent.referidos.lista) ? parent.referidos.lista : [];
-            rows.forEach(child => {
-                const key = normalize(child.telefono);
-                const byRelation = parentKeys.has(normalize(child.referido_por));
-                const bySavedList = savedList.some(saved => normalize(saved && (saved.id || saved.telefono)) === key);
-                if (key && !network.has(key) && (byRelation || bySavedList)) { network.set(key, child); queue.push(child); }
-            });
+            const db = rowByKey.get(norm(parent.id));
+            const refs = childSaved(db && db.referidos).concat(childSaved(parent));
+            rows.filter(row => [parent.id, parent.codigo_referido].filter(Boolean).map(norm).includes(norm(row.referido_por))).forEach(row => refs.push(row));
+            refs.forEach(item => { const child = ensure(item, 2, parent); if (child && !queue.includes(child)) queue.push(child); });
         }
-        const resultRows = Array.from(network.values()).filter(r => normalize(r.telefono) !== normalize(u.telefono));
-        const byPhone = new Map();
-        (Array.isArray(stored.lista) ? stored.lista : []).forEach(x => { if (x && x.id) byPhone.set(String(x.id), x); });
-        resultRows.forEach(r => byPhone.set(String(r.telefono || r.id), {
-            id: r.telefono,
-            telefono: r.telefono,
-            nombre: [r.nombre, r.apellido].filter(Boolean).join(' '),
-            plan: r.plan || 'Sin plan',
-            plan_nombre: r.plan || null,
-            plan_actual: r.plan || null,
-            plan_amount: Number(r.plan_amount || 0),
-            daily_earnings: Number(r.daily_earnings || 0),
-            tienePlan: Boolean((r.plan && !['sin plan','null','undefined','ninguno'].includes(String(r.plan).trim().toLowerCase())) || Number(r.plan_amount || 0) > 0 || Number(r.daily_earnings || 0) > 0),
-            date: r.fecha_registro,
-            referido_por: r.referido_por,
-            codigo_referido: r.codigo_referido || null,
-            referidos: r.referidos && typeof r.referidos === 'object' ? r.referidos : null,
-            activo: r.cuenta_habilitada !== false
-        }));
-        const networkList = Array.from(byPhone.values()).map(item => ({ ...item, hijos: [] }));
-        const identifiers = item => [item.id, item.telefono, item.codigo_referido].filter(Boolean).map(normalize);
-        networkList.forEach(child => {
-            const childKey = normalize(child.id || child.telefono);
-            const parentRef = normalize(child.referido_por);
-            const parentByRelation = parentRef ? networkList.find(candidate => identifiers(candidate).includes(parentRef)) : null;
-            if (parentByRelation && parentByRelation !== child) parentByRelation.hijos.push(child);
-            networkList.forEach(parent => {
-                const saved = parent.referidos && typeof parent.referidos === 'object' && Array.isArray(parent.referidos.lista) ? parent.referidos.lista : [];
-                if (saved.some(item => normalize(item && (item.id || item.telefono)) === childKey) && parent !== child && !parent.hijos.some(x => normalize(x.id || x.telefono) === childKey)) parent.hijos.push(child);
-            });
-        });
-        res.json({
-            codigo_referido: u.codigo_referido || null,
-            referidos: networkList,
-            arbol: stored
-        });
+        const flat = Array.from(nodes.values()).map(node => { const copy = { ...node }; delete copy.parent; return copy; });
+        res.json({ codigo_referido: owner.codigo_referido || null, referidos: flat, arbol: { lista: roots.map(node => ({ ...node, hijos: undefined })) }, raices: flat.filter(node => node.nivel === 1), arbol_niveles: roots });
     } catch (error) {
         console.error('Error al cargar referidos:', error);
         res.status(500).json({ error: 'No se pudieron cargar los referidos' });
     }
 });
-
 // ============================================================
 // CONFIGURACIÓN CENTRALIZADA DE TAREAS
 // ============================================================
