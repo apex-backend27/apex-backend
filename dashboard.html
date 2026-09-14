@@ -252,6 +252,21 @@
     var byDaily={5:'Temporal',8:'Trader',13:'Analista',17:'Gestor',27:'Master',42:'Elite'};
     return byAmount[Number(x&&x.plan_amount)]||byDaily[Number(x&&x.daily_earnings)]||'';
   }
+  function renderReferralTree(){
+    var box=document.getElementById('referidosListaContainer');
+    if(!box||!window.user)return;
+    var old=box.querySelector('.apex-referral-tree-restore-v1');if(old)old.remove();
+    var direct=Array.isArray(user.referidos&&user.referidos.lista)?user.referidos.lista:[];
+    var all=typeof getUsers==='function'?getUsers():[];
+    function children(parent){
+      var keys=[parent&&parent.codigo_referido,parent&&parent.codigo,parent&&parent.telefono,parent&&parent.id].filter(Boolean).map(String);
+      return all.filter(function(x){return [x&&x.referido_por,x&&x.referidoPor,x&&x.codigo_referido_padre,x&&x.codigoReferidoPadre].filter(Boolean).map(String).some(function(v){return keys.indexOf(v)>=0;});});
+    }
+    function node(x,level){var name=x&& (x.nombre||x.name||x.telefono||x.id)||'Sin nombre',id=x&& (x.telefono||x.id)||'',plan=planOf(x)||'Sin plan';return '<div class="apex-ref-node apex-ref-level'+level+'"><span class="apex-ref-avatar">'+esc(String(name).replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9]/g,'').slice(0,2).toUpperCase()||'??')+'</span><div><div class="apex-ref-name">'+esc(name)+' <span class="apex-ref-badge">'+esc(plan)+'</span></div><div class="apex-ref-meta">'+esc(id)+'</div></div></div>';}
+    var cols=direct.map(function(x){var kids=Array.isArray(x.hijos)?x.hijos:(Array.isArray(x.children)?x.children:children(x));return '<div class="apex-ref-column">'+node(x,1)+(kids.length?kids.map(function(y){return node(y,2);}).join(''):'<div class="apex-ref-empty">Sin invitados de este referido</div>')+'</div>';}).join('');
+    var tree=document.createElement('div');tree.className='apex-ref-tree apex-referral-tree-restore-v1';tree.innerHTML='<h3>🌳 Árbol de referidos</h3><div class="apex-ref-node apex-ref-root"><span class="apex-ref-avatar">TÚ</span></div>'+(direct.length?'<div class="apex-ref-children">'+cols+'</div>':'<div class="apex-ref-empty">Comparte tu enlace para comenzar tu red.</div>')+'<div class="legend"><span>🟣 Nivel 1 · Invitados directos</span><span>🔵 Nivel 2 · Invitados de tus referidos</span></div>';
+    box.insertBefore(tree,box.firstChild);
+  }
   function renderReferralPlans(){
     var box=document.getElementById('referidosListaContainer');
     var list=window.user&&user.referidos&&Array.isArray(user.referidos.lista)?user.referidos.lista:[];
@@ -265,6 +280,7 @@
     });
     html+='</div>';
     box.innerHTML=html;
+    renderReferralTree();
     var count=document.getElementById('referralCount')||document.getElementById('totalReferidos');
     if(count)count.textContent=String(list.length);
   }
