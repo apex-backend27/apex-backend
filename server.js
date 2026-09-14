@@ -1332,10 +1332,14 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
         const networkList = Array.from(byPhone.values()).map(item => ({ ...item, hijos: [] }));
         const identifiers = item => [item.id, item.telefono, item.codigo_referido].filter(Boolean).map(normalize);
         networkList.forEach(child => {
+            const childKey = normalize(child.id || child.telefono);
             const parentRef = normalize(child.referido_por);
-            if (!parentRef) return;
-            const parent = networkList.find(candidate => identifiers(candidate).includes(parentRef));
-            if (parent && parent !== child) parent.hijos.push(child);
+            const parentByRelation = parentRef ? networkList.find(candidate => identifiers(candidate).includes(parentRef)) : null;
+            if (parentByRelation && parentByRelation !== child) parentByRelation.hijos.push(child);
+            networkList.forEach(parent => {
+                const saved = parent.referidos && typeof parent.referidos === 'object' && Array.isArray(parent.referidos.lista) ? parent.referidos.lista : [];
+                if (saved.some(item => normalize(item && (item.id || item.telefono)) === childKey) && parent !== child && !parent.hijos.some(x => normalize(x.id || x.telefono) === childKey)) parent.hijos.push(child);
+            });
         });
         res.json({
             codigo_referido: u.codigo_referido || null,
