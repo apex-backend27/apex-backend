@@ -328,3 +328,25 @@ window.requestWithdraw=async function(){try{var fresh=await api('/api/verify');i
 function init(){removeCoupons();var observer=new MutationObserver(removeCoupons);observer.observe(document.body,{childList:true,subtree:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();</script>
+<script id="apex-referrals-rebuild-final-v1">
+(function(){
+  function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function plan(x){return String(x&&(x.plan||x.plan_nombre||x.plan_actual)||'Sin plan');}
+  function node(x,level){var name=x&&x.nombre||x&&x.name||x&&x.telefono||x&&x.id||'Sin nombre';return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;margin:6px 0 6px '+(level===2?'28px':'0')+';border-left:2px solid '+(level===1?'#b36bff':'#27d3ff')+';background:rgba(10,30,55,.55);border-radius:8px"><div style="width:32px;height:32px;border-radius:50%;display:grid;place-items:center;border:2px solid '+(level===1?'#b36bff':'#27d3ff')+';color:#fff;font-size:10px;font-weight:800">'+esc(String(name).replace(/[^A-Za-z0-9ÁÉÍÓÚÑáéíóúñ]/g,'').slice(0,2).toUpperCase()||'??')+'</div><div><div style="font-weight:800;color:#fff">'+esc(name)+' <span style="margin-left:5px;padding:3px 7px;border-radius:8px;background:#123f35;color:#6dffcf;font-size:10px">'+esc(plan(x))+'</span></div><div style="font-size:10px;color:#a9c5dd">'+esc(x&&x.telefono||x&&x.id||'')+'</div></div></div>';}
+  function render(data){
+    var roots=Array.isArray(data&&data.raices)?data.raices:[];
+    var box=document.getElementById('referidosListaContainer');if(!box)return;
+    var list='<div style="margin-bottom:14px"><div style="font-size:14px;font-weight:800;color:#ffd447;margin-bottom:8px">📋 Tus referidos</div>';
+    list+=roots.length?roots.map(function(x){return '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 12px;margin:6px 0;border:1px solid #39c7ff;border-radius:10px;background:#0b1d32;color:#eef7ff"><span><strong>'+esc(x.nombre||x.telefono||x.id)+'</strong><small style="display:block;color:#a9c5dd">📱 '+esc(x.telefono||x.id||'')+'</small></span><b style="color:#6dffcf">'+esc(plan(x))+'</b></div>';}).join(''):'<div style="color:#a9c5dd;padding:10px">Aún no tienes referidos.</div>';
+    list+='</div><div class="apex-ref-tree apex-referral-tree-rebuild-v1"><h3>🌳 Árbol de referidos</h3><div style="text-align:center;padding:8px;color:#fff;font-weight:900">🔵 TÚ</div>';
+    list+=roots.length?roots.map(function(x){var kids=Array.isArray(x.hijos)?x.hijos:[];return '<div><div>'+node(x,1)+'</div>'+(kids.length?kids.map(function(y){return node(y,2);}).join(''):'<div style="color:#a9bcd0;font-size:12px;margin:8px 0 12px 40px">Sin invitados de este referido</div>')+'</div>';}).join(''):'<div style="color:#a9bcd0;font-size:12px">Comparte tu enlace para comenzar tu red.</div>';
+    list+='<div class="legend"><span>🟣 Nivel 1 · Invitados directos</span><span>🔵 Nivel 2 · Invitados de tus referidos</span></div></div>';
+    box.innerHTML=list;
+    var count=document.getElementById('totalReferidos')||document.getElementById('referralCount');if(count)count.textContent=String(roots.length);
+  }
+  async function load(){var token=localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';if(!token||!window.user)return;try{var r=await fetch(API_URL+'/api/user/referrals?rebuild=1',{cache:'no-store',headers:{Authorization:'Bearer '+token}}),d=await r.json();if(!r.ok||d.error)throw Error(d.error||'No se pudieron cargar referidos');user.referidos=Object.assign({},user.referidos,{lista:Array.isArray(d.raices)?d.raices:[],red:Array.isArray(d.referidos)?d.referidos:[]});render(d);}catch(e){console.warn('Referidos:',e.message);}}
+  window.cargarReferidosRemotos=load;window.renderTree=function(){load();};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();
+  window.addEventListener('load',function(){setTimeout(load,300);});
+})();
+</script>
