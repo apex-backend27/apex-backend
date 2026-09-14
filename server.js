@@ -1282,14 +1282,27 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
         const storedPhones = (Array.isArray(stored.lista) ? stored.lista : []).map(x => x && x.id ? String(x.id) : null).filter(Boolean);
         [stored.izquierda, stored.derecha].forEach(x => { if (x) storedPhones.push(String(x)); });
         const result = await pool.query(`
+            WITH RECURSIVE red AS (
+                SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings,
+                       cuenta_habilitada, fecha_registro, referido_por, codigo_referido
+                FROM users
+                WHERE LOWER(TRIM(COALESCE(referido_por, ''))) IN (LOWER(TRIM($1)), LOWER(TRIM($2)))
+                   OR telefono = ANY($3::text[])
+                UNION
+                SELECT child.id, child.telefono, child.nombre, child.apellido, child.plan,
+                       child.plan_amount, child.daily_earnings, child.cuenta_habilitada,
+                       child.fecha_registro, child.referido_por, child.codigo_referido
+                FROM users child
+                JOIN red parent ON LOWER(TRIM(COALESCE(child.referido_por, ''))) IN (
+                    LOWER(TRIM(parent.telefono)), LOWER(TRIM(parent.codigo_referido))
+                )
+            )
             SELECT id, telefono, nombre, apellido, plan, plan_amount, daily_earnings,
-                   cuenta_habilitada, fecha_registro, referido_por
-            FROM users
-            WHERE referido_por = $1
-               OR LOWER(TRIM(COALESCE(referido_por, ''))) = LOWER(TRIM($2))
-               OR telefono = ANY($3::text[])
+                   cuenta_habilitada, fecha_registro, referido_por, codigo_referido
+            FROM red
+            WHERE telefono <> $4
             ORDER BY fecha_registro ASC NULLS LAST, id ASC
-        `, [u.telefono, u.codigo_referido || '', storedPhones]);
+        `, [u.telefono, u.codigo_referido || '', storedPhones, u.telefono]);
         const byPhone = new Map();
         (Array.isArray(stored.lista) ? stored.lista : []).forEach(x => { if (x && x.id) byPhone.set(String(x.id), x); });
         result.rows.forEach(r => byPhone.set(String(r.telefono), {
@@ -1304,6 +1317,7 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
             tienePlan: Boolean((r.plan && !['sin plan','null','undefined','ninguno'].includes(String(r.plan).trim().toLowerCase())) || Number(r.plan_amount || 0) > 0 || Number(r.daily_earnings || 0) > 0),
             date: r.fecha_registro,
             referido_por: r.referido_por,
+            codigo_referido: r.codigo_referido || null,
             activo: r.cuenta_habilitada !== false
         }));
         res.json({

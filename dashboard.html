@@ -256,8 +256,9 @@
     var box=document.getElementById('referidosListaContainer');
     if(!box||!window.user)return;
     var old=box.querySelector('.apex-referral-tree-restore-v1');if(old)old.remove();
-    var direct=Array.isArray(user.referidos&&user.referidos.lista)?user.referidos.lista:[];
-    var all=typeof getUsers==='function'?getUsers():[];
+    var all=Array.isArray(user.referidos&&user.referidos.lista)?user.referidos.lista:[];
+    var ownerKeys=[user.telefono,user.codigo_referido].filter(Boolean).map(String);
+    var direct=all.filter(function(x){return ownerKeys.indexOf(String(x&&x.referido_por||''))>=0;});
     function children(parent){
       var keys=[parent&&parent.codigo_referido,parent&&parent.codigo,parent&&parent.telefono,parent&&parent.id].filter(Boolean).map(String);
       return all.filter(function(x){return [x&&x.referido_por,x&&x.referidoPor,x&&x.codigo_referido_padre,x&&x.codigoReferidoPadre].filter(Boolean).map(String).some(function(v){return keys.indexOf(v)>=0;});});
