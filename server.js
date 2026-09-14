@@ -1720,6 +1720,12 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             return res.status(404).json({ error: 'Usuario no encontrado' });
         }
         const u = result.rows[0];
+        // La pausa administrativa solo bloquea el cobro de producción diaria.
+        // No debe impedir login, perfil, retiros, juegos ni actividades asignadas.
+        if (u.produccion_pausada === true) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ error: 'Privilegios insuficientes: el cobro de tareas está pausado por el administrador' });
+        }
         const cfgResult = await client.query('SELECT tareas_pausadas, tareas_activacion, tareas_activacion_dia, tareas_autorizadas, tareas_dias_activos, hora_cobro FROM configuracion WHERE id = 1');
         const hoyLima = normalizarFechaLima(new Date());
         const fechaValor = cfgResult.rows[0]?.tareas_activacion;
