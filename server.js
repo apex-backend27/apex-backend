@@ -2411,8 +2411,18 @@ app.post('/api/user/task/submit', authenticate, async (req,res)=>{
         const task = tasks[taskIndex];
         if (!task) throw new Error('Tarea no encontrada');
         const state = String(task.estado || '').toLowerCase();
-        if (['aprobada','aprobado','rechazada','rechazado','completada','completado'].includes(state) || task.completada === true) {
-            throw new Error('Esta tarea ya fue enviada o procesada');
+        if (['aprobada','aprobado','rechazada','rechazado','completada','completado','caducada','caducado'].includes(state) || task.completada === true) {
+            throw new Error(['caducada','caducado'].includes(state) ? 'Esta tarea está caducada' : 'Esta tarea ya fue enviada o procesada');
+        }
+        const assignedAt = task.fechaAsignacion ? new Date(task.fechaAsignacion) : new Date(0);
+        const explicitExpiry = task.fechaVencimiento ? new Date(task.fechaVencimiento) : null;
+        const durationDays = Math.max(1, Number(task.diasVencimiento || task.dias_vencimiento || task.dias || 3));
+        const expiry = explicitExpiry && !Number.isNaN(explicitExpiry.getTime()) ? explicitExpiry : new Date(assignedAt.getTime() + durationDays * 86400000);
+        if (Date.now() >= expiry.getTime()) {
+            task.estado = 'caducada'; task.status = 'caducada'; task.fechaCaducidad = new Date().toISOString();
+            await client.query('UPDATE users SET tareas_asignadas=$1::jsonb WHERE id=$2', [JSON.stringify(tasks), req.userId]);
+            await client.query('COMMIT');
+            throw new Error('Esta tarea está caducada');
         }
         task.estado = 'completada';
         task.completada = true;
@@ -2448,7 +2458,7 @@ app.post('/api/admin/user/:id/task/assign', authenticate, isAdmin, async (req,re
             puntos: String(t.tipo_recompensa || 'puntos') === 'puntos' ? Number(t.cantidad || 0) : 0,
             estado: 'pendiente', fechaAsignacion: new Date().toISOString(),
             diasVencimiento: (Number(t.diasVencimiento || t.dias_vencimiento || t.dias || 0) > 0) ? Number(t.diasVencimiento || t.dias_vencimiento || t.dias) : ((t.fechaVencimiento && t.fechaAsignacion) ? Math.max(1, Math.round((new Date(t.fechaVencimiento).getTime() - new Date(t.fechaAsignacion).getTime()) / 86400000)) : 3),
-            fechaVencimiento: t.fechaVencimiento || null, comprobante: null, fechaCompletado: null
+            fechaVencimiento: t.fechaVencimiento || new Date(Date.now() + Math.max(1, Number(t.diasVencimiento || t.dias_vencimiento || t.dias || 3)) * 86400000).toISOString(), comprobante: null, fechaCompletado: null
         };
         ts.push(tarea);
         const r = await client.query('UPDATE users SET tareas_asignadas=$1::jsonb WHERE id=$2 RETURNING *', [JSON.stringify(ts), u.id]);
