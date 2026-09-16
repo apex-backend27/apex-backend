@@ -1518,6 +1518,14 @@ app.post('/api/admin/tasks/activate', authenticate, isAdmin, async (req, res) =>
     } catch (error) { console.error('Error activando tareas:', error); res.status(500).json({error:'No se pudieron activar las tareas'}); }
 });
 
+app.post('/api/admin/tasks/reset-today', authenticate, isAdmin, async (req, res) => {
+    try {
+        const hoyLima = normalizarFechaLima(new Date());
+        const r = await pool.query(`UPDATE users SET tareas_completadas_hoy = '[]'::jsonb, ultima_fecha_tareas = $1, cobro_tareas_fecha = NULL, cobro_tareas_monto = 0 WHERE plan IS NOT NULL RETURNING id`, [hoyLima]);
+        res.json({message:'Tareas reiniciadas para hoy', usuariosAfectados:r.rowCount});
+    } catch (error) { console.error('Error reiniciando tareas:', error); res.status(500).json({error:'No se pudieron reiniciar las tareas'}); }
+});
+
 app.post('/api/admin/tasks/pause', authenticate, isAdmin, async (req, res) => {
     try {
         await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS tareas_activacion TIMESTAMP, ADD COLUMN IF NOT EXISTS tareas_pausadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_autorizadas BOOLEAN DEFAULT FALSE, ADD COLUMN IF NOT EXISTS tareas_activacion_dia DATE`);
