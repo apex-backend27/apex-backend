@@ -353,7 +353,9 @@ const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
 const DEPOSIT_CONFIRMATIONS = Math.max(1, Number(process.env.DEPOSIT_CONFIRMATIONS || 10));
 const DEPOSIT_SCAN_INTERVAL_MS = Math.max(15000, Number(process.env.DEPOSIT_SCAN_INTERVAL_MS || 30000));
-const POLYGON_RPC_URLS = String(process.env.POLYGON_RPC_URLS || process.env.POLYGON_RPC_URL || 'https://rpc.ankr.com/polygon,https://polygon.publicnode.com,https://polygon.drpc.org').split(',').map(x => x.trim()).filter(Boolean);
+const POLYGON_PUBLIC_FALLBACKS = ['https://polygon-rpc.com', 'https://polygon.publicnode.com', 'https://polygon.drpc.org'];
+const POLYGON_RPC_CONFIGURED = String(process.env.POLYGON_RPC_URLS || process.env.POLYGON_RPC_URL || '').split(',').map(x => x.trim()).filter(Boolean);
+const POLYGON_RPC_URLS = Array.from(new Set([...POLYGON_RPC_CONFIGURED, ...POLYGON_PUBLIC_FALLBACKS]));
 let activeRpcUrl = null;
 let monitorRunning = false;
 async function rpcCall(method, params) {
@@ -369,7 +371,7 @@ async function rpcCall(method, params) {
             if (!response.ok || body.error) throw new Error(`${body.error?.message || raw.slice(0, 500) || `HTTP ${response.status}`} [${method}]`);
             activeRpcUrl = rpcUrl;
             return body.result;
-        } catch (error) { lastError = error; if (activeRpcUrl === rpcUrl) activeRpcUrl = null; }
+        } catch (error) { lastError = error; if (/monthly capacity|rate limit|quota|too many requests|429/i.test(String(error.message || ''))) console.warn(`RPC Polygon limitado; se prueba el siguiente respaldo (${new URL(rpcUrl).host})`); if (activeRpcUrl === rpcUrl) activeRpcUrl = null; }
     }
     throw new Error(`${method}: ${lastError?.message || 'sin RPC disponible'}`);
 }
