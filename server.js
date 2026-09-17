@@ -597,6 +597,14 @@ app.get('/api/admin/deposits', authenticate, isAdmin, async (req, res) => {
     }
 });
 
+app.post('/api/admin/deposits/sync', authenticate, isAdmin, async (req, res) => {
+    try {
+        await monitorDepositosPolygon();
+        const result = await pool.query(`SELECT d.id, d.user_id, d.tx_hash, d.log_index, d.amount, d.block_number, d.confirmations, d.status, d.token_contract, d.created_at, d.credited_at, u.nombre, u.apellido, u.telefono, u.polygon_address FROM polygon_deposits d LEFT JOIN users u ON u.id=d.user_id ORDER BY d.created_at DESC, d.id DESC LIMIT 200`);
+        res.json({ message: 'Monitor de depósitos ejecutado', deposits: result.rows });
+    } catch (error) { console.error('Error sincronizando depósitos admin:', error.message); res.status(503).json({ error: 'No se pudo sincronizar el monitor de depósitos' }); }
+});
+
 // ============================================================
 // GESTIÓN DE SUB-ADMINS: SOLO SUPERADMIN
 // ============================================================
@@ -1041,7 +1049,8 @@ app.post('/api/me/deposits/sync', authenticate, async (req, res) => {
   try {
     await monitorDepositosPolygon();
     const result = await pool.query('SELECT id, tx_hash, amount, block_number, confirmations, status, created_at, credited_at FROM polygon_deposits WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [req.userId]);
-    res.json({ message: 'Sincronización ejecutada', deposits: result.rows });
+    const fresh = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
+    res.json({ message: 'Sincronización ejecutada', deposits: result.rows, user: fresh.rows[0] ? publicUserData(fresh.rows[0]) : null });
   } catch (error) {
     console.error('Error sincronizando depósitos:', error.message);
     res.status(503).json({ error: 'No se pudo sincronizar el depósito' });
