@@ -110,7 +110,8 @@ async function ensureTaskColumnsInternal() {
             ADD COLUMN IF NOT EXISTS hora_cobro VARCHAR(5) DEFAULT '20:00',
             ADD COLUMN IF NOT EXISTS minimo_retiro NUMERIC(18,6) DEFAULT 10,
             ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
-            ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT ''
+            ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT '',
+            ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE
         `);
         await pool.query(`
             ALTER TABLE users
@@ -478,8 +479,12 @@ async function obtenerLogTransferVerificado(txHash, toAddress) {
     }
     return null;
 }
-async function monitorDepositosPolygon() {
-    if (monitorRunning) return;
+async function monitorDepositosPolygon({ force = false } = {}) {
+    if (!force) {
+        const setting = await pool.query('SELECT deposit_monitor_enabled FROM configuracion WHERE id = 1');
+        if (setting.rows[0]?.deposit_monitor_enabled !== true) return { skipped: true, reason: 'manual_mode' };
+    }
+    if (monitorRunning) return { skipped: true, reason: 'already_running' };
     monitorRunning = true;
     try {
         await ensureTaskColumns();
@@ -536,7 +541,7 @@ app.get('/', (req, res) => {
   res.send('Servidor funcionando correctamente');
 });
 app.get('/api/deposit-monitor-status', (req, res) => {
-    res.json({ version: DEPOSIT_MONITOR_VERSION, mnemonic_configured: Boolean(process.env.APEX_DEPOSIT_MNEMONIC), rpc_mode: 'alchemy_getAssetTransfers_chunked_plus_eth_getTransactionReceipt_plus_eth_getLogs', rpc_endpoints: POLYGON_RPC_URLS.map(x => { try { return new URL(x).host; } catch (_) { return 'invalid'; } }), batch_size: 500, lookback_blocks: Math.min(50000, Math.max(100, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 50000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 50000) : 50000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
+    res.json({ version: DEPOSIT_MONITOR_VERSION, automatic_monitor: false, manual_sync_required: true, mnemonic_configured: Boolean(process.env.APEX_DEPOSIT_MNEMONIC), rpc_mode: 'alchemy_getAssetTransfers_chunked_plus_eth_getTransactionReceipt_plus_eth_getLogs', rpc_endpoints: POLYGON_RPC_URLS.map(x => { try { return new URL(x).host; } catch (_) { return 'invalid'; } }), batch_size: 500, lookback_blocks: Math.min(50000, Math.max(100, Number.isFinite(Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 50000)) ? Number(process.env.DEPOSIT_LOOKBACK_BLOCKS || 50000) : 50000)), token_contract: POLYGON_TOKEN_CONTRACT, confirmations: DEPOSIT_CONFIRMATIONS });
 });
 
 app.get('/test', (req, res) => {
@@ -639,7 +644,7 @@ app.post('/api/admin/deposits/reconcile', authenticate, isAdmin, async (req, res
 
 app.post('/api/admin/deposits/sync', authenticate, isAdmin, async (req, res) => {
     try {
-        await monitorDepositosPolygon();
+        await monitorDepositosPolygon({ force: true });
         const result = await pool.query(`SELECT d.id, d.user_id, d.tx_hash, d.log_index, d.amount, d.block_number, d.confirmations, d.status, d.token_contract, d.created_at, d.credited_at, u.nombre, u.apellido, u.telefono, u.polygon_address FROM polygon_deposits d LEFT JOIN users u ON u.id=d.user_id ORDER BY d.created_at DESC, d.id DESC LIMIT 200`);
         res.json({ message: 'Monitor de depósitos ejecutado', deposits: result.rows });
     } catch (error) { console.error('Error sincronizando depósitos admin:', error.message); res.status(503).json({ error: 'No se pudo sincronizar el monitor de depósitos' }); }
@@ -1087,7 +1092,6 @@ app.get('/api/me/deposits', authenticate, async (req, res) => {
 });
 app.post('/api/me/deposits/sync', authenticate, async (req, res) => {
   try {
-    await monitorDepositosPolygon();
     const result = await pool.query('SELECT id, tx_hash, amount, block_number, confirmations, status, created_at, credited_at FROM polygon_deposits WHERE user_id = $1 ORDER BY id DESC LIMIT 50', [req.userId]);
     const fresh = await pool.query('SELECT * FROM users WHERE id = $1', [req.userId]);
     res.json({ message: 'Sincronización ejecutada', deposits: result.rows, user: fresh.rows[0] ? publicUserData(fresh.rows[0]) : null });
