@@ -646,11 +646,11 @@ app.post('/api/admin/deposits/reconcile', authenticate, isAdmin, async (req, res
 });
 
 app.get('/api/admin/deposits/monitor-status', authenticate, isAdmin, async (req, res) => {
-    try { const today = normalizarFechaLima(new Date()); const r = await pool.query('SELECT deposit_monitor_enabled, deposit_monitor_enabled_until FROM configuracion WHERE id=1'); const row=r.rows[0]||{}; res.json({ enabled: row.deposit_monitor_enabled===true && String(row.deposit_monitor_enabled_until||'')===today, enabledUntil: row.deposit_monitor_enabled_until || null, today }); }
+    try { await pool.query('ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE'); const today = normalizarFechaLima(new Date()); const r = await pool.query('SELECT deposit_monitor_enabled, deposit_monitor_enabled_until FROM configuracion WHERE id=1'); const row=r.rows[0]||{}; res.json({ enabled: row.deposit_monitor_enabled===true && String(row.deposit_monitor_enabled_until||'')===today, enabledUntil: row.deposit_monitor_enabled_until || null, today }); }
     catch (e) { res.status(500).json({error:'No se pudo leer el estado del monitor'}); }
 });
 app.post('/api/admin/deposits/monitor-toggle', authenticate, isAdmin, async (req, res) => {
-    try { const today=normalizarFechaLima(new Date()), enabled=req.body?.enabled===true; const r=await pool.query('UPDATE configuracion SET deposit_monitor_enabled=$1, deposit_monitor_enabled_until=$2, updated_at=NOW() WHERE id=1 RETURNING deposit_monitor_enabled, deposit_monitor_enabled_until',[enabled,enabled?today:null]); res.json({enabled:r.rows[0]?.deposit_monitor_enabled===true, enabledUntil:r.rows[0]?.deposit_monitor_enabled_until||null, today}); }
+    try { await pool.query('ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE'); const today=normalizarFechaLima(new Date()), enabled=req.body?.enabled===true; const r=await pool.query('UPDATE configuracion SET deposit_monitor_enabled=$1, deposit_monitor_enabled_until=$2, updated_at=NOW() WHERE id=1 RETURNING deposit_monitor_enabled, deposit_monitor_enabled_until',[enabled,enabled?today:null]); res.json({enabled:r.rows[0]?.deposit_monitor_enabled===true, enabledUntil:r.rows[0]?.deposit_monitor_enabled_until||null, today}); }
     catch (e) { res.status(500).json({error:'No se pudo cambiar el monitor automático'}); }
 });
 
