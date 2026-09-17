@@ -352,7 +352,7 @@ const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLo
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
 const DEPOSIT_CONFIRMATIONS = Math.max(1, Number(process.env.DEPOSIT_CONFIRMATIONS || 10));
-const DEPOSIT_SCAN_INTERVAL_MS = Math.max(30000, Number(process.env.DEPOSIT_SCAN_INTERVAL_MS || 60000));
+const DEPOSIT_SCAN_INTERVAL_MS = Math.max(15000, Number(process.env.DEPOSIT_SCAN_INTERVAL_MS || 30000));
 const POLYGON_RPC_URLS = String(process.env.POLYGON_RPC_URLS || process.env.POLYGON_RPC_URL || 'https://rpc.ankr.com/polygon,https://polygon.publicnode.com,https://polygon.drpc.org').split(',').map(x => x.trim()).filter(Boolean);
 let activeRpcUrl = null;
 let monitorRunning = false;
@@ -595,6 +595,44 @@ app.get('/api/admin/deposits', authenticate, isAdmin, async (req, res) => {
         console.error('Error cargando depósitos admin:', e.message);
         res.status(500).json({ error: 'No se pudo cargar el registro de depósitos' });
     }
+});
+
+async function reconciliarDepositoPorHash(txHash) {
+    const hash = String(txHash || '').trim();
+    if (!/^0x[0-9a-f]{64}$/i.test(hash)) throw new Error('Hash de transacción inválido');
+    const receipt = await rpcCall('eth_getTransactionReceipt', [hash]);
+    if (!receipt || receipt.status !== '0x1') throw new Error('La transacción no está confirmada o falló');
+    const latest = parseInt(await rpcCall('eth_blockNumber', []), 16);
+    const blockNumber = parseInt(receipt.blockNumber || '0x0', 16);
+    const confirmations = Math.max(0, latest - blockNumber + 1);
+    const users = await pool.query("SELECT id, LOWER(polygon_address) AS polygon_address FROM users WHERE polygon_address IS NOT NULL");
+    const addressMap = new Map(users.rows.map(u => [String(u.polygon_address || '').toLowerCase(), u.id]));
+    const found = [];
+    for (const log of (receipt.logs || [])) {
+        if (String(log.address || '').toLowerCase() !== POLYGON_TOKEN_CONTRACT) continue;
+        if (!Array.isArray(log.topics) || log.topics.length < 3 || String(log.topics[0]).toLowerCase() !== POLYGON_TRANSFER_TOPIC.toLowerCase()) continue;
+        let to;
+        try { to = topicAddress(log.topics[2]); } catch (_) { continue; }
+        const userId = addressMap.get(String(to).toLowerCase());
+        if (!userId) continue;
+        const amount = montoTransferenciaToken({ value: null, rawContract: { value: log.data, decimal: '0x6' } });
+        if (!(amount > 0)) continue;
+        let from;
+        try { from = topicAddress(log.topics[1]); } catch (_) { from = '0x0000000000000000000000000000000000000000'; }
+        const logIndex = parseInt(log.logIndex || log.index || '0x0', 16);
+        const inserted = await pool.query(`INSERT INTO polygon_deposits (tx_hash, log_index, user_id, token_contract, from_address, to_address, amount, block_number, confirmations, status, raw_log) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10::jsonb) ON CONFLICT (tx_hash, log_index) DO NOTHING RETURNING id`, [hash, logIndex, userId, POLYGON_TOKEN_CONTRACT, from, to, amount, blockNumber, confirmations, JSON.stringify({ blockHash: receipt.blockHash, topics: log.topics, data: log.data, source: 'manual_hash_reconciliation' })]);
+        const row = inserted.rows[0] || (await pool.query('SELECT id FROM polygon_deposits WHERE tx_hash=$1 AND log_index=$2', [hash, logIndex])).rows[0];
+        if (row && confirmations >= DEPOSIT_CONFIRMATIONS) await acreditarDeposito({ id: row.id });
+        const status = (await pool.query('SELECT status, amount, user_id, confirmations FROM polygon_deposits WHERE id=$1', [row.id])).rows[0];
+        found.push(status);
+    }
+    if (!found.length) throw new Error('No se encontró una transferencia USDT al destino de ningún usuario APEX');
+    return { txHash: hash, confirmations, deposits: found };
+}
+
+app.post('/api/admin/deposits/reconcile', authenticate, isAdmin, async (req, res) => {
+    try { const result = await reconciliarDepositoPorHash(req.body?.txHash); res.json({ message: 'Depósito reconciliado', ...result }); }
+    catch (error) { console.error('Error reconciliando depósito:', error.message); res.status(422).json({ error: error.message || 'No se pudo reconciliar el depósito' }); }
 });
 
 app.post('/api/admin/deposits/sync', authenticate, isAdmin, async (req, res) => {
