@@ -111,7 +111,8 @@ async function ensureTaskColumnsInternal() {
             ADD COLUMN IF NOT EXISTS minimo_retiro NUMERIC(18,6) DEFAULT 10,
             ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
             ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT '',
-            ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE
+            ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+            ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE
         `);
         await pool.query(`
             ALTER TABLE users
@@ -353,7 +354,7 @@ const POLYGON_TOKEN_CONTRACT = '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'.toLo
 const POLYGON_TRANSFER_TOPIC = id('Transfer(address,address,uint256)');
 const POLYGON_TOKEN_DECIMALS = 6;
 const DEPOSIT_CONFIRMATIONS = Math.max(1, Number(process.env.DEPOSIT_CONFIRMATIONS || 10));
-const DEPOSIT_SCAN_INTERVAL_MS = Math.max(15000, Number(process.env.DEPOSIT_SCAN_INTERVAL_MS || 30000));
+const DEPOSIT_SCAN_INTERVAL_MS = Math.max(300000, Number(process.env.DEPOSIT_SCAN_INTERVAL_MS || 300000));
 const POLYGON_PUBLIC_FALLBACKS = ['https://polygon-rpc.com', 'https://polygon.publicnode.com', 'https://polygon.drpc.org'];
 const POLYGON_RPC_CONFIGURED = String(process.env.POLYGON_RPC_URLS || process.env.POLYGON_RPC_URL || '').split(',').map(x => x.trim()).filter(Boolean);
 const POLYGON_RPC_URLS = Array.from(new Set([...POLYGON_RPC_CONFIGURED, ...POLYGON_PUBLIC_FALLBACKS]));
@@ -480,9 +481,11 @@ async function obtenerLogTransferVerificado(txHash, toAddress) {
     return null;
 }
 async function monitorDepositosPolygon({ force = false } = {}) {
+    const todayLima = normalizarFechaLima(new Date());
     if (!force) {
-        const setting = await pool.query('SELECT deposit_monitor_enabled FROM configuracion WHERE id = 1');
-        if (setting.rows[0]?.deposit_monitor_enabled !== true) return { skipped: true, reason: 'manual_mode' };
+        const setting = await pool.query('SELECT deposit_monitor_enabled, deposit_monitor_enabled_until FROM configuracion WHERE id = 1');
+        const enabledToday = setting.rows[0]?.deposit_monitor_enabled === true && String(setting.rows[0]?.deposit_monitor_enabled_until || '') === todayLima;
+        if (!enabledToday) return { skipped: true, reason: 'manual_mode' };
     }
     if (monitorRunning) return { skipped: true, reason: 'already_running' };
     monitorRunning = true;
@@ -640,6 +643,15 @@ async function reconciliarDepositoPorHash(txHash) {
 app.post('/api/admin/deposits/reconcile', authenticate, isAdmin, async (req, res) => {
     try { const result = await reconciliarDepositoPorHash(req.body?.txHash); res.json({ message: 'Depósito reconciliado', ...result }); }
     catch (error) { console.error('Error reconciliando depósito:', error.message); res.status(422).json({ error: error.message || 'No se pudo reconciliar el depósito' }); }
+});
+
+app.get('/api/admin/deposits/monitor-status', authenticate, isAdmin, async (req, res) => {
+    try { const today = normalizarFechaLima(new Date()); const r = await pool.query('SELECT deposit_monitor_enabled, deposit_monitor_enabled_until FROM configuracion WHERE id=1'); const row=r.rows[0]||{}; res.json({ enabled: row.deposit_monitor_enabled===true && String(row.deposit_monitor_enabled_until||'')===today, enabledUntil: row.deposit_monitor_enabled_until || null, today }); }
+    catch (e) { res.status(500).json({error:'No se pudo leer el estado del monitor'}); }
+});
+app.post('/api/admin/deposits/monitor-toggle', authenticate, isAdmin, async (req, res) => {
+    try { const today=normalizarFechaLima(new Date()), enabled=req.body?.enabled===true; const r=await pool.query('UPDATE configuracion SET deposit_monitor_enabled=$1, deposit_monitor_enabled_until=$2, updated_at=NOW() WHERE id=1 RETURNING deposit_monitor_enabled, deposit_monitor_enabled_until',[enabled,enabled?today:null]); res.json({enabled:r.rows[0]?.deposit_monitor_enabled===true, enabledUntil:r.rows[0]?.deposit_monitor_enabled_until||null, today}); }
+    catch (e) { res.status(500).json({error:'No se pudo cambiar el monitor automático'}); }
 });
 
 app.post('/api/admin/deposits/sync', authenticate, isAdmin, async (req, res) => {
