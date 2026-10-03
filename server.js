@@ -113,7 +113,7 @@ async function ensureTaskColumnsInternal() {
             ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT '',
             ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
             ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE,
-            ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13}'::jsonb
+            ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb
         `);
         await pool.query(`
             ALTER TABLE users
@@ -141,7 +141,7 @@ async function ensureTaskColumnsInternal() {
             ADD COLUMN IF NOT EXISTS minimo_retiro NUMERIC(18,6) DEFAULT 10,
             ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
             ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT '',
-            ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13}'::jsonb
+            ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb
         `);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS polygon_deposits (
@@ -648,11 +648,11 @@ app.post('/api/admin/deposits/reconcile', authenticate, isAdmin, async (req, res
 });
 
 app.get('/api/admin/deposits/monitor-status', authenticate, isAdmin, async (req, res) => {
-    try { await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE, ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13}'::jsonb`); const today = normalizarFechaLima(new Date()); const r = await pool.query('SELECT deposit_monitor_enabled, deposit_monitor_enabled_until FROM configuracion WHERE id=1'); const row=r.rows[0]||{}; res.json({ enabled: row.deposit_monitor_enabled===true && String(row.deposit_monitor_enabled_until||'')===today, enabledUntil: row.deposit_monitor_enabled_until || null, today }); }
+    try { await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE, ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb`); const today = normalizarFechaLima(new Date()); const r = await pool.query('SELECT deposit_monitor_enabled, deposit_monitor_enabled_until FROM configuracion WHERE id=1'); const row=r.rows[0]||{}; res.json({ enabled: row.deposit_monitor_enabled===true && String(row.deposit_monitor_enabled_until||'')===today, enabledUntil: row.deposit_monitor_enabled_until || null, today }); }
     catch (e) { res.status(500).json({error:'No se pudo leer el estado del monitor'}); }
 });
 app.post('/api/admin/deposits/monitor-toggle', authenticate, isAdmin, async (req, res) => {
-    try { await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE, ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13}'::jsonb`); const today=normalizarFechaLima(new Date()), enabled=req.body?.enabled===true; const r=await pool.query('UPDATE configuracion SET deposit_monitor_enabled=$1, deposit_monitor_enabled_until=$2, updated_at=NOW() WHERE id=1 RETURNING deposit_monitor_enabled, deposit_monitor_enabled_until',[enabled,enabled?today:null]); res.json({enabled:r.rows[0]?.deposit_monitor_enabled===true, enabledUntil:r.rows[0]?.deposit_monitor_enabled_until||null, today}); }
+    try { await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE, ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb`); const today=normalizarFechaLima(new Date()), enabled=req.body?.enabled===true; const r=await pool.query('UPDATE configuracion SET deposit_monitor_enabled=$1, deposit_monitor_enabled_until=$2, updated_at=NOW() WHERE id=1 RETURNING deposit_monitor_enabled, deposit_monitor_enabled_until',[enabled,enabled?today:null]); res.json({enabled:r.rows[0]?.deposit_monitor_enabled===true, enabledUntil:r.rows[0]?.deposit_monitor_enabled_until||null, today}); }
     catch (e) { res.status(500).json({error:'No se pudo cambiar el monitor automático'}); }
 });
 
@@ -1570,7 +1570,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             diaHabilitadoHoy,
             horaCobro: row.hora_cobro || '20:00',
             hora_cobro: row.hora_cobro || '20:00',
-            puntosPorPlan: row.puntos_por_plan || { Temporal: 5, Trader: 8, Analista: 13 },
+            puntosPorPlan: row.puntos_por_plan || { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 },
             tareasSyD: Array.isArray(row.tareas_syd) ? row.tareas_syd : []
         });
     } catch (error) {
@@ -1873,8 +1873,9 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Necesitas adquirir un plan activo antes de cobrar tareas' });
         }
         const recompensa = Number((diario * porcentaje).toFixed(2));
-        const puntosConfig = (cfgResult.rows[0]?.puntos_por_plan && typeof cfgResult.rows[0].puntos_por_plan === 'object') ? cfgResult.rows[0].puntos_por_plan : { Temporal: 5, Trader: 8, Analista: 13 };
-        const puntosPlan = Number(puntosConfig[planNormalizado] ?? puntosConfig[String(planNormalizado || '').trim()] ?? 0);
+        const puntosConfig = (cfgResult.rows[0]?.puntos_por_plan && typeof cfgResult.rows[0].puntos_por_plan === 'object') ? cfgResult.rows[0].puntos_por_plan : { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 };
+        const puntosDefecto = { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 };
+        const puntosPlan = Number(puntosConfig[planNormalizado] ?? puntosDefecto[planNormalizado] ?? 0);
         const puntosAcreditar = completadas.length >= 2 ? Math.max(0, Math.round(puntosPlan)) : 0;
         const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
         historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas ${Math.round(porcentaje * 100)}%`, actividad: 'Tareas diarias', monto: recompensa, puntos: puntosAcreditar, fecha: new Date().toISOString(), estado: 'aprobado' });
@@ -2018,9 +2019,9 @@ app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
         const result = await pool.query('SELECT * FROM configuracion LIMIT 1');
         if (result.rows.length === 0) {
             await pool.query(
-                `INSERT INTO configuracion (tiempo_produccion, puntos_por_codigo, puntos_por_plan) VALUES (10, 10, '{"Temporal":5,"Trader":8,"Analista":13}'::jsonb)`
+                `INSERT INTO configuracion (tiempo_produccion, puntos_por_codigo, puntos_por_plan) VALUES (10, 10, '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb)`
             );
-            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10, puntos_por_plan: {Temporal:5,Trader:8,Analista:13}, minimo_retiro: 10, comision_retiro_porcentaje: 23, telegram_soporte_url: '' });
+            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10, puntos_por_plan: { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 }, minimo_retiro: 10, comision_retiro_porcentaje: 23, telegram_soporte_url: '' });
         }
         res.json({
             tiempo_produccion: result.rows[0].tiempo_produccion || 10,
@@ -2028,7 +2029,7 @@ app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
             minimo_retiro: Number(result.rows[0].minimo_retiro ?? 10),
             comision_retiro_porcentaje: Number(result.rows[0].comision_retiro_porcentaje ?? 23),
             telegram_soporte_url: String(result.rows[0].telegram_soporte_url || ''),
-            puntos_por_plan: result.rows[0].puntos_por_plan || {Temporal:5,Trader:8,Analista:13}
+            puntos_por_plan: result.rows[0].puntos_por_plan || { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 }
         });
     } catch (error) {
         console.error('Error al obtener configuración:', error);
@@ -2057,7 +2058,8 @@ app.put('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
         // Insertar o actualizar, conservando valores omitidos por el formulario.
         const actual = await pool.query('SELECT tiempo_produccion, puntos_por_codigo, puntos_por_plan, minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url FROM configuracion WHERE id = 1');
         const previo = actual.rows[0] || {};
-        const puntosPlanFinal = (puntos_por_plan && typeof puntos_por_plan === 'object') ? { Temporal: Math.max(0, Number(puntos_por_plan.Temporal) || 0), Trader: Math.max(0, Number(puntos_por_plan.Trader) || 0), Analista: Math.max(0, Number(puntos_por_plan.Analista) || 0) } : (previo.puntos_por_plan || {Temporal:5,Trader:8,Analista:13});
+        const puntosFuente = puntos_por_plan && typeof puntos_por_plan === 'object' ? puntos_por_plan : (previo.puntos_por_plan || {});
+        const puntosPlanFinal = { Temporal: Math.max(0, Number(puntosFuente.Temporal ?? 5) || 0), Trader: Math.max(0, Number(puntosFuente.Trader ?? 8) || 0), Analista: Math.max(0, Number(puntosFuente.Analista ?? 13) || 0), Gestor: Math.max(0, Number(puntosFuente.Gestor ?? 17) || 0), Master: Math.max(0, Number(puntosFuente.Master ?? 27) || 0), Elite: Math.max(0, Number(puntosFuente.Elite ?? 42) || 0) };
         const tiempoFinal = Number(tiempo_produccion) > 0 ? Number(tiempo_produccion) : Number(previo.tiempo_produccion ?? 10);
         const puntosFinal = Number(puntos_por_codigo) > 0 ? Number(puntos_por_codigo) : Number(previo.puntos_por_codigo ?? 10);
         const minimoFinal = minimo_retiro !== undefined && Number(minimo_retiro) >= 0 ? Number(minimo_retiro) : Number(previo.minimo_retiro ?? 10);
