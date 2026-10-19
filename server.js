@@ -2900,6 +2900,7 @@ async function apexLoanSummaryForUsers(userIds = null) {
 
 app.get('/api/admin/loans/summary', authenticate, isAdmin, async (req, res) => {
     try {
+        await ensureTaskColumns();
         const rows = await apexLoanSummaryForUsers();
         res.json({ summaries: rows.map(r => ({ userId: Number(r.user_id), totalPrestado: Number(r.total_prestado||0), totalAbonado: Number(r.total_abonado||0), debe: Number(r.debe||0), prestamos: Number(r.prestamos||0) })) });
     } catch (error) { console.error('Apex loan summary:', error); res.status(500).json({ error: 'No se pudo cargar el resumen de préstamos' }); }
@@ -2907,6 +2908,7 @@ app.get('/api/admin/loans/summary', authenticate, isAdmin, async (req, res) => {
 
 app.get('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => {
     try {
+        await ensureTaskColumns();
         const userId = Number(req.params.id);
         const user = await pool.query('SELECT id, nombre, apellido, telefono, balance FROM users WHERE id=$1', [userId]);
         if (!user.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -2919,6 +2921,7 @@ app.get('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => 
 app.post('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
+        await ensureTaskColumns();
         const userId = Number(req.params.id), amount = Number(req.body.amount), issuedAt = req.body.issuedAt ? new Date(req.body.issuedAt) : new Date();
         if (!Number.isInteger(userId) || !Number.isFinite(amount) || amount <= 0 || Number.isNaN(issuedAt.getTime())) return res.status(400).json({ error: 'Usuario, monto y fecha válidos son obligatorios' });
         await client.query('BEGIN');
@@ -2936,6 +2939,7 @@ app.post('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) =>
 app.post('/api/admin/loans/:loanId/payments', authenticate, isAdmin, async (req, res) => {
     const client = await pool.connect();
     try {
+        await ensureTaskColumns();
         const loanId=Number(req.params.loanId), amount=Number(req.body.amount), paidAt=req.body.paidAt?new Date(req.body.paidAt):new Date();
         if (!Number.isInteger(loanId)||!Number.isFinite(amount)||amount<=0||Number.isNaN(paidAt.getTime())) return res.status(400).json({error:'Préstamo, monto y fecha válidos son obligatorios'});
         await client.query('BEGIN');
@@ -2958,6 +2962,7 @@ app.post('/api/admin/loans/:loanId/payments', authenticate, isAdmin, async (req,
 
 app.get('/api/user/loans', authenticate, async (req,res)=>{
     try {
+        await ensureTaskColumns();
         const loans=await pool.query(`SELECT l.*,COALESCE(json_agg(json_build_object('id',p.id,'amount',p.amount,'paidAt',p.paid_at) ORDER BY p.paid_at DESC) FILTER (WHERE p.id IS NOT NULL),'[]') AS payments FROM apex_loans l LEFT JOIN apex_loan_payments p ON p.loan_id=l.id WHERE l.user_id=$1 GROUP BY l.id ORDER BY l.issued_at DESC`,[req.userId]);
         const summary=(await apexLoanSummaryForUsers([req.userId]))[0]||{total_prestado:0,total_abonado:0,debe:0,prestamos:0};
         res.json({loans:loans.rows,summary:{totalPrestado:Number(summary.total_prestado||0),totalAbonado:Number(summary.total_abonado||0),debe:Number(summary.debe||0)}});
