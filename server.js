@@ -2912,9 +2912,13 @@ app.get('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => 
         const userId = Number(req.params.id);
         const user = await pool.query('SELECT id, nombre, apellido, telefono, balance FROM users WHERE id=$1', [userId]);
         if (!user.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
-        const loans = await pool.query(`SELECT l.*, COALESCE(json_agg(json_build_object('id',p.id,'amount',p.amount,'paidAt',p.paid_at) ORDER BY p.paid_at DESC) FILTER (WHERE p.id IS NOT NULL),'[]') AS payments FROM apex_loans l LEFT JOIN apex_loan_payments p ON p.loan_id=l.id WHERE l.user_id=$1 GROUP BY l.id ORDER BY l.issued_at DESC`, [userId]);
+        const loansQ = await pool.query('SELECT * FROM apex_loans WHERE user_id=$1 ORDER BY issued_at DESC', [userId]);
+        const paymentsQ = await pool.query('SELECT id, loan_id, amount, paid_at FROM apex_loan_payments WHERE user_id=$1 ORDER BY paid_at DESC', [userId]);
+        const paymentsByLoan = {};
+        paymentsQ.rows.forEach(payment => { (paymentsByLoan[payment.loan_id] ||= []).push({ id: payment.id, amount: payment.amount, paidAt: payment.paid_at }); });
+        const loans = loansQ.rows.map(loan => ({ ...loan, payments: paymentsByLoan[loan.id] || [] }));
         const summary = await apexLoanSummaryForUsers([userId]);
-        res.json({ user: user.rows[0], loans: loans.rows, summary: summary[0] || { total_prestado:0,total_abonado:0,debe:0,prestamos:0 } });
+        res.json({ user: user.rows[0], loans, summary: summary[0] || { total_prestado:0,total_abonado:0,debe:0,prestamos:0 } });
     } catch (error) { console.error('Apex user loans:', error); res.status(500).json({ error: 'No se pudo cargar el historial de préstamos' }); }
 });
 
@@ -2963,9 +2967,12 @@ app.post('/api/admin/loans/:loanId/payments', authenticate, isAdmin, async (req,
 app.get('/api/user/loans', authenticate, async (req,res)=>{
     try {
         await ensureTaskColumns();
-        const loans=await pool.query(`SELECT l.*,COALESCE(json_agg(json_build_object('id',p.id,'amount',p.amount,'paidAt',p.paid_at) ORDER BY p.paid_at DESC) FILTER (WHERE p.id IS NOT NULL),'[]') AS payments FROM apex_loans l LEFT JOIN apex_loan_payments p ON p.loan_id=l.id WHERE l.user_id=$1 GROUP BY l.id ORDER BY l.issued_at DESC`,[req.userId]);
+        const loansQ=await pool.query('SELECT * FROM apex_loans WHERE user_id=$1 ORDER BY issued_at DESC',[req.userId]);
+        const paymentsQ=await pool.query('SELECT id, loan_id, amount, paid_at FROM apex_loan_payments WHERE user_id=$1 ORDER BY paid_at DESC',[req.userId]);
+        const paymentsByLoan={};paymentsQ.rows.forEach(payment=>{(paymentsByLoan[payment.loan_id] ||= []).push({id:payment.id,amount:payment.amount,paidAt:payment.paid_at})});
+        const loans=loansQ.rows.map(loan=>({...loan,payments:paymentsByLoan[loan.id]||[]}));
         const summary=(await apexLoanSummaryForUsers([req.userId]))[0]||{total_prestado:0,total_abonado:0,debe:0,prestamos:0};
-        res.json({loans:loans.rows,summary:{totalPrestado:Number(summary.total_prestado||0),totalAbonado:Number(summary.total_abonado||0),debe:Number(summary.debe||0)}});
+        res.json({loans,summary:{totalPrestado:Number(summary.total_prestado||0),totalAbonado:Number(summary.total_abonado||0),debe:Number(summary.debe||0)}});
     } catch(error){console.error('Apex dashboard loans:',error);res.status(500).json({error:'No se pudo cargar tus préstamos'});}
 });
 
