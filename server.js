@@ -56,6 +56,13 @@ function normalizarFechaLima(value) {
     return out.year && out.month && out.day ? `${out.year}-${out.month}-${out.day}` : null;
 }
 const INGRESO_TIPOS = new Set(['ganancia','produccion','actividad','juego','tarea','tareas_cobro','canje','cupon','logro','bono','recompensa','premio']);
+const APEX_REWARD_COMMISSION_PERCENT = 23;
+function liquidarRecompensaUSDT(bruto) {
+    const montoBruto = Math.max(0, Number(bruto) || 0);
+    const comision = Number((montoBruto * APEX_REWARD_COMMISSION_PERCENT / 100).toFixed(2));
+    const montoNeto = Number((montoBruto - comision).toFixed(2));
+    return { montoBruto, comision, montoNeto };
+}
 function montoIngreso(item) {
     if (!item || typeof item !== 'object') return 0;
     const tipo = String(item.tipo || item.type || item.category || '').trim().toLowerCase();
@@ -113,7 +120,7 @@ async function ensureTaskColumnsInternal() {
             ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT '',
             ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE,
             ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE,
-            ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Impulso":3,"Energía":5,"Potencia":8,"Rendimiento":12,"Máximo":19,"Ultra":30}'::jsonb
+            ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb
         `);
         await pool.query(`
             ALTER TABLE users
@@ -141,34 +148,8 @@ async function ensureTaskColumnsInternal() {
             ADD COLUMN IF NOT EXISTS minimo_retiro NUMERIC(18,6) DEFAULT 10,
             ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT 23,
             ADD COLUMN IF NOT EXISTS telegram_soporte_url TEXT DEFAULT '',
-            ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Impulso":3,"Energía":5,"Potencia":8,"Rendimiento":12,"Máximo":19,"Ultra":30}'::jsonb
+            ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb
         `);
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS apex_loans (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                amount NUMERIC(18,6) NOT NULL CHECK (amount > 0),
-                outstanding NUMERIC(18,6) NOT NULL CHECK (outstanding >= 0),
-                issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                status VARCHAR(20) NOT NULL DEFAULT 'pendiente',
-                created_by INTEGER REFERENCES users(id),
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        `);
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS apex_loan_payments (
-                id SERIAL PRIMARY KEY,
-                loan_id INTEGER NOT NULL REFERENCES apex_loans(id) ON DELETE CASCADE,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                amount NUMERIC(18,6) NOT NULL CHECK (amount > 0),
-                paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                created_by INTEGER REFERENCES users(id),
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        `);
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loans_user ON apex_loans(user_id)');
-        await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loan_payments_loan ON apex_loan_payments(loan_id)');
         await pool.query(`
             CREATE TABLE IF NOT EXISTS polygon_deposits (
                 id BIGSERIAL PRIMARY KEY,
@@ -263,6 +244,7 @@ function permisoRequeridoParaRuta(req) {
     if (/config|catalog|code|codigo/i.test(path)) return 'configuracion';
     if (/activ|premio|logro|cupon/i.test(path)) return 'actividades';
     if (/refer/i.test(path)) return 'referidos';
+    if (/loan|prestam|abono|payment/i.test(path)) return 'usuarios';
     if (/user|usuario/i.test(path)) return 'usuarios';
     return null;
 }
@@ -311,6 +293,39 @@ const pool = new Pool({
   statement_timeout: 15000,
   idle_in_transaction_session_timeout: 30000
 });
+let apexLoanSchemaReady = false;
+let apexLoanSchemaInFlight = null;
+async function ensureApexLoanSchema() {
+    if (apexLoanSchemaReady) return;
+    if (apexLoanSchemaInFlight) return apexLoanSchemaInFlight;
+    apexLoanSchemaInFlight = (async () => {
+        await pool.query(`CREATE TABLE IF NOT EXISTS apex_loans (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            principal NUMERIC(18,6) NOT NULL CHECK (principal > 0),
+            outstanding NUMERIC(18,6) NOT NULL CHECK (outstanding >= 0),
+            status VARCHAR(16) NOT NULL DEFAULT 'pendiente'
+                CHECK (status IN ('pendiente','pagado')),
+            issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS apex_loan_payments (
+            id BIGSERIAL PRIMARY KEY,
+            loan_id BIGINT NOT NULL REFERENCES apex_loans(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            amount NUMERIC(18,6) NOT NULL CHECK (amount > 0),
+            paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loans_user ON apex_loans(user_id, issued_at DESC)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loan_payments_loan ON apex_loan_payments(loan_id, paid_at DESC)');
+        apexLoanSchemaReady = true;
+    })().finally(() => { apexLoanSchemaInFlight = null; });
+    return apexLoanSchemaInFlight;
+}
 const REFERIDO_CARACTERES = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function generarCandidatoCodigoReferido() {
     const bytes = randomBytes(6);
@@ -674,11 +689,11 @@ app.post('/api/admin/deposits/reconcile', authenticate, isAdmin, async (req, res
 });
 
 app.get('/api/admin/deposits/monitor-status', authenticate, isAdmin, async (req, res) => {
-    try { await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE, ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Impulso":3,"Energía":5,"Potencia":8,"Rendimiento":12,"Máximo":19,"Ultra":30}'::jsonb`); const today = normalizarFechaLima(new Date()); const r = await pool.query('SELECT deposit_monitor_enabled, deposit_monitor_enabled_until FROM configuracion WHERE id=1'); const row=r.rows[0]||{}; res.json({ enabled: row.deposit_monitor_enabled===true && String(row.deposit_monitor_enabled_until||'')===today, enabledUntil: row.deposit_monitor_enabled_until || null, today }); }
+    try { await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE, ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb`); const today = normalizarFechaLima(new Date()); const r = await pool.query('SELECT deposit_monitor_enabled, deposit_monitor_enabled_until FROM configuracion WHERE id=1'); const row=r.rows[0]||{}; res.json({ enabled: row.deposit_monitor_enabled===true && String(row.deposit_monitor_enabled_until||'')===today, enabledUntil: row.deposit_monitor_enabled_until || null, today }); }
     catch (e) { res.status(500).json({error:'No se pudo leer el estado del monitor'}); }
 });
 app.post('/api/admin/deposits/monitor-toggle', authenticate, isAdmin, async (req, res) => {
-    try { await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE, ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Impulso":3,"Energía":5,"Potencia":8,"Rendimiento":12,"Máximo":19,"Ultra":30}'::jsonb`); const today=normalizarFechaLima(new Date()), enabled=req.body?.enabled===true; const r=await pool.query('UPDATE configuracion SET deposit_monitor_enabled=$1, deposit_monitor_enabled_until=$2, updated_at=NOW() WHERE id=1 RETURNING deposit_monitor_enabled, deposit_monitor_enabled_until',[enabled,enabled?today:null]); res.json({enabled:r.rows[0]?.deposit_monitor_enabled===true, enabledUntil:r.rows[0]?.deposit_monitor_enabled_until||null, today}); }
+    try { await pool.query(`ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS deposit_monitor_enabled BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS deposit_monitor_enabled_until DATE, ADD COLUMN IF NOT EXISTS puntos_por_plan JSONB DEFAULT '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb`); const today=normalizarFechaLima(new Date()), enabled=req.body?.enabled===true; const r=await pool.query('UPDATE configuracion SET deposit_monitor_enabled=$1, deposit_monitor_enabled_until=$2, updated_at=NOW() WHERE id=1 RETURNING deposit_monitor_enabled, deposit_monitor_enabled_until',[enabled,enabled?today:null]); res.json({enabled:r.rows[0]?.deposit_monitor_enabled===true, enabledUntil:r.rows[0]?.deposit_monitor_enabled_until||null, today}); }
     catch (e) { res.status(500).json({error:'No se pudo cambiar el monitor automático'}); }
 });
 
@@ -1266,7 +1281,7 @@ app.put('/api/user/update', async (req, res) => {
                 'referidos_directos', 'fechas_invito',
                 'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
                 'direccion_retiro', 'password_retiro',
-                'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado', 'es_admin', 'es_super_admin'
+                'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado'
             ];
             
             if (camposPermitidos.includes(key)) {
@@ -1596,7 +1611,7 @@ app.get('/api/tasks/config', authenticate, async (req, res) => {
             diaHabilitadoHoy,
             horaCobro: row.hora_cobro || '20:00',
             hora_cobro: row.hora_cobro || '20:00',
-            puntosPorPlan: row.puntos_por_plan || { Impulso: 3, Energía: 5, Potencia: 8, Rendimiento: 12, Máximo: 19, Ultra: 30 },
+            puntosPorPlan: row.puntos_por_plan || { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 },
             tareasSyD: Array.isArray(row.tareas_syd) ? row.tareas_syd : []
         });
     } catch (error) {
@@ -1720,10 +1735,11 @@ app.post('/api/user/redeem', authenticate, async (req,res)=>{
         if(puntos<costo) return (await client.query('ROLLBACK'),res.status(409).json({error:'Puntos insuficientes',puntos:puntos,costo:costo}));
         const fecha=new Date().toISOString();
         const cr=Array.isArray(u.canjes_realizados)?u.canjes_realizados:[];
-        const solicitud={nombre:canje.nombre||canje.titulo||'Canje',puntos:costo,monto:monto,fecha:fecha,estado:'pendiente'};
+        const liquidacion=liquidarRecompensaUSDT(monto);
+        const solicitud={nombre:canje.nombre||canje.titulo||'Canje',puntos:costo,monto:liquidacion.montoNeto,montoBruto:liquidacion.montoBruto,comision:liquidacion.comision,porcentajeComision:APEX_REWARD_COMMISSION_PERCENT,fecha:fecha,estado:'pendiente'};
         const saved=await client.query(`UPDATE users SET puntos=COALESCE(puntos,0)-$1,canjes_realizados=$2::jsonb WHERE id=$3 RETURNING *`,[costo,JSON.stringify(cr.concat(solicitud)),req.userId]);
         await client.query('COMMIT');
-        res.json({message:'Solicitud de canje enviada',premio:monto,puntosDescontados:costo,pendienteAprobacion:true,user:publicUserData(saved.rows[0])});
+        res.json({message:'Solicitud de canje enviada',premio:monto,montoNeto:liquidacion.montoNeto,comision:liquidacion.comision,porcentajeComision:APEX_REWARD_COMMISSION_PERCENT,puntosDescontados:costo,pendienteAprobacion:true,user:publicUserData(saved.rows[0])});
     }catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message||'No se pudo procesar el canje'});}finally{client.release();}
 });
 function normalizarTipoRecompensa(value) {
@@ -1790,17 +1806,20 @@ app.post('/api/user/coupons/use', authenticate, async (req, res) => {
         const assigned=Array.isArray(u.cupones_asignados)?u.cupones_asignados:[];
         const ai=assigned.findIndex(x=>String(x?.codigo||x?.cuponId||x?.id||'').toUpperCase()===code && !x.usado);
         if (ai<0) throw new Error('No tienes este cupón disponible');
-        const item=assigned[ai]; item.usado=true; item.usado_en=new Date().toISOString(); item.beneficio_aplicado={tipo,valor};
-        const value=Number(coupon.valor||0), type=normalizarTipoCupon(coupon.tipo), benefit={tipo:type,valor:value,codigo:coupon.codigo,activadoEn:new Date().toISOString()};
+        const item=assigned[ai]; item.usado=true; item.usado_en=new Date().toISOString();
+        const value=Number(coupon.valor||0), type=normalizarTipoCupon(coupon.tipo);
+        const liquidacion=type==='usdt'?liquidarRecompensaUSDT(value):{montoBruto:value,comision:0,montoNeto:value};
+        const benefit={tipo:type,valor:value,valorNeto:liquidacion.montoNeto,comision:liquidacion.comision,porcentajeComision:type==='usdt'?APEX_REWARD_COMMISSION_PERCENT:0,codigo:coupon.codigo,activadoEn:new Date().toISOString()};
+        item.beneficio_aplicado={tipo:type,valor:value,valorNeto:liquidacion.montoNeto,comision:liquidacion.comision};
         let balance=0,points=0,usage={};
-        if(type==='usdt') balance=value; else if(type==='puntos') points=Math.floor(value); else if(['ruleta_usos','cofres_usos','dados_usos'].includes(type)) usage[type]=Math.floor(value);
+        if(type==='usdt') balance=liquidacion.montoNeto; else if(type==='puntos') points=Math.floor(value); else if(['ruleta_usos','cofres_usos','dados_usos'].includes(type)) usage[type]=Math.floor(value);
         const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];
-        hist.push({tipo:'cupon',concepto:`Cupón utilizado: ${coupon.nombre}`,monto:balance,puntos:points,beneficio:benefit,fecha:new Date().toISOString(),estado:'acreditado'});
+        hist.push({tipo:'cupon',concepto:type==='usdt'?`Cupón utilizado: ${coupon.nombre} · ${value.toFixed(2)} - 23% = ${balance.toFixed(2)} USDT`:`Cupón utilizado: ${coupon.nombre}`,monto:balance,montoBruto:liquidacion.montoBruto,comision:liquidacion.comision,porcentajeComision:benefit.porcentajeComision,puntos:points,beneficio:benefit,fecha:new Date().toISOString(),estado:'acreditado'});
         await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bonusReferidoActivo JSONB DEFAULT NULL, ADD COLUMN IF NOT EXISTS bonusDepositoActivo JSONB DEFAULT NULL`);
         const retiroActivo=type==='descuento_retiro'?JSON.stringify(benefit):JSON.stringify(u.descuentoRetiroActivo||null), referidoActivo=type==='descuento_referido'?JSON.stringify(benefit):JSON.stringify(u.bonusReferidoActivo||null), depositoActivo=type==='bono_deposito'?JSON.stringify(benefit):JSON.stringify(u.bonusDepositoActivo||null);
         const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,cupones_asignados=$3::jsonb,ruleta_usos=COALESCE(ruleta_usos,0)+$4,cofres_usos=COALESCE(cofres_usos,0)+$5,dados_usos=COALESCE(dados_usos,0)+$6,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,$8::date)=$8::date THEN COALESCE(ganado_semanal,0)+$1 ELSE $1 END,ganado_semanal_inicio=$8::date,descuentoRetiroActivo=$10::jsonb,bonusReferidoActivo=$11::jsonb,bonusDepositoActivo=$12::jsonb,historial_detallado=$7::jsonb WHERE id=$9 RETURNING *`,[balance,points,JSON.stringify(assigned),usage.ruleta_usos||0,usage.cofres_usos||0,usage.dados_usos||0,JSON.stringify(hist),inicioSemanaLima(new Date()),req.userId,retiroActivo,referidoActivo,depositoActivo]);
         await client.query('COMMIT');
-        res.json({message:'Cupón utilizado correctamente',beneficio:{tipo:type,valor},user:publicUserData(out.rows[0])});
+        res.json({message:'Cupón utilizado correctamente',beneficio:{tipo:type,valor:value,valorNeto:balance,comision:liquidacion.comision,porcentajeComision:benefit.porcentajeComision},user:publicUserData(out.rows[0])});
     } catch(e) { try{await client.query('ROLLBACK')}catch(_){} res.status(400).json({error:e.message}); } finally { client.release(); }
 });
 
@@ -1813,7 +1832,7 @@ app.post('/api/user/game/prize', authenticate, async (req,res)=>{
   const prizeField={ruleta:'premio_ruleta',cofre:'premio_cofre',dados:'premio_dados'}[game];
   if(!usage||!prizeField||!Number.isFinite(requestedAmount)||requestedAmount<0) return res.status(400).json({error:'Premio inválido'});
   const client=await pool.connect();
-  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const amount=Number(u[prizeField]||0); const usos=Number(u[usage]||0); if(amount<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'Solo contacta al administrador para hacer uso de tu oportunidad'});} if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const nombresJuego={ruleta:'Máquina de bolas',cofre:'Cofre del tesoro',dados:'Dados'}; const nombreJuego=nombresJuego[game]||game; const item={tipo:'juego',juego:game,actividad:nombreJuego,concepto:`Premio de ${nombreJuego}`,monto:amount,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const hoy=normalizarFechaLima(new Date()); const inicioSemana=normalizarFechaLima(new Date(Date.now()-((obtenerDiaSemanaLima(new Date())+6)%7)*86400000)); const semanalInicio=normalizarFechaLima(u.ganado_semanal_inicio)||inicioSemana; const semanal=semanalInicio<inicioSemana?amount:Number(u.ganado_semanal||0)+amount; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=$2, ganado_semanal_inicio=$3, historial_detallado=$4::jsonb WHERE id=$5 RETURNING *`,[amount,semanal,inicioSemana,JSON.stringify(hist.concat(item)),req.userId]); await reconciliarAcumulados(req.userId, client); await client.query('COMMIT'); try { await crearNotificacion({ userId: req.userId, tipo: 'actividad', titulo: 'Premio acreditado', descripcion: `Ganaste ${amount.toFixed(2)} USDT en ${game}`, accion: 'informativa', entidadId: `${game}:${new Date().toISOString().slice(0,10)}:${Date.now()}`, metadata: { game, amount } }); } catch (notificationError) { console.error('No se pudo crear notificación de premio:', notificationError.message); } res.json({message:'Premio acreditado',premio:amount,user:publicUserData(out.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
+  try{await client.query('BEGIN'); const q=await client.query(`SELECT * FROM users WHERE id=$1 FOR UPDATE`,[req.userId]); if(!q.rows.length) throw new Error('Usuario no encontrado'); const u=q.rows[0]; const amount=Number(u[prizeField]||0); const usos=Number(u[usage]||0); if(amount<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'Solo contacta al administrador para hacer uso de tu oportunidad'});} if(usos<=0) {await client.query('ROLLBACK');return res.status(409).json({error:'No tienes usos disponibles'});} const nombresJuego={ruleta:'Máquina de bolas',cofre:'Cofre del tesoro',dados:'Dados'}; const nombreJuego=nombresJuego[game]||game; const liquidacion=liquidarRecompensaUSDT(amount); const neto=liquidacion.montoNeto; const item={tipo:'juego',juego:game,actividad:nombreJuego,concepto:`Premio de ${nombreJuego}: ${amount.toFixed(2)} - 23% = ${neto.toFixed(2)} USDT`,monto:neto,montoBruto:amount,comision:liquidacion.comision,porcentajeComision:APEX_REWARD_COMMISSION_PERCENT,fecha:new Date().toISOString(),estado:'acreditado'}; const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; const hoy=normalizarFechaLima(new Date()); const inicioSemana=normalizarFechaLima(new Date(Date.now()-((obtenerDiaSemanaLima(new Date())+6)%7)*86400000)); const semanalInicio=normalizarFechaLima(u.ganado_semanal_inicio)||inicioSemana; const semanal=semanalInicio<inicioSemana?neto:Number(u.ganado_semanal||0)+neto; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1, ${usage}=GREATEST(COALESCE(${usage},0)-1,0), total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=$2, ganado_semanal_inicio=$3, historial_detallado=$4::jsonb WHERE id=$5 RETURNING *`,[neto,semanal,inicioSemana,JSON.stringify(hist.concat(item)),req.userId]); await reconciliarAcumulados(req.userId, client); await client.query('COMMIT'); try { await crearNotificacion({ userId: req.userId, tipo: 'actividad', titulo: 'Premio acreditado', descripcion: `Premio bruto ${amount.toFixed(2)} USDT; comisión 23%; acreditado ${neto.toFixed(2)} USDT en ${game}`, accion: 'informativa', entidadId: `${game}:${new Date().toISOString().slice(0,10)}:${Date.now()}`, metadata: { game, amountBruto: amount, comision: liquidacion.comision, amount: neto } }); } catch (notificationError) { console.error('No se pudo crear notificación de premio:', notificationError.message); } res.json({message:'Premio acreditado',premio:amount,montoBruto:amount,montoNeto:neto,comision:liquidacion.comision,porcentajeComision:APEX_REWARD_COMMISSION_PERCENT,user:publicUserData(out.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('game prize',e);res.status(500).json({error:'No se pudo acreditar el premio'})}finally{client.release()}
 });
 
 // ============================================================
@@ -1898,13 +1917,15 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
             await client.query('ROLLBACK');
             return res.status(400).json({ error: 'Necesitas adquirir un plan activo antes de cobrar tareas' });
         }
-        const recompensa = Number((diario * porcentaje).toFixed(2));
-        const puntosConfig = (cfgResult.rows[0]?.puntos_por_plan && typeof cfgResult.rows[0].puntos_por_plan === 'object') ? cfgResult.rows[0].puntos_por_plan : { Impulso: 3, Energía: 5, Potencia: 8, Rendimiento: 12, Máximo: 19, Ultra: 30 };
-        const puntosDefecto = { Impulso: 3, Energía: 5, Potencia: 8, Rendimiento: 12, Máximo: 19, Ultra: 30 };
+        const recompensaBruta = Number((diario * porcentaje).toFixed(2));
+        const liquidacion = liquidarRecompensaUSDT(recompensaBruta);
+        const recompensa = liquidacion.montoNeto;
+        const puntosConfig = (cfgResult.rows[0]?.puntos_por_plan && typeof cfgResult.rows[0].puntos_por_plan === 'object') ? cfgResult.rows[0].puntos_por_plan : { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 };
+        const puntosDefecto = { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 };
         const puntosPlan = Number(puntosConfig[planNormalizado] ?? puntosDefecto[planNormalizado] ?? 0);
         const puntosAcreditar = completadas.length >= 2 ? Math.max(0, Math.round(puntosPlan)) : 0;
         const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
-        historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas ${Math.round(porcentaje * 100)}%`, actividad: 'Tareas diarias', monto: recompensa, puntos: puntosAcreditar, fecha: new Date().toISOString(), estado: 'aprobado' });
+        historial.push({ tipo: 'tareas_cobro', concepto: `Cobro de tareas: ${recompensaBruta.toFixed(2)} - 23% = ${recompensa.toFixed(2)} USDT`, actividad: 'Tareas diarias', monto: recompensa, montoBruto: recompensaBruta, comision: liquidacion.comision, porcentajeComision: APEX_REWARD_COMMISSION_PERCENT, puntos: puntosAcreditar, fecha: new Date().toISOString(), estado: 'aprobado' });
         const updated = await client.query(
             `UPDATE users SET balance = COALESCE(balance, 0) + $1, puntos = COALESCE(puntos,0) + $6, daily_earnings = $2, total_ganado=COALESCE(total_ganado,0)+$1, ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio, CURRENT_DATE) < $3::date - ((EXTRACT(ISODOW FROM $3::date)::int)-1) THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END, ganado_semanal_inicio=$3::date - ((EXTRACT(ISODOW FROM $3::date)::int)-1), cobro_tareas_fecha = $3, cobro_tareas_monto = $1, historial_detallado = $4 WHERE id = $5 AND (cobro_tareas_fecha IS NULL OR cobro_tareas_fecha <> $3) RETURNING *`,
             [recompensa, diario, hoy, JSON.stringify(historial), req.userId, puntosAcreditar]
@@ -1916,7 +1937,7 @@ app.post('/api/user/tasks/claim', authenticate, async (req, res) => {
         await reconciliarAcumulados(req.userId, client);
         const saved = await client.query('SELECT * FROM users WHERE id=$1',[req.userId]);
         await client.query('COMMIT');
-        res.json({ message: 'Cobro realizado', recompensa, puntos: puntosAcreditar, porcentaje: Math.round(porcentaje * 100), user: publicUserData(saved.rows[0]) });
+        res.json({ message: 'Cobro realizado', recompensa: recompensaBruta, montoBruto: recompensaBruta, montoNeto: recompensa, comision: liquidacion.comision, porcentajeComision: APEX_REWARD_COMMISSION_PERCENT, puntos: puntosAcreditar, porcentaje: Math.round(porcentaje * 100), user: publicUserData(saved.rows[0]) });
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error en cobro diario:', error);
@@ -2045,9 +2066,9 @@ app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
         const result = await pool.query('SELECT * FROM configuracion LIMIT 1');
         if (result.rows.length === 0) {
             await pool.query(
-                `INSERT INTO configuracion (tiempo_produccion, puntos_por_codigo, puntos_por_plan) VALUES (10, 10, '{"Impulso":3,"Energía":5,"Potencia":8,"Rendimiento":12,"Máximo":19,"Ultra":30}'::jsonb)`
+                `INSERT INTO configuracion (tiempo_produccion, puntos_por_codigo, puntos_por_plan) VALUES (10, 10, '{"Temporal":5,"Trader":8,"Analista":13,"Gestor":17,"Master":27,"Elite":42}'::jsonb)`
             );
-            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10, puntos_por_plan: { Impulso: 3, Energía: 5, Potencia: 8, Rendimiento: 12, Máximo: 19, Ultra: 30 }, minimo_retiro: 10, comision_retiro_porcentaje: 23, telegram_soporte_url: '' });
+            return res.json({ tiempo_produccion: 10, puntos_por_codigo: 10, puntos_por_plan: { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 }, minimo_retiro: 10, comision_retiro_porcentaje: 23, telegram_soporte_url: '' });
         }
         res.json({
             tiempo_produccion: result.rows[0].tiempo_produccion || 10,
@@ -2055,7 +2076,7 @@ app.get('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
             minimo_retiro: Number(result.rows[0].minimo_retiro ?? 10),
             comision_retiro_porcentaje: Number(result.rows[0].comision_retiro_porcentaje ?? 23),
             telegram_soporte_url: String(result.rows[0].telegram_soporte_url || ''),
-            puntos_por_plan: result.rows[0].puntos_por_plan || { Impulso: 3, Energía: 5, Potencia: 8, Rendimiento: 12, Máximo: 19, Ultra: 30 }
+            puntos_por_plan: result.rows[0].puntos_por_plan || { Temporal: 5, Trader: 8, Analista: 13, Gestor: 17, Master: 27, Elite: 42 }
         });
     } catch (error) {
         console.error('Error al obtener configuración:', error);
@@ -2085,7 +2106,7 @@ app.put('/api/admin/config', ...requireSuperAdmin, async (req, res) => {
         const actual = await pool.query('SELECT tiempo_produccion, puntos_por_codigo, puntos_por_plan, minimo_retiro, comision_retiro_porcentaje, telegram_soporte_url FROM configuracion WHERE id = 1');
         const previo = actual.rows[0] || {};
         const puntosFuente = puntos_por_plan && typeof puntos_por_plan === 'object' ? puntos_por_plan : (previo.puntos_por_plan || {});
-        const puntosPlanFinal = { Impulso: Math.max(0, Number(puntosFuente.Impulso ?? 3) || 0), Energía: Math.max(0, Number(puntosFuente.Energía ?? 5) || 0), Potencia: Math.max(0, Number(puntosFuente.Potencia ?? 8) || 0), Rendimiento: Math.max(0, Number(puntosFuente.Rendimiento ?? 12) || 0), Máximo: Math.max(0, Number(puntosFuente.Máximo ?? 19) || 0), Ultra: Math.max(0, Number(puntosFuente.Ultra ?? 30) || 0) };
+        const puntosPlanFinal = { Temporal: Math.max(0, Number(puntosFuente.Temporal ?? 5) || 0), Trader: Math.max(0, Number(puntosFuente.Trader ?? 8) || 0), Analista: Math.max(0, Number(puntosFuente.Analista ?? 13) || 0), Gestor: Math.max(0, Number(puntosFuente.Gestor ?? 17) || 0), Master: Math.max(0, Number(puntosFuente.Master ?? 27) || 0), Elite: Math.max(0, Number(puntosFuente.Elite ?? 42) || 0) };
         const tiempoFinal = Number(tiempo_produccion) > 0 ? Number(tiempo_produccion) : Number(previo.tiempo_produccion ?? 10);
         const puntosFinal = Number(puntos_por_codigo) > 0 ? Number(puntos_por_codigo) : Number(previo.puntos_por_codigo ?? 10);
         const minimoFinal = minimo_retiro !== undefined && Number(minimo_retiro) >= 0 ? Number(minimo_retiro) : Number(previo.minimo_retiro ?? 10);
@@ -2348,12 +2369,12 @@ app.delete('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
 // COMANDOS TRANSACCIONALES DEL SISTEMA APEX
 // ============================================================
 const PLANES_APEX = {
-    Impulso: { amount: 200, daily: 3 },
-    Energía: { amount: 300, daily: 5 },
-    Potencia: { amount: 500, daily: 8 },
-    Rendimiento: { amount: 800, daily: 12, comingSoon: true },
-    Máximo: { amount: 1200, daily: 19, comingSoon: true },
-    Ultra: { amount: 1800, daily: 30, comingSoon: true }
+    Temporal: { amount: 200, daily: 5 },
+    Trader: { amount: 300, daily: 8 },
+    Analista: { amount: 500, daily: 13 },
+    Gestor: { amount: 800, daily: 17, comingSoon: true },
+    Master: { amount: 1200, daily: 27, comingSoon: true },
+    Elite: { amount: 1800, daily: 42, comingSoon: true }
 };
 
 function gananciaDiariaOficial(row) {
@@ -2370,15 +2391,15 @@ async function normalizarGananciasDiariasUsuarios() {
         const result = await pool.query(`
             UPDATE users
             SET daily_earnings = CASE
-                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'impulso' OR plan_amount = 200 THEN 3
-                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'energía' OR plan_amount = 300 THEN 5
-                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'potencia' OR plan_amount = 500 THEN 8
-                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'rendimiento' OR plan_amount = 800 THEN 12
-                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'máximo' OR plan_amount = 1200 THEN 19
-                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'ultra' OR plan_amount = 1800 THEN 30
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'temporal' OR plan_amount = 200 THEN 5
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'trader' OR plan_amount = 300 THEN 8
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'analista' OR plan_amount = 500 THEN 13
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'gestor' OR plan_amount = 800 THEN 17
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'master' OR plan_amount = 1200 THEN 27
+                WHEN LOWER(TRIM(COALESCE(plan, ''))) = 'elite' OR plan_amount = 1800 THEN 42
                 ELSE daily_earnings
             END
-            WHERE LOWER(TRIM(COALESCE(plan, ''))) IN ('impulso','energía','potencia','rendimiento','máximo','ultra')
+            WHERE LOWER(TRIM(COALESCE(plan, ''))) IN ('temporal','trader','analista','gestor','master','elite')
                OR plan_amount IN (200,300,500,800,1200,1800)
         `);
         console.log(`Ganancias diarias normalizadas: ${result.rowCount} usuario(s)`);
@@ -2622,13 +2643,15 @@ app.post('/api/admin/user/:id/task/approve', authenticate, isAdmin, async (req, 
         if (!Number.isFinite(quantity) || quantity < 0) throw new Error('Recompensa inválida');
         const isMoney = ['usdt', 'usdt0', 'usd', 'dinero', 'saldo', 'monto', 'money'].includes(rewardType) || rewardType.includes('usdt');
         const points = isMoney ? 0 : Math.floor(quantity);
-        const money = isMoney ? Number(quantity.toFixed(2)) : 0;
+        const moneyBruto = isMoney ? Number(quantity.toFixed(2)) : 0;
+        const liquidacion = isMoney ? liquidarRecompensaUSDT(moneyBruto) : {montoBruto:0,comision:0,montoNeto:0};
+        const money = isMoney ? liquidacion.montoNeto : 0;
         const now = new Date().toISOString();
         tarea.estado = 'aprobada'; tarea.status = 'aprobado'; tarea.fechaAprobacion = now;
         if (req.body.nota !== undefined) tarea.notaAdmin = String(req.body.nota);
 
         const historial = Array.isArray(u.historial_detallado) ? u.historial_detallado : [];
-        historial.push({ tipo: 'tarea', type: 'tarea', concepto: 'Tarea aprobada: ' + (tarea.tareaNombre || tarea.nombre || 'Actividad'), actividad: tarea.tareaNombre || tarea.nombre || 'Actividad', puntos: points, monto: money, amount: money, nota: tarea.notaAdmin || null, fecha: now, estado: 'aprobado', status: 'aprobado' });
+        historial.push({ tipo: 'tarea', type: 'tarea', concepto: isMoney ? ('Tarea aprobada: ' + (tarea.tareaNombre || tarea.nombre || 'Actividad') + ' · ' + moneyBruto.toFixed(2) + ' - 23% = ' + money.toFixed(2) + ' USDT') : ('Tarea aprobada: ' + (tarea.tareaNombre || tarea.nombre || 'Actividad')), actividad: tarea.tareaNombre || tarea.nombre || 'Actividad', puntos: points, monto: money, montoBruto: moneyBruto, comision: liquidacion.comision, porcentajeComision: isMoney ? APEX_REWARD_COMMISSION_PERCENT : 0, amount: money, nota: tarea.notaAdmin || null, fecha: now, estado: 'aprobado', status: 'aprobado' });
         const weekStart = inicioSemanaLima(new Date());
         const oldWeekStart = normalizarFechaLima(u.ganado_semanal_inicio);
         const oldWeekly = oldWeekStart === weekStart ? Number(u.ganado_semanal || 0) : 0;
@@ -2659,7 +2682,7 @@ app.post('/api/admin/user/:id/achievement/review', authenticate, isAdmin, async 
 });
 app.post('/api/user/achievement/claim', authenticate, async (req,res)=>{
     const client=await pool.connect();
-    try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],list=Array.isArray(u.logros_asignados)?u.logros_asignados:[],id=String(req.body.logroId||req.body.id||''),idx=list.findIndex(x=>String(x.logroId||x.id)===id);if(idx<0)throw new Error('Logro no encontrado');const l=list[idx];if(String(l.estado)!=='verificado')throw new Error('El logro todavía no ha sido verificado por el administrador');const type=String(l.recompensa_tipo||l.tipo_recompensa||'puntos').toLowerCase(),qty=Math.max(0,Number(l.recompensa||l.cantidad)||0),money=type.includes('usdt')?qty:0,points=type.includes('usdt')?0:Math.floor(qty),now=new Date().toISOString(),hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];l.estado='reclamado';l.fechaReclamado=now;list[idx]=l;hist.push({tipo:'logro',concepto:'Logro reclamado: '+l.nombre,monto:money,puntos:points,fecha:now,estado:'aprobado'});const weekStart=inicioSemanaLima(new Date()),oldStart=normalizarFechaLima(u.ganado_semanal_inicio),weekly=oldStart===weekStart?Number(u.ganado_semanal||0):0;const r=await client.query(`UPDATE users SET logros_asignados=$1::jsonb,balance=COALESCE(balance,0)+$2,puntos=COALESCE(puntos,0)+$3,total_ganado=COALESCE(total_ganado,0)+$2,ganado_semanal=$4,ganado_semanal_inicio=$5::date,historial_detallado=$6::jsonb WHERE id=$7 RETURNING *`,[JSON.stringify(list),money,points,Number((weekly+money).toFixed(2)),weekStart,JSON.stringify(hist),u.id]);await client.query('COMMIT');res.json({message:'Recompensa acreditada',user:publicUserData(r.rows[0]),recompensa:{tipo:type,cantidad:qty}});}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{client.release()}
+    try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],list=Array.isArray(u.logros_asignados)?u.logros_asignados:[],id=String(req.body.logroId||req.body.id||''),idx=list.findIndex(x=>String(x.logroId||x.id)===id);if(idx<0)throw new Error('Logro no encontrado');const l=list[idx];if(String(l.estado)!=='verificado')throw new Error('El logro todavía no ha sido verificado por el administrador');const type=String(l.recompensa_tipo||l.tipo_recompensa||'puntos').toLowerCase(),qty=Math.max(0,Number(l.recompensa||l.cantidad)||0),liquidacion=type.includes('usdt')?liquidarRecompensaUSDT(qty):{montoBruto:0,comision:0,montoNeto:0},money=type.includes('usdt')?liquidacion.montoNeto:0,points=type.includes('usdt')?0:Math.floor(qty),now=new Date().toISOString(),hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];l.estado='reclamado';l.fechaReclamado=now;list[idx]=l;hist.push({tipo:'logro',concepto:type.includes('usdt')?'Logro reclamado: '+l.nombre+' · '+qty.toFixed(2)+' - 23% = '+money.toFixed(2)+' USDT':'Logro reclamado: '+l.nombre,monto:money,montoBruto:liquidacion.montoBruto,comision:liquidacion.comision,porcentajeComision:type.includes('usdt')?APEX_REWARD_COMMISSION_PERCENT:0,puntos:points,fecha:now,estado:'aprobado'});const weekStart=inicioSemanaLima(new Date()),oldStart=normalizarFechaLima(u.ganado_semanal_inicio),weekly=oldStart===weekStart?Number(u.ganado_semanal||0):0;const r=await client.query(`UPDATE users SET logros_asignados=$1::jsonb,balance=COALESCE(balance,0)+$2,puntos=COALESCE(puntos,0)+$3,total_ganado=COALESCE(total_ganado,0)+$2,ganado_semanal=$4,ganado_semanal_inicio=$5::date,historial_detallado=$6::jsonb WHERE id=$7 RETURNING *`,[JSON.stringify(list),money,points,Number((weekly+money).toFixed(2)),weekStart,JSON.stringify(hist),u.id]);await client.query('COMMIT');res.json({message:'Recompensa acreditada',user:publicUserData(r.rows[0]),recompensa:{tipo:type,cantidad:qty,montoNeto:money,comision:liquidacion.comision,porcentajeComision:type.includes('usdt')?APEX_REWARD_COMMISSION_PERCENT:0}});}catch(e){try{await client.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{client.release()}
 });
 
 app.delete('/api/admin/user/:id/assignments', authenticate, isAdmin, async (req,res)=>{
@@ -2674,309 +2697,218 @@ app.delete('/api/admin/user/:id/assignments', authenticate, isAdmin, async (req,
 app.post('/api/admin/user/:id/task/reject', authenticate, isAdmin, async (req,res)=>{try{const q=await pool.query('SELECT tareas_asignadas FROM users WHERE id=$1',[req.params.id]);if(!q.rows.length)return res.status(404).json({error:'Usuario no encontrado'});const ts=q.rows[0].tareas_asignadas||[],t=ts[Number(req.body.index)];if(!t)return res.status(404).json({error:'Tarea no encontrada'});t.estado='rechazada';t.fechaRechazo=new Date().toISOString();t.notaAdmin=String(req.body.nota||'');const r=await pool.query('UPDATE users SET tareas_asignadas=$1 WHERE id=$2 RETURNING *',[JSON.stringify(ts),req.params.id]);res.json({message:'Tarea rechazada',user:publicUserData(r.rows[0])});}catch(e){res.status(500).json({error:'Error procesando tarea'})}});
 app.post('/api/admin/user/:id/withdraw/approve', authenticate, isAdmin, async (req,res)=>{const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],h=Array.isArray(u.historial)?u.historial:[];const requestedDate=String(req.body.fecha||'');let i=Number(req.body.index);if(requestedDate){const found=h.findIndex(function(item){return item&&item.type==='retiro'&&item.status==='pendiente'&&String(item.date)===requestedDate});if(found>=0)i=found}const w=h[i];if(!w||w.type!=='retiro'||w.status!=='pendiente')throw new Error('Retiro pendiente no encontrado');w.status='aprobado';w.approvedAt=new Date().toISOString();w.nota_admin=String(req.body.nota||'');w.direccion_envio=w.address||u.direccion_retiro||null;const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'retiro',concepto:'Retiro aprobado'+(w.nota_admin?'. Nota: '+w.nota_admin:''),monto:Number(w.amount||0),comision:Number(w.commission||0),neto:Number(w.netAmount||w.amount||0),fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET historial=$1,historial_detallado=$2 WHERE id=$3 RETURNING *',[JSON.stringify(h),JSON.stringify(d),req.params.id]);await client.query('COMMIT');res.json({message:'Retiro aprobado',user:publicUserData(r.rows[0])})}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}});
 app.post('/api/admin/user/:id/withdraw/reject', authenticate, isAdmin, async (req,res)=>{const client=await pool.connect();try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],h=Array.isArray(u.historial)?u.historial:[];const requestedDate=String(req.body.fecha||'');let i=Number(req.body.index);if(requestedDate){const found=h.findIndex(function(item){return item&&item.type==='retiro'&&item.status==='pendiente'&&String(item.date)===requestedDate});if(found>=0)i=found}const w=h[i];if(!w||w.type!=='retiro'||w.status!=='pendiente')throw new Error('Retiro pendiente no encontrado');w.status='rechazado';w.rejectedAt=new Date().toISOString();const amount=Number(w.amount||0);const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'retiro_reembolso',concepto:'Saldo devuelto por retiro rechazado',monto:amount,fecha:new Date().toISOString(),estado:'aprobado'});const r=await client.query('UPDATE users SET balance=COALESCE(balance,0)+$1,historial=$2,historial_detallado=$3 WHERE id=$4 RETURNING *',[amount,JSON.stringify(h),JSON.stringify(d),req.params.id]);await client.query('COMMIT');res.json({message:'Retiro rechazado y saldo devuelto',user:publicUserData(r.rows[0])})}catch(e){try{await client.query('ROLLBACK')}catch{}res.status(400).json({error:e.message})}finally{client.release()}});
-
-// ============================================================
-// ENERGO: CHECK-IN DIARIO Y JORNADA DE 8 HORAS
-// ============================================================
-const ENERGO_SHIFT_HOURS = 8;
-const ENERGO_SHIFT_MS = ENERGO_SHIFT_HOURS * 60 * 60 * 1000;
-const ENERGO_DEFAULT_CHECKIN_CODE = process.env.ENERGO_CHECKIN_CODE || 'ENERGO-2026';
-
-function energoTodayLima() {
-    return normalizarFechaLima(new Date());
-}
-
-async function ensureEnergoCheckinSchema() {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS energo_checkins (
-            id BIGSERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            checkin_code TEXT NOT NULL,
-            started_at TIMESTAMPTZ NOT NULL,
-            expected_end_at TIMESTAMPTZ NOT NULL,
-            ended_at TIMESTAMPTZ,
-            status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','completed','expired','cancelled')),
-            duration_minutes INTEGER NOT NULL DEFAULT 480,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        )
-    `);
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_energo_checkins_user_date ON energo_checkins(user_id, started_at DESC)');
-    await pool.query('CREATE INDEX IF NOT EXISTS idx_energo_checkins_active ON energo_checkins(status, expected_end_at)');
-    await pool.query(`
-        ALTER TABLE configuracion
-        ADD COLUMN IF NOT EXISTS energo_checkin_code TEXT DEFAULT '${ENERGO_DEFAULT_CHECKIN_CODE}',
-        ADD COLUMN IF NOT EXISTS energo_shift_hours INTEGER DEFAULT 8
-    `);
-    await pool.query(`
-        INSERT INTO configuracion (id, energo_checkin_code, energo_shift_hours)
-        VALUES (1, $1, 8)
-        ON CONFLICT (id) DO UPDATE SET
-          energo_checkin_code = COALESCE(configuracion.energo_checkin_code, EXCLUDED.energo_checkin_code),
-          energo_shift_hours = COALESCE(configuracion.energo_shift_hours, EXCLUDED.energo_shift_hours)
-    `, [ENERGO_DEFAULT_CHECKIN_CODE]);
-}
-
-async function energoExpireCheckin(row) {
-    if (!row || row.status !== 'active') return row;
-    if (new Date(row.expected_end_at).getTime() <= Date.now()) {
-        const result = await pool.query(
-            `UPDATE energo_checkins SET status='expired', ended_at=expected_end_at WHERE id=$1 RETURNING *`,
-            [row.id]
-        );
-        return result.rows[0] || row;
-    }
-    return row;
-}
-
-async function energoCurrentCheckin(userId) {
-    const result = await pool.query(
-        `SELECT * FROM energo_checkins WHERE user_id=$1 ORDER BY started_at DESC LIMIT 1`,
-        [userId]
-    );
-    return energoExpireCheckin(result.rows[0] || null);
-}
-
-async function energoGetConfiguredCode() {
-    const result = await pool.query('SELECT energo_checkin_code FROM configuracion WHERE id=1');
-    return String(result.rows[0]?.energo_checkin_code || ENERGO_DEFAULT_CHECKIN_CODE).trim();
-}
-
-// Estado del check-in actual y últimas jornadas del usuario.
-app.get('/api/user/checkin/status', authenticate, async (req, res) => {
-    try {
-        const current = await energoCurrentCheckin(req.userId);
-        const history = await pool.query(
-            `SELECT id, checkin_code, started_at, expected_end_at, ended_at, status, duration_minutes
-             FROM energo_checkins WHERE user_id=$1 ORDER BY started_at DESC LIMIT 30`,
-            [req.userId]
-        );
-        const active = current?.status === 'active' ? current : null;
-        res.json({
-            jornada_horas: ENERGO_SHIFT_HOURS,
-            active,
-            history: history.rows,
-            server_time: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error('EnerGo check-in status:', error);
-        res.status(500).json({ error: 'No se pudo consultar el estado del check-in' });
-    }
-});
-
-// Inicia una sola jornada de 8 horas por usuario y por día.
-app.post('/api/user/checkin/start', authenticate, async (req, res) => {
-    const code = String(req.body?.code || '').trim().toUpperCase();
-    if (!code) return res.status(400).json({ error: 'Código de check-in requerido' });
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        const configuredCode = (await client.query('SELECT energo_checkin_code FROM configuracion WHERE id=1')).rows[0]?.energo_checkin_code || ENERGO_DEFAULT_CHECKIN_CODE;
-        if (code !== String(configuredCode).trim().toUpperCase()) {
-            await client.query('ROLLBACK');
-            return res.status(400).json({ error: 'El código no es válido o ya expiró' });
-        }
-        const today = energoTodayLima();
-        const todayRows = await client.query(
-            `SELECT * FROM energo_checkins WHERE user_id=$1 AND (started_at AT TIME ZONE 'America/Lima')::date=$2::date ORDER BY started_at DESC LIMIT 1 FOR UPDATE`,
-            [req.userId, today]
-        );
-        const previous = todayRows.rows[0];
-        if (previous?.status === 'active' && new Date(previous.expected_end_at).getTime() > Date.now()) {
-            await client.query('ROLLBACK');
-            return res.status(409).json({ error: 'Ya tienes una jornada activa', checkin: previous });
-        }
-        if (previous && ['completed', 'expired'].includes(previous.status)) {
-            await client.query('ROLLBACK');
-            return res.status(409).json({ error: 'Ya registraste tu check-in de hoy', checkin: previous });
-        }
-        const startedAt = new Date();
-        const expectedEndAt = new Date(startedAt.getTime() + ENERGO_SHIFT_MS);
-        const created = await client.query(
-            `INSERT INTO energo_checkins (user_id, checkin_code, started_at, expected_end_at, status, duration_minutes)
-             VALUES ($1,$2,$3,$4,'active',480) RETURNING *`,
-            [req.userId, code, startedAt, expectedEndAt]
-        );
-        await client.query(
-            `UPDATE users SET ultima_fecha_tareas=$1, tareas_completadas_hoy='[]'::jsonb WHERE id=$2`,
-            [today, req.userId]
-        );
-        await client.query('COMMIT');
-        res.json({
-            message: 'Check-in iniciado correctamente',
-            jornada_horas: ENERGO_SHIFT_HOURS,
-            checkin: created.rows[0]
-        });
-    } catch (error) {
-        try { await client.query('ROLLBACK'); } catch (_) {}
-        console.error('EnerGo check-in start:', error);
-        res.status(500).json({ error: 'No se pudo iniciar la jornada' });
-    } finally { client.release(); }
-});
-
-// Cierre manual de la jornada; el cierre automático ocurre al consultar después de 8 horas.
-app.post('/api/user/checkin/stop', authenticate, async (req, res) => {
-    try {
-        const current = await energoCurrentCheckin(req.userId);
-        if (!current || current.status !== 'active') return res.status(404).json({ error: 'No tienes una jornada activa' });
-        const endedAt = new Date();
-        const result = await pool.query(
-            `UPDATE energo_checkins SET status='completed', ended_at=$1 WHERE id=$2 AND status='active' RETURNING *`,
-            [endedAt, current.id]
-        );
-        if (!result.rows.length) return res.status(409).json({ error: 'La jornada ya fue cerrada' });
-        res.json({ message: 'Jornada cerrada', checkin: result.rows[0] });
-    } catch (error) {
-        console.error('EnerGo check-in stop:', error);
-        res.status(500).json({ error: 'No se pudo cerrar la jornada' });
-    }
-});
-
-// Administración: consultar jornadas recientes y personas actualmente activas.
-app.get('/api/admin/checkins', authenticate, isAdmin, async (req, res) => {
-    try {
-        await pool.query(`UPDATE energo_checkins SET status='expired', ended_at=expected_end_at WHERE status='active' AND expected_end_at <= NOW()`);
-        const result = await pool.query(
-            `SELECT c.*, u.nombre, u.apellido, u.telefono, u.email, u.plan, u.plan_amount
-             FROM energo_checkins c JOIN users u ON u.id=c.user_id
-             ORDER BY c.started_at DESC LIMIT 200`
-        );
-        res.json({ jornada_horas: ENERGO_SHIFT_HOURS, checkins: result.rows });
-    } catch (error) {
-        console.error('EnerGo admin check-ins:', error);
-        res.status(500).json({ error: 'No se pudieron consultar las jornadas' });
-    }
-});
-
-// Administración: rotar el código diario de acceso.
-app.post('/api/admin/checkin-code', authenticate, isAdmin, async (req, res) => {
-    const code = String(req.body?.code || '').trim().toUpperCase();
-    if (!/^[A-Z0-9-]{4,32}$/.test(code)) return res.status(400).json({ error: 'El código debe tener entre 4 y 32 caracteres alfanuméricos' });
-    try {
-        await pool.query(`UPDATE configuracion SET energo_checkin_code=$1, updated_at=NOW() WHERE id=1`, [code]);
-        res.json({ message: 'Código de check-in actualizado', code });
-    } catch (error) {
-        console.error('EnerGo admin check-in code:', error);
-        res.status(500).json({ error: 'No se pudo actualizar el código' });
-    }
-});
-
-app.get('/api/admin/checkin-code', authenticate, isAdmin, async (req, res) => {
-    try { res.json({ code: await energoGetConfiguredCode(), jornada_horas: ENERGO_SHIFT_HOURS }); }
-    catch (error) { res.status(500).json({ error: 'No se pudo consultar el código' }); }
-});
-
 // ============================================================
 // INICIAR SERVIDOR
 // ============================================================
 app.post('/api/user/achievements/claim', authenticate, async (req,res)=>{
   const logroId=String(req.body?.logroId||req.body?.id||'').trim(); if(!logroId)return res.status(400).json({error:'Logro requerido'});
-  const client=await pool.connect(); try{await client.query('BEGIN'); const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]); if(!q.rows.length)throw new Error('Usuario no encontrado'); const u=q.rows[0]; const assigned=Array.isArray(u.logros_asignados)?u.logros_asignados:[]; const index=assigned.findIndex(x=>String(x?.id??x?.logroId??x?.logro_id??x)===logroId); if(index<0)throw new Error('Logro no encontrado'); const logro=typeof assigned[index]==='object'?{...assigned[index]}:{id:logroId}; const reclaimed=Array.isArray(u.logros_reclamados)?u.logros_reclamados:[]; if(logro.reclamado||reclaimed.some(x=>String(typeof x==='object'?(x.id||x.logroId):x)===logroId))throw new Error('Este logro ya fue reclamado'); const tipo=String(logro.tipo||'').toLowerCase(); const isPlan=tipo==='plan'||/tener\s*plan/i.test(String(logro.nombre||'')); const completed=['completado','completada','completed'].includes(String(logro.estado||'').toLowerCase())||logro.completado===true||isPlan&&u.plan&& !/^sin[_ ]?plan$/i.test(String(u.plan)); if(!completed)throw new Error('El logro aún no está completado'); const reward=Math.max(0,Number(logro.recompensa??logro.cantidad??logro.premio??0)||0); if(reward<=0)throw new Error('El logro no tiene recompensa válida'); const rewardType=String(logro.recompensa_tipo||logro.tipo_recompensa||'puntos').toLowerCase(); logro.estado='reclamado'; logro.reclamado=true; logro.reclamadoEn=new Date().toISOString(); assigned[index]=logro; const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,DATE '1900-01-01')<DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END,ganado_semanal_inicio=DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date,logros_asignados=$3::jsonb,logros_reclamados=$4::jsonb WHERE id=$5 RETURNING *`,[rewardType==='usdt'?reward:0,rewardType==='usdt'?0:Math.floor(reward),JSON.stringify(assigned),JSON.stringify(reclaimed.concat({id:logroId,nombre:logro.nombre||'',recompensa:reward,recompensa_tipo:rewardType,fecha:logro.reclamadoEn})),req.userId]); const item={tipo:'logro',concepto:`Recompensa de logro: ${logro.nombre||logroId}`,monto:rewardType==='usdt'?reward:0,puntos:rewardType==='usdt'?0:Math.floor(reward),fecha:logro.reclamadoEn,estado:'acreditado'}; const row=out.rows[0]; const hist=Array.isArray(row.historial_detallado)?row.historial_detallado:[]; const saved=await client.query('UPDATE users SET historial_detallado=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(hist.concat(item)),req.userId]); await client.query('COMMIT'); res.json({message:'Recompensa reclamada',premio:reward,tipo_recompensa:rewardType,user:publicUserData(saved.rows[0])}); }catch(e){try{await client.query('ROLLBACK')}catch(_){} console.error('achievement claim',e);res.status(400).json({error:e.message||'No se pudo reclamar el logro'});}finally{client.release();}
+  const client=await pool.connect();
+  try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],assigned=Array.isArray(u.logros_asignados)?u.logros_asignados:[],index=assigned.findIndex(x=>String(x?.id??x?.logroId??x?.logro_id??x)===logroId);if(index<0)throw new Error('Logro no encontrado');const logro=typeof assigned[index]==='object'?{...assigned[index]}:{id:logroId},reclaimed=Array.isArray(u.logros_reclamados)?u.logros_reclamados:[];if(logro.reclamado||reclaimed.some(x=>String(typeof x==='object'?(x.id||x.logroId):x)===logroId))throw new Error('Este logro ya fue reclamado');const tipo=String(logro.tipo||'').toLowerCase(),isPlan=tipo==='plan'||/tener\s*plan/i.test(String(logro.nombre||'')),completed=['completado','completada','completed'].includes(String(logro.estado||'').toLowerCase())||logro.completado===true||isPlan&&u.plan&&!/^sin[_ ]?plan$/i.test(String(u.plan));if(!completed)throw new Error('El logro aún no está completado');const reward=Math.max(0,Number(logro.recompensa??logro.cantidad??logro.premio??0)||0);if(reward<=0)throw new Error('El logro no tiene recompensa válida');const rewardType=String(logro.recompensa_tipo||logro.tipo_recompensa||'puntos').toLowerCase(),liquidacion=rewardType==='usdt'?liquidarRecompensaUSDT(reward):{montoBruto:0,comision:0,montoNeto:0},neto=rewardType==='usdt'?liquidacion.montoNeto:0,pts=rewardType==='usdt'?0:Math.floor(reward),now=new Date().toISOString();logro.estado='reclamado';logro.reclamado=true;logro.reclamadoEn=now;assigned[index]=logro;const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,DATE '1900-01-01')<DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END,ganado_semanal_inicio=DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date,logros_asignados=$3::jsonb,logros_reclamados=$4::jsonb WHERE id=$5 RETURNING *`,[neto,pts,JSON.stringify(assigned),JSON.stringify(reclaimed.concat({id:logroId,nombre:logro.nombre||'',recompensa:reward,montoNeto:neto,comision:liquidacion.comision,recompensa_tipo:rewardType,fecha:now})),req.userId]);const item={tipo:'logro',concepto:rewardType==='usdt'?`Recompensa de logro: ${logro.nombre||logroId} · ${reward.toFixed(2)} - 23% = ${neto.toFixed(2)} USDT`:`Recompensa de logro: ${logro.nombre||logroId}`,monto:neto,montoBruto:liquidacion.montoBruto,comision:liquidacion.comision,porcentajeComision:rewardType==='usdt'?APEX_REWARD_COMMISSION_PERCENT:0,puntos:pts,fecha:now,estado:'acreditado'};const row=out.rows[0],hist=Array.isArray(row.historial_detallado)?row.historial_detallado:[],saved=await client.query('UPDATE users SET historial_detallado=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(hist.concat(item)),req.userId]);await client.query('COMMIT');res.json({message:'Recompensa reclamada',premio:reward,montoNeto:neto,comision:liquidacion.comision,tipo_recompensa:rewardType,user:publicUserData(saved.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('achievement claim',e);res.status(400).json({error:e.message||'No se pudo reclamar el logro'});}finally{client.release();}
 });
 
-
-// ============================================================
-// PRÉSTAMOS APEX
-// Se mantiene separado del historial general: loans registra la deuda
-// y loan_payments registra cada abono con su fecha.
-// ============================================================
-async function apexLoanSummaryForUsers(userIds = null) {
-    const params = [];
-    let filter = '';
-    if (Array.isArray(userIds) && userIds.length) {
-        params.push(userIds.map(Number).filter(Number.isInteger));
-        filter = 'WHERE l.user_id = ANY($1::int[])';
+function validarMontoPrestamo(value) {
+    const raw = String(value ?? '').trim();
+    if (!/^\d+(?:\.\d{1,6})?$/.test(raw)) return null;
+    if ((raw.split('.')[0].replace(/^0+/, '') || '0').length > 12) return null;
+    const amount = Number(raw);
+    return Number.isFinite(amount) && amount > 0 ? raw : null;
+}
+async function apexObtenerPrestamosUsuario(userId) {
+    await ensureApexLoanSchema();
+    const loansResult = await pool.query(
+        'SELECT id, user_id, principal, outstanding, status, issued_at, created_at FROM apex_loans WHERE user_id = $1 ORDER BY issued_at DESC, id DESC',
+        [userId]
+    );
+    const paymentsResult = await pool.query(
+        'SELECT id, loan_id, amount, paid_at FROM apex_loan_payments WHERE user_id = $1 ORDER BY paid_at DESC, id DESC',
+        [userId]
+    );
+    const paymentsByLoan = new Map();
+    for (const payment of paymentsResult.rows) {
+        const key = String(payment.loan_id);
+        if (!paymentsByLoan.has(key)) paymentsByLoan.set(key, []);
+        paymentsByLoan.get(key).push({
+            id: payment.id,
+            amount: Number(payment.amount),
+            paid_at: payment.paid_at
+        });
     }
-    const q = await pool.query(`
-        SELECT l.user_id,
-               COALESCE(SUM(l.amount),0) AS total_prestado,
-               COALESCE(SUM(l.amount-l.outstanding),0) AS total_abonado,
-               COALESCE(SUM(l.outstanding),0) AS debe,
-               COUNT(l.id)::int AS prestamos
-        FROM apex_loans l ${filter}
-        GROUP BY l.user_id
-    `, params);
-    return q.rows;
+    return loansResult.rows.map(loan => ({
+        id: loan.id,
+        user_id: loan.user_id,
+        principal: Number(loan.principal),
+        outstanding: Number(loan.outstanding),
+        status: loan.status,
+        issued_at: loan.issued_at,
+        created_at: loan.created_at,
+        payments: paymentsByLoan.get(String(loan.id)) || []
+    }));
 }
 
-app.get('/api/admin/loans/summary', authenticate, isAdmin, async (req, res) => {
+app.get('/api/admin/loans/users', authenticate, isAdmin, async (req, res) => {
     try {
-        await ensureTaskColumns();
-        const rows = await apexLoanSummaryForUsers();
-        res.json({ summaries: rows.map(r => ({ userId: Number(r.user_id), totalPrestado: Number(r.total_prestado||0), totalAbonado: Number(r.total_abonado||0), debe: Number(r.debe||0), prestamos: Number(r.prestamos||0) })) });
-    } catch (error) { console.error('Apex loan summary:', error); res.status(500).json({ error: 'No se pudo cargar el resumen de préstamos' }); }
+        await ensureApexLoanSchema();
+        const search = String(req.query.search || '').trim().slice(0, 100);
+        const pattern = `%${search}%`;
+        const result = await pool.query(`
+            SELECT id, nombre, apellido, telefono
+            FROM users
+            WHERE $1 = '' OR id::text ILIKE $2
+               OR COALESCE(telefono, '') ILIKE $2
+               OR CONCAT_WS(' ', nombre, apellido) ILIKE $2
+            ORDER BY id DESC
+            LIMIT 100
+        `, [search, pattern]);
+        res.json({ users: result.rows });
+    } catch (error) {
+        console.error('Error buscando usuarios para préstamos:', error.message);
+        res.status(500).json({ error: 'No se pudieron cargar los usuarios' });
+    }
 });
 
 app.get('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => {
     try {
-        await ensureTaskColumns();
-        const userId = Number(req.params.id);
-        const user = await pool.query('SELECT id, nombre, apellido, telefono, balance FROM users WHERE id=$1', [userId]);
-        if (!user.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
-        const loansQ = await pool.query('SELECT * FROM apex_loans WHERE user_id=$1 ORDER BY issued_at DESC', [userId]);
-        const paymentsQ = await pool.query('SELECT id, loan_id, amount, paid_at FROM apex_loan_payments WHERE user_id=$1 ORDER BY paid_at DESC', [userId]);
-        const paymentsByLoan = {};
-        paymentsQ.rows.forEach(payment => { (paymentsByLoan[payment.loan_id] ||= []).push({ id: payment.id, amount: payment.amount, paidAt: payment.paid_at }); });
-        const loans = loansQ.rows.map(loan => ({ ...loan, payments: paymentsByLoan[loan.id] || [] }));
-        const summary = await apexLoanSummaryForUsers([userId]);
-        res.json({ user: user.rows[0], loans, summary: summary[0] || { total_prestado:0,total_abonado:0,debe:0,prestamos:0 } });
-    } catch (error) { console.error('Apex user loans:', error); res.status(500).json({ error: 'No se pudo cargar el historial de préstamos' }); }
+        const userId = String(req.params.id || '');
+        if (!/^\d+$/.test(userId)) return res.status(400).json({ error: 'ID de usuario inválido' });
+        await ensureApexLoanSchema();
+        const userResult = await pool.query(
+            'SELECT id, nombre, apellido, telefono FROM users WHERE id = $1', [userId]
+        );
+        if (!userResult.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const loans = await apexObtenerPrestamosUsuario(userId);
+        const totals = await pool.query(`
+            SELECT COALESCE(SUM(principal), 0) AS principal,
+                   COALESCE(SUM(principal - outstanding), 0) AS abonado,
+                   COALESCE(SUM(outstanding), 0) AS pendiente
+            FROM apex_loans WHERE user_id = $1
+        `, [userId]);
+        res.json({
+            user: userResult.rows[0],
+            loans,
+            summary: {
+                principal: Number(totals.rows[0].principal),
+                abonado: Number(totals.rows[0].abonado),
+                pendiente: Number(totals.rows[0].pendiente)
+            }
+        });
+    } catch (error) {
+        console.error('Error cargando préstamos del usuario:', error.message);
+        res.status(500).json({ error: 'No se pudieron cargar los préstamos' });
+    }
 });
 
 app.post('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => {
-    const client = await pool.connect();
     try {
-        await ensureTaskColumns();
-        const userId = Number(req.params.id), amount = Number(req.body.amount), issuedAt = req.body.issuedAt ? new Date(req.body.issuedAt) : new Date();
-        if (!Number.isInteger(userId) || !Number.isFinite(amount) || amount <= 0 || Number.isNaN(issuedAt.getTime())) return res.status(400).json({ error: 'Usuario, monto y fecha válidos son obligatorios' });
-        await client.query('BEGIN');
-        const user = await client.query('SELECT id, balance, historial_detallado FROM users WHERE id=$1 FOR UPDATE', [userId]);
-        if (!user.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error:'Usuario no encontrado' }); }
-        const inserted = await client.query(`INSERT INTO apex_loans(user_id,amount,outstanding,issued_at,created_by) VALUES($1,$2,$2,$3,$4) RETURNING *`, [userId, amount, issuedAt, req.userId]);
-        const row=user.rows[0], history=Array.isArray(row.historial_detallado)?row.historial_detallado:[];
-        history.push({ tipo:'prestamo_otorgado', monto:amount, concepto:'Préstamo otorgado', fecha:issuedAt.toISOString(), estado:'aprobado', loanId:inserted.rows[0].id });
-        const updated=await client.query('UPDATE users SET balance=COALESCE(balance,0)+$1,historial_detallado=$2::jsonb WHERE id=$3 RETURNING *',[amount,JSON.stringify(history),userId]);
-        await client.query('COMMIT');
-        res.json({ loan: inserted.rows[0], user: typeof publicUserData==='function'?publicUserData(updated.rows[0]):updated.rows[0] });
-    } catch (error) { try { await client.query('ROLLBACK'); } catch (_) {} console.error('Apex create loan:', error); res.status(500).json({ error:'No se pudo registrar el préstamo' }); } finally { client.release(); }
+        const userId = String(req.params.id || '');
+        const principal = validarMontoPrestamo(req.body?.amount);
+        if (!/^\d+$/.test(userId)) return res.status(400).json({ error: 'ID de usuario inválido' });
+        if (!principal) return res.status(400).json({ error: 'Ingresa un monto mayor que cero, con hasta 6 decimales' });
+        let issuedAt = new Date();
+        if (req.body?.issuedAt) {
+            const suppliedDate = String(req.body.issuedAt).trim();
+            issuedAt = /^\d{4}-\d{2}-\d{2}$/.test(suppliedDate)
+                ? new Date(`${suppliedDate}T12:00:00.000Z`)
+                : new Date(suppliedDate);
+            if (Number.isNaN(issuedAt.getTime())) return res.status(400).json({ error: 'Fecha del préstamo inválida' });
+        }
+        await ensureApexLoanSchema();
+        const result = await pool.query(`
+            INSERT INTO apex_loans (user_id, principal, outstanding, issued_at, created_by)
+            SELECT id, $2::numeric, $2::numeric, $3, $4
+            FROM users WHERE id = $1
+            RETURNING id, user_id, principal, outstanding, status, issued_at, created_at
+        `, [userId, principal, issuedAt, req.userId]);
+        if (!result.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const loan = result.rows[0];
+        res.status(201).json({
+            message: 'Préstamo registrado',
+            loan: { ...loan, principal: Number(loan.principal), outstanding: Number(loan.outstanding) }
+        });
+    } catch (error) {
+        console.error('Error registrando préstamo:', error.message);
+        res.status(500).json({ error: 'No se pudo registrar el préstamo' });
+    }
 });
 
 app.post('/api/admin/loans/:loanId/payments', authenticate, isAdmin, async (req, res) => {
+    const loanId = String(req.params.loanId || '');
+    const amount = validarMontoPrestamo(req.body?.amount);
+    if (!/^\d+$/.test(loanId)) return res.status(400).json({ error: 'ID de préstamo inválido' });
+    if (!amount) return res.status(400).json({ error: 'Ingresa un abono mayor que cero, con hasta 6 decimales' });
     const client = await pool.connect();
     try {
-        await ensureTaskColumns();
-        const loanId=Number(req.params.loanId), amount=Number(req.body.amount), paidAt=req.body.paidAt?new Date(req.body.paidAt):new Date();
-        if (!Number.isInteger(loanId)||!Number.isFinite(amount)||amount<=0||Number.isNaN(paidAt.getTime())) return res.status(400).json({error:'Préstamo, monto y fecha válidos son obligatorios'});
+        await ensureApexLoanSchema();
         await client.query('BEGIN');
-        const loanQ=await client.query('SELECT * FROM apex_loans WHERE id=$1 FOR UPDATE',[loanId]);
-        if(!loanQ.rows.length){await client.query('ROLLBACK');return res.status(404).json({error:'Préstamo no encontrado'});}
-        const loan=loanQ.rows[0], outstanding=Number(loan.outstanding||0);
-        if(amount>outstanding+0.000001){await client.query('ROLLBACK');return res.status(400).json({error:`El abono no puede superar la deuda pendiente de $${outstanding.toFixed(2)}`});}
-        const userQ=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[loan.user_id]);
-        const user=userQ.rows[0], balance=Number(user.balance||0);
-        if(amount>balance+0.000001){await client.query('ROLLBACK');return res.status(400).json({error:`Saldo insuficiente. El usuario tiene $${balance.toFixed(2)}`});}
-        const payment=await client.query(`INSERT INTO apex_loan_payments(loan_id,user_id,amount,paid_at,created_by) VALUES($1,$2,$3,$4,$5) RETURNING *`,[loanId,loan.user_id,amount,paidAt,req.userId]);
-        const newOutstanding=Math.max(0,outstanding-amount),newStatus=newOutstanding<=0.000001?'pagado':'pendiente';
-        await client.query('UPDATE apex_loans SET outstanding=$1,status=$2,updated_at=NOW() WHERE id=$3',[newOutstanding,newStatus,loanId]);
-        const history=Array.isArray(user.historial_detallado)?user.historial_detallado:[];history.push({tipo:'abono_prestamo',monto:amount,concepto:'Abono de préstamo',fecha:paidAt.toISOString(),estado:'aprobado',loanId});
-        const updated=await client.query('UPDATE users SET balance=$1,historial_detallado=$2::jsonb WHERE id=$3 RETURNING *',[balance-amount,JSON.stringify(history),loan.user_id]);
+        const locked = await client.query(
+            'SELECT id, user_id, principal, outstanding, status FROM apex_loans WHERE id = $1 FOR UPDATE',
+            [loanId]
+        );
+        if (!locked.rows.length) {
+            const error = new Error('Préstamo no encontrado'); error.status = 404; throw error;
+        }
+        const loan = locked.rows[0];
+        const outstanding = Number(loan.outstanding);
+        if (loan.status === 'pagado' || outstanding <= 0) {
+            const error = new Error('Este préstamo ya está pagado'); error.status = 400; throw error;
+        }
+        const amountCheck = await client.query('SELECT $1::numeric <= $2::numeric AS valid', [amount, loan.outstanding]);
+        if (!amountCheck.rows[0].valid) {
+            const error = new Error('El abono no puede superar el saldo pendiente'); error.status = 400; throw error;
+        }
+        const paymentResult = await client.query(`
+            INSERT INTO apex_loan_payments (loan_id, user_id, amount, created_by)
+            VALUES ($1, $2, $3::numeric, $4)
+            RETURNING id, loan_id, user_id, amount, paid_at
+        `, [loanId, loan.user_id, amount, req.userId]);
+        const updated = await client.query(`
+            UPDATE apex_loans
+            SET outstanding = GREATEST(0, outstanding - $1::numeric),
+                status = CASE WHEN outstanding - $1::numeric <= 0 THEN 'pagado' ELSE 'pendiente' END,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING id, user_id, principal, outstanding, status, issued_at, created_at
+        `, [amount, loanId]);
         await client.query('COMMIT');
-        res.json({payment:payment.rows[0],debe:newOutstanding,user:typeof publicUserData==='function'?publicUserData(updated.rows[0]):updated.rows[0]});
-    } catch(error){try{await client.query('ROLLBACK')}catch(_){} console.error('Apex loan payment:',error);res.status(500).json({error:'No se pudo registrar el abono'});} finally{client.release();}
+        const saved = updated.rows[0];
+        res.status(201).json({
+            message: 'Abono registrado y saldo pendiente actualizado',
+            payment: { ...paymentResult.rows[0], amount: Number(paymentResult.rows[0].amount) },
+            loan: { ...saved, principal: Number(saved.principal), outstanding: Number(saved.outstanding) }
+        });
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        const status = error.status || 500;
+        if (status === 500) console.error('Error registrando abono:', error.message);
+        res.status(status).json({ error: status === 500 ? 'No se pudo registrar el abono' : error.message });
+    } finally {
+        client.release();
+    }
 });
 
-app.get('/api/user/loans', authenticate, async (req,res)=>{
+app.get('/api/me/loans', authenticate, async (req, res) => {
     try {
-        await ensureTaskColumns();
-        const loansQ=await pool.query('SELECT * FROM apex_loans WHERE user_id=$1 ORDER BY issued_at DESC',[req.userId]);
-        const paymentsQ=await pool.query('SELECT id, loan_id, amount, paid_at FROM apex_loan_payments WHERE user_id=$1 ORDER BY paid_at DESC',[req.userId]);
-        const paymentsByLoan={};paymentsQ.rows.forEach(payment=>{(paymentsByLoan[payment.loan_id] ||= []).push({id:payment.id,amount:payment.amount,paidAt:payment.paid_at})});
-        const loans=loansQ.rows.map(loan=>({...loan,payments:paymentsByLoan[loan.id]||[]}));
-        const summary=(await apexLoanSummaryForUsers([req.userId]))[0]||{total_prestado:0,total_abonado:0,debe:0,prestamos:0};
-        res.json({loans,summary:{totalPrestado:Number(summary.total_prestado||0),totalAbonado:Number(summary.total_abonado||0),debe:Number(summary.debe||0)}});
-    } catch(error){console.error('Apex dashboard loans:',error);res.status(500).json({error:'No se pudo cargar tus préstamos'});}
+        const loans = await apexObtenerPrestamosUsuario(req.userId);
+        const totals = await pool.query(`
+            SELECT COALESCE(SUM(principal), 0) AS principal,
+                   COALESCE(SUM(principal - outstanding), 0) AS abonado,
+                   COALESCE(SUM(outstanding), 0) AS pendiente
+            FROM apex_loans WHERE user_id = $1
+        `, [req.userId]);
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            loans,
+            summary: {
+                principal: Number(totals.rows[0].principal),
+                abonado: Number(totals.rows[0].abonado),
+                pendiente: Number(totals.rows[0].pendiente)
+            }
+        });
+    } catch (error) {
+        console.error('Error cargando préstamos del usuario:', error.message);
+        res.status(500).json({ error: 'No se pudieron cargar tus préstamos' });
+    }
 });
 
-ensureEnergoCheckinSchema().catch(error => console.error('EnerGo schema:', error.message));
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor corriendo en puerto ${port}`);
 });
