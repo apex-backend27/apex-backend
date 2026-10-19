@@ -44,7 +44,7 @@ function renderIngresoRow(e){var o=e.monto||0,a="💰";return"produccion"===e.ti
 (function(){
   'use strict';
   function token(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||''}
-  function apiBase(){return window.API_URL||''}
+  function apiBase(){return (window.API_URL||'https://apex-backend-cj21.onrender.com').replace(/\/$/,'')}
   function esc(v){return String(v==null?'':v).replace(/[&<>'"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]})}
   function money(v){return '$'+Number(v||0).toFixed(2)}
   function date(v){if(!v)return '—';try{return new Date(v).toLocaleDateString('es-CO',{year:'numeric',month:'2-digit',day:'2-digit'})}catch(_){return v}}
