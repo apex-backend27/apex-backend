@@ -239,7 +239,7 @@
   window.buyPlan=atomicBuy;
 })();
 </script>
-<style id="apex-hide-referral-tree-v1">.apex-ref-tree,.apex-admin-ref-tree,.apex-referral-tree-rebuild-v1,.apex-referrals-mirror-admin-v1{display:none!important}</style><script defer src="apex-loans-user.js?v=20261020-4"></script></body></html><script id="apex-assigned-task-details-v4">(function(){window.abrirTareasAsignadas=function(){var a=Array.isArray(window.user&&user.tareas_asignadas)?user.tareas_asignadas:[],e=a.filter(function(x){var s=String(x&&x.estado||"").toLowerCase();return !["aprobada","aprobado","rechazada","rechazado"].includes(s)});if(!e.length)return showAlert("⚠️ No tienes actividades asignadas","warning");var html=e.map(function(t,idx){var originalIndex=a.indexOf(t),state=String(t.estado||"").toLowerCase(),name=t.tareaNombre||t.nombre||t.titulo||("Actividad "+(idx+1)),desc=t.tareaDescripcion||t.descripcion||t.descripcion_tarea||"Sin descripción",kind=String(t.tipo_recompensa||"puntos").toLowerCase(),qty=Number(t.cantidad??t.puntos??0),reward="usdt"===kind?"💵 $"+qty.toFixed(2)+" USDT":"⭐ "+qty+" puntos",days=t.diasVencimiento||t.dias_vencimiento||t.dias||null;if(!days&&t.fechaVencimiento&&t.fechaAsignacion)days=Math.max(1,Math.round((new Date(t.fechaVencimiento)-new Date(t.fechaAsignacion))/864e5));days=Number(days)||3;var status="completada"===state||"completado"===state||t.completada===true?'<div style="color:#ffed9b;font-weight:800">⏳ Comprobante enviado · Pendiente de aprobación</div>':'rechazada'===state||"rechazado"===state?'<div style="color:#ffd2d8;font-weight:800">❌ Rechazada</div>':'<button type="button" class="btn-action apex-submit-assigned-task" data-index="'+originalIndex+'" style="margin-top:10px;width:100%">📎 Cargar comprobante</button>';return '<article style="padding:14px;border:1px solid #27d3ff;border-radius:14px;margin:9px 0;background:rgba(10,20,40,.7)"><strong style="font-size:16px">'+name+'</strong><p style="opacity:.9;margin:8px 0;line-height:1.45">'+desc+'</p><div style="display:flex;gap:10px;flex-wrap:wrap;color:#ffd447;font-weight:700"><span>'+reward+'</span><span>📅 '+days+' día'+(1===days?"":"s")+' para cumplir</span></div>'+(t.nota?'<small style="display:block;margin-top:8px">📝 Comprobante enviado: '+t.nota+'</small>':'')+'<div style="margin-top:10px">'+status+'</div></article>'}).join(""),modal=apexModal("📋 Actividades asignadas",html);modal.querySelectorAll(".apex-submit-assigned-task").forEach(function(btn){btn.onclick=async function(){var note=prompt("📝 Escribe el comprobante o nota de la actividad:");if(null===note||!note.trim())return showAlert("⚠️ Debes escribir un comprobante","warning");btn.disabled=true;btn.textContent="⏳ Enviando…";try{var token=localStorage.getItem("apex_token")||sessionStorage.getItem("apex_token")||"",resp=await fetch(API_URL+"/api/user/task/submit",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({index:Number(btn.dataset.index),comprobante:note.trim()})}),data=await resp.json();if(!resp.ok||data.error)throw new Error(data.error||"No se pudo enviar el comprobante");if(data.user){user=Object.assign(user,data.user);sessionStorage.setItem("apex_user",JSON.stringify(user));localStorage.setItem("apex_user",JSON.stringify(user))}modal.remove();showAlert("✅ Comprobante enviado y pendiente de aprobación","success");if(typeof renderDashboard==="function")renderDashboard()}catch(err){btn.disabled=false;btn.textContent="📎 Cargar comprobante";showAlert("❌ "+err.message,"danger")}}})};})();</script><script id="apex-final-redeem-module-v5">(function(){window.abrirPuntos=function(){var lista=typeof getCanjes==='function'?getCanjes():[],html='<p style="margin:0 0 12px">Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!lista.length)html+='<p>No hay canjes configurados.</p>';else html+=lista.map(function(c,i){var costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0);return '<div class="apex-redeem-card" style="padding:12px;margin:10px 0;border:1px solid #21466a;border-radius:12px;background:#0b1a2d;color:#fff"><strong>'+(c.nombre||c.titulo||'Canje '+(i+1))+'</strong><p style="margin:7px 0">'+(c.descripcion||'')+'<br>🎁 Recibes: <strong>$'+monto.toFixed(2)+' USDT</strong><br>⭐ Se descuentan: <strong>'+costo+' puntos</strong></p><button type="button" class="btn-action apex-redeem" data-i="'+i+'">Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem').forEach(function(btn){btn.onclick=function(){var c=lista[Number(btn.dataset.i)]||{},costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0),actual=Number(user.puntos||0);if(actual<costo)return showAlert('⚠️ Puntos insuficientes. Necesitas '+costo+' puntos y tienes '+actual+'.','warning');if(!confirm('¿Confirmar canje?\n\nSe descontarán: '+costo+' puntos\nRecibirás: $'+monto.toFixed(2)+' USDT'))return;user.puntos=actual-costo;user.canjes_realizados=Array.isArray(user.canjes_realizados)?user.canjes_realizados:[];var fecha=new Date().toISOString();user.canjes_realizados.push({nombre:c.nombre||c.titulo||'Canje',puntos:costo,monto:monto,fecha:fecha,estado:'pendiente'});user.historial_detallado=Array.isArray(user.historial_detallado)?user.historial_detallado:[];user.historial_detallado.push({tipo:'canje',concepto:'Canje: '+(c.nombre||c.titulo||'Canje'),monto:monto,puntos:costo,fecha:fecha,estado:'aprobado'});if(typeof apexPersist==='function')apexPersist();if(typeof calcularGanancias==='function')calcularGanancias();modal.remove();showAlert('✅ Canje solicitado: -'+costo+' puntos, +$'+monto.toFixed(2)+' USDT','success');};});};})();</script><script id="apex-stable-redeem-v6">(function(){window.abrirPuntos=function(){var lista=typeof getCanjes==='function'?getCanjes():[],html='<p style="margin:0 0 12px">Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!lista.length)html+='<p>No hay canjes configurados.</p>';else html+=lista.map(function(c,i){var costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0);return '<div style="padding:12px;margin:10px 0;border:1px solid #21466a;border-radius:12px;background:#0b1a2d;color:#fff"><strong>'+(c.nombre||c.titulo||'Canje '+(i+1))+'</strong><p style="margin:7px 0">'+(c.descripcion||'')+'<br>🎁 Recibes: <strong>$'+monto.toFixed(2)+' USDT</strong><br>⭐ Se descuentan: <strong>'+costo+' puntos</strong></p><button type="button" class="btn-action apex-redeem" data-i="'+i+'">Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem').forEach(function(btn){btn.onclick=async function(){var c=lista[Number(btn.dataset.i)]||{},costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0),actual=Number(user.puntos||0);if(actual<costo)return showAlert('⚠️ Puntos insuficientes. Necesitas '+costo+' puntos y tienes '+actual+'.','warning');if(!confirm('¿Confirmar canje?\n\nSe descontarán: '+costo+' puntos\nRecibirás: $'+monto.toFixed(2)+' USDT'))return;btn.disabled=true;var fecha=new Date().toISOString();user.puntos=actual-costo;user.canjes_realizados=Array.isArray(user.canjes_realizados)?user.canjes_realizados:[];user.canjes_realizados.push({nombre:c.nombre||c.titulo||'Canje',puntos:costo,monto:monto,fecha:fecha,estado:'pendiente'});user.historial_detallado=Array.isArray(user.historial_detallado)?user.historial_detallado:[];user.historial_detallado.push({tipo:'canje',concepto:'Canje: '+(c.nombre||c.titulo||'Canje'),monto:monto,puntos:costo,fecha:fecha,estado:'aprobado'});if(typeof calcularGanancias==='function')calcularGanancias();try{var respuesta=typeof saveUserData==='function'?await saveUserData():null;if(respuesta&&respuesta.user)user=Object.assign(user,respuesta.user);if(typeof calcularGanancias==='function')calcularGanancias();if(typeof renderDashboard==='function')renderDashboard();modal.remove();showAlert('✅ Canje guardado: -'+costo+' puntos, +$'+monto.toFixed(2)+' USDT','success')}catch(e){btn.disabled=false;showAlert('❌ No se pudo guardar el canje. Inténtalo nuevamente.','danger')}};});};})();</script><style id="apex-redeem-server-style-v7">.apex-redeem-confirm-backdrop{position:fixed;inset:0;z-index:10050;background:rgba(1,7,16,.72);display:flex;align-items:center;justify-content:center;padding:18px}.apex-redeem-confirm{width:min(390px,100%);background:linear-gradient(145deg,#102d49,#071321);border:1px solid #39c7ff;border-radius:18px;padding:22px;color:#eef8ff;box-shadow:0 22px 60px rgba(0,0,0,.55);text-align:center}.apex-redeem-confirm h3{margin:0 0 12px;color:#ffd447;font-size:20px}.apex-redeem-confirm .redeem-lines{padding:13px;border:1px solid rgba(255,212,71,.42);border-radius:12px;background:rgba(2,12,24,.55);line-height:1.8;margin:12px 0 16px}.apex-redeem-confirm .redeem-actions{display:flex;gap:10px}.apex-redeem-confirm button{flex:1;padding:11px;border-radius:11px;cursor:pointer;font-weight:800}.apex-redeem-cancel{background:#12263b;color:#d6eaff;border:1px solid #557695}.apex-redeem-accept{background:linear-gradient(135deg,#0b8e72,#27d3a5);color:#04130f;border:1px solid #7affd9}</style><script id="apex-redeem-server-modal-v7">(function(){window.abrirPuntos=function(){var lista=typeof getCanjes==='function'?getCanjes():[],html='<p style="margin:0 0 12px">Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!lista.length)html+='<p>No hay canjes configurados.</p>';else html+=lista.map(function(c,i){var costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0);return '<div style="padding:12px;margin:10px 0;border:1px solid #21466a;border-radius:12px;background:#0b1a2d;color:#fff"><strong>'+(c.nombre||c.titulo||'Canje '+(i+1))+'</strong><p style="margin:7px 0">'+(c.descripcion||'')+'<br>🎁 Recibes: <strong>$'+monto.toFixed(2)+' USDT</strong><br>⭐ Se descuentan: <strong>'+costo+' puntos</strong></p><button type="button" class="btn-action apex-redeem" data-i="'+i+'">Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem').forEach(function(btn){btn.onclick=function(){var c=lista[Number(btn.dataset.i)]||{},costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0),actual=Number(user.puntos||0);if(actual<costo){modal.remove();return showAlert('⚠️ Puntos insuficientes. Necesitas '+costo+' puntos y tienes '+actual+'.','warning')}var back=document.createElement('div');back.className='apex-redeem-confirm-backdrop';back.innerHTML='<div class="apex-redeem-confirm" role="dialog" aria-modal="true"><h3>Confirmar canje</h3><div class="redeem-lines"><div>⭐ Se descontarán: <strong>'+costo+' puntos</strong></div><div>🎁 Recibirás: <strong>$'+monto.toFixed(2)+' USDT</strong></div></div><div class="redeem-actions"><button type="button" class="apex-redeem-cancel">Cancelar</button><button type="button" class="apex-redeem-accept">Confirmar canje</button></div></div>';document.body.appendChild(back);back.querySelector('.apex-redeem-cancel').onclick=function(){back.remove()};back.querySelector('.apex-redeem-accept').onclick=async function(){var ok=back.querySelector('.apex-redeem-accept');ok.disabled=true;ok.textContent='Procesando…';back.remove();try{var token=localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';var res=await fetch(API_URL+'/api/user/redeem',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({canjeId:c.id||c.codigo})});var data=await res.json();if(!res.ok||data.error)throw new Error(data.error||'No se pudo procesar el canje');user=Object.assign(user,data.user||{});localStorage.setItem('apex_user',JSON.stringify(user));sessionStorage.setItem('apex_user',JSON.stringify(user));if(typeof calcularGanancias==='function')calcularGanancias();if(typeof renderDashboard==='function')renderDashboard();back.remove();modal.remove();showAlert('✅ Solicitud enviada: -'+costo+' puntos, pendiente de aprobación del administrador','success')}catch(e){ok.disabled=false;ok.textContent='Confirmar canje';showAlert('❌ '+e.message,'danger')}};};});};})();</script>
+<style id="apex-hide-referral-tree-v1">.apex-ref-tree,.apex-admin-ref-tree,.apex-referral-tree-rebuild-v1,.apex-referrals-mirror-admin-v1{display:none!important}</style></body></html><script id="apex-assigned-task-details-v4">(function(){window.abrirTareasAsignadas=function(){var a=Array.isArray(window.user&&user.tareas_asignadas)?user.tareas_asignadas:[],e=a.filter(function(x){var s=String(x&&x.estado||"").toLowerCase();return !["aprobada","aprobado","rechazada","rechazado"].includes(s)});if(!e.length)return showAlert("⚠️ No tienes actividades asignadas","warning");var html=e.map(function(t,idx){var originalIndex=a.indexOf(t),state=String(t.estado||"").toLowerCase(),name=t.tareaNombre||t.nombre||t.titulo||("Actividad "+(idx+1)),desc=t.tareaDescripcion||t.descripcion||t.descripcion_tarea||"Sin descripción",kind=String(t.tipo_recompensa||"puntos").toLowerCase(),qty=Number(t.cantidad??t.puntos??0),reward="usdt"===kind?"💵 $"+qty.toFixed(2)+" USDT":"⭐ "+qty+" puntos",days=t.diasVencimiento||t.dias_vencimiento||t.dias||null;if(!days&&t.fechaVencimiento&&t.fechaAsignacion)days=Math.max(1,Math.round((new Date(t.fechaVencimiento)-new Date(t.fechaAsignacion))/864e5));days=Number(days)||3;var status="completada"===state||"completado"===state||t.completada===true?'<div style="color:#ffed9b;font-weight:800">⏳ Comprobante enviado · Pendiente de aprobación</div>':'rechazada'===state||"rechazado"===state?'<div style="color:#ffd2d8;font-weight:800">❌ Rechazada</div>':'<button type="button" class="btn-action apex-submit-assigned-task" data-index="'+originalIndex+'" style="margin-top:10px;width:100%">📎 Cargar comprobante</button>';return '<article style="padding:14px;border:1px solid #27d3ff;border-radius:14px;margin:9px 0;background:rgba(10,20,40,.7)"><strong style="font-size:16px">'+name+'</strong><p style="opacity:.9;margin:8px 0;line-height:1.45">'+desc+'</p><div style="display:flex;gap:10px;flex-wrap:wrap;color:#ffd447;font-weight:700"><span>'+reward+'</span><span>📅 '+days+' día'+(1===days?"":"s")+' para cumplir</span></div>'+(t.nota?'<small style="display:block;margin-top:8px">📝 Comprobante enviado: '+t.nota+'</small>':'')+'<div style="margin-top:10px">'+status+'</div></article>'}).join(""),modal=apexModal("📋 Actividades asignadas",html);modal.querySelectorAll(".apex-submit-assigned-task").forEach(function(btn){btn.onclick=async function(){var note=prompt("📝 Escribe el comprobante o nota de la actividad:");if(null===note||!note.trim())return showAlert("⚠️ Debes escribir un comprobante","warning");btn.disabled=true;btn.textContent="⏳ Enviando…";try{var token=localStorage.getItem("apex_token")||sessionStorage.getItem("apex_token")||"",resp=await fetch(API_URL+"/api/user/task/submit",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({index:Number(btn.dataset.index),comprobante:note.trim()})}),data=await resp.json();if(!resp.ok||data.error)throw new Error(data.error||"No se pudo enviar el comprobante");if(data.user){user=Object.assign(user,data.user);sessionStorage.setItem("apex_user",JSON.stringify(user));localStorage.setItem("apex_user",JSON.stringify(user))}modal.remove();showAlert("✅ Comprobante enviado y pendiente de aprobación","success");if(typeof renderDashboard==="function")renderDashboard()}catch(err){btn.disabled=false;btn.textContent="📎 Cargar comprobante";showAlert("❌ "+err.message,"danger")}}})};})();</script><script id="apex-final-redeem-module-v5">(function(){window.abrirPuntos=function(){var lista=typeof getCanjes==='function'?getCanjes():[],html='<p style="margin:0 0 12px">Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!lista.length)html+='<p>No hay canjes configurados.</p>';else html+=lista.map(function(c,i){var costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0);return '<div class="apex-redeem-card" style="padding:12px;margin:10px 0;border:1px solid #21466a;border-radius:12px;background:#0b1a2d;color:#fff"><strong>'+(c.nombre||c.titulo||'Canje '+(i+1))+'</strong><p style="margin:7px 0">'+(c.descripcion||'')+'<br>🎁 Recibes: <strong>$'+monto.toFixed(2)+' USDT</strong><br>⭐ Se descuentan: <strong>'+costo+' puntos</strong></p><button type="button" class="btn-action apex-redeem" data-i="'+i+'">Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem').forEach(function(btn){btn.onclick=function(){var c=lista[Number(btn.dataset.i)]||{},costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0),actual=Number(user.puntos||0);if(actual<costo)return showAlert('⚠️ Puntos insuficientes. Necesitas '+costo+' puntos y tienes '+actual+'.','warning');if(!confirm('¿Confirmar canje?\n\nSe descontarán: '+costo+' puntos\nRecibirás: $'+monto.toFixed(2)+' USDT'))return;user.puntos=actual-costo;user.canjes_realizados=Array.isArray(user.canjes_realizados)?user.canjes_realizados:[];var fecha=new Date().toISOString();user.canjes_realizados.push({nombre:c.nombre||c.titulo||'Canje',puntos:costo,monto:monto,fecha:fecha,estado:'pendiente'});user.historial_detallado=Array.isArray(user.historial_detallado)?user.historial_detallado:[];user.historial_detallado.push({tipo:'canje',concepto:'Canje: '+(c.nombre||c.titulo||'Canje'),monto:monto,puntos:costo,fecha:fecha,estado:'aprobado'});if(typeof apexPersist==='function')apexPersist();if(typeof calcularGanancias==='function')calcularGanancias();modal.remove();showAlert('✅ Canje solicitado: -'+costo+' puntos, +$'+monto.toFixed(2)+' USDT','success');};});};})();</script><script id="apex-stable-redeem-v6">(function(){window.abrirPuntos=function(){var lista=typeof getCanjes==='function'?getCanjes():[],html='<p style="margin:0 0 12px">Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!lista.length)html+='<p>No hay canjes configurados.</p>';else html+=lista.map(function(c,i){var costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0);return '<div style="padding:12px;margin:10px 0;border:1px solid #21466a;border-radius:12px;background:#0b1a2d;color:#fff"><strong>'+(c.nombre||c.titulo||'Canje '+(i+1))+'</strong><p style="margin:7px 0">'+(c.descripcion||'')+'<br>🎁 Recibes: <strong>$'+monto.toFixed(2)+' USDT</strong><br>⭐ Se descuentan: <strong>'+costo+' puntos</strong></p><button type="button" class="btn-action apex-redeem" data-i="'+i+'">Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem').forEach(function(btn){btn.onclick=async function(){var c=lista[Number(btn.dataset.i)]||{},costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0),actual=Number(user.puntos||0);if(actual<costo)return showAlert('⚠️ Puntos insuficientes. Necesitas '+costo+' puntos y tienes '+actual+'.','warning');if(!confirm('¿Confirmar canje?\n\nSe descontarán: '+costo+' puntos\nRecibirás: $'+monto.toFixed(2)+' USDT'))return;btn.disabled=true;var fecha=new Date().toISOString();user.puntos=actual-costo;user.canjes_realizados=Array.isArray(user.canjes_realizados)?user.canjes_realizados:[];user.canjes_realizados.push({nombre:c.nombre||c.titulo||'Canje',puntos:costo,monto:monto,fecha:fecha,estado:'pendiente'});user.historial_detallado=Array.isArray(user.historial_detallado)?user.historial_detallado:[];user.historial_detallado.push({tipo:'canje',concepto:'Canje: '+(c.nombre||c.titulo||'Canje'),monto:monto,puntos:costo,fecha:fecha,estado:'aprobado'});if(typeof calcularGanancias==='function')calcularGanancias();try{var respuesta=typeof saveUserData==='function'?await saveUserData():null;if(respuesta&&respuesta.user)user=Object.assign(user,respuesta.user);if(typeof calcularGanancias==='function')calcularGanancias();if(typeof renderDashboard==='function')renderDashboard();modal.remove();showAlert('✅ Canje guardado: -'+costo+' puntos, +$'+monto.toFixed(2)+' USDT','success')}catch(e){btn.disabled=false;showAlert('❌ No se pudo guardar el canje. Inténtalo nuevamente.','danger')}};});};})();</script><style id="apex-redeem-server-style-v7">.apex-redeem-confirm-backdrop{position:fixed;inset:0;z-index:10050;background:rgba(1,7,16,.72);display:flex;align-items:center;justify-content:center;padding:18px}.apex-redeem-confirm{width:min(390px,100%);background:linear-gradient(145deg,#102d49,#071321);border:1px solid #39c7ff;border-radius:18px;padding:22px;color:#eef8ff;box-shadow:0 22px 60px rgba(0,0,0,.55);text-align:center}.apex-redeem-confirm h3{margin:0 0 12px;color:#ffd447;font-size:20px}.apex-redeem-confirm .redeem-lines{padding:13px;border:1px solid rgba(255,212,71,.42);border-radius:12px;background:rgba(2,12,24,.55);line-height:1.8;margin:12px 0 16px}.apex-redeem-confirm .redeem-actions{display:flex;gap:10px}.apex-redeem-confirm button{flex:1;padding:11px;border-radius:11px;cursor:pointer;font-weight:800}.apex-redeem-cancel{background:#12263b;color:#d6eaff;border:1px solid #557695}.apex-redeem-accept{background:linear-gradient(135deg,#0b8e72,#27d3a5);color:#04130f;border:1px solid #7affd9}</style><script id="apex-redeem-server-modal-v7">(function(){window.abrirPuntos=function(){var lista=typeof getCanjes==='function'?getCanjes():[],html='<p style="margin:0 0 12px">Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!lista.length)html+='<p>No hay canjes configurados.</p>';else html+=lista.map(function(c,i){var costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0);return '<div style="padding:12px;margin:10px 0;border:1px solid #21466a;border-radius:12px;background:#0b1a2d;color:#fff"><strong>'+(c.nombre||c.titulo||'Canje '+(i+1))+'</strong><p style="margin:7px 0">'+(c.descripcion||'')+'<br>🎁 Recibes: <strong>$'+monto.toFixed(2)+' USDT</strong><br>⭐ Se descuentan: <strong>'+costo+' puntos</strong></p><button type="button" class="btn-action apex-redeem" data-i="'+i+'">Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem').forEach(function(btn){btn.onclick=function(){var c=lista[Number(btn.dataset.i)]||{},costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0),actual=Number(user.puntos||0);if(actual<costo){modal.remove();return showAlert('⚠️ Puntos insuficientes. Necesitas '+costo+' puntos y tienes '+actual+'.','warning')}var back=document.createElement('div');back.className='apex-redeem-confirm-backdrop';back.innerHTML='<div class="apex-redeem-confirm" role="dialog" aria-modal="true"><h3>Confirmar canje</h3><div class="redeem-lines"><div>⭐ Se descontarán: <strong>'+costo+' puntos</strong></div><div>🎁 Recibirás: <strong>$'+monto.toFixed(2)+' USDT</strong></div></div><div class="redeem-actions"><button type="button" class="apex-redeem-cancel">Cancelar</button><button type="button" class="apex-redeem-accept">Confirmar canje</button></div></div>';document.body.appendChild(back);back.querySelector('.apex-redeem-cancel').onclick=function(){back.remove()};back.querySelector('.apex-redeem-accept').onclick=async function(){var ok=back.querySelector('.apex-redeem-accept');ok.disabled=true;ok.textContent='Procesando…';back.remove();try{var token=localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';var res=await fetch(API_URL+'/api/user/redeem',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({canjeId:c.id||c.codigo})});var data=await res.json();if(!res.ok||data.error)throw new Error(data.error||'No se pudo procesar el canje');user=Object.assign(user,data.user||{});localStorage.setItem('apex_user',JSON.stringify(user));sessionStorage.setItem('apex_user',JSON.stringify(user));if(typeof calcularGanancias==='function')calcularGanancias();if(typeof renderDashboard==='function')renderDashboard();back.remove();modal.remove();showAlert('✅ Solicitud enviada: -'+costo+' puntos, pendiente de aprobación del administrador','success')}catch(e){ok.disabled=false;ok.textContent='Confirmar canje';showAlert('❌ '+e.message,'danger')}};};});};})();</script>
 <script id="apex-redeem-final-pending-v8">(function(){window.abrirPuntos=function(){var lista=typeof getCanjes==='function'?getCanjes():[],html='<p style="margin:0 0 12px">Tienes <strong>'+Number(user.puntos||0)+'</strong> puntos.</p>';if(!lista.length)html+='<p>No hay canjes configurados.</p>';else html+=lista.map(function(c,i){var costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0);return '<div style="padding:12px;margin:10px 0;border:1px solid #21466a;border-radius:12px;background:#0b1a2d;color:#fff"><strong>'+(c.nombre||c.titulo||'Canje '+(i+1))+'</strong><p style="margin:7px 0">'+(c.descripcion||'')+'<br>🎁 Recibes: <strong>$'+monto.toFixed(2)+' USDT</strong><br>⭐ Se descuentan: <strong>'+costo+' puntos</strong></p><button type="button" class="btn-action apex-redeem-final" data-i="'+i+'">Canjear</button></div>';}).join('');var modal=apexModal('⭐ Canjear puntos',html);modal.querySelectorAll('.apex-redeem-final').forEach(function(btn){btn.onclick=function(){var c=lista[Number(btn.dataset.i)]||{},costo=Number(c.costoPuntos||0),monto=Number(c.montoUSDT||c.monto||c.amount||0),actual=Number(user.puntos||0);if(actual<costo){modal.remove();return showAlert('⚠️ Puntos insuficientes. Necesitas '+costo+' puntos y tienes '+actual+'.','warning')}modal.remove();var back=document.createElement('div');back.className='apex-redeem-confirm-backdrop';back.innerHTML='<div class="apex-redeem-confirm" role="dialog" aria-modal="true"><h3>Confirmar canje</h3><div class="redeem-lines"><div>⭐ Se descontarán: <strong>'+costo+' puntos</strong></div><div>🎁 Recibirás: <strong>$'+monto.toFixed(2)+' USDT</strong></div></div><div class="redeem-actions"><button type="button" class="apex-redeem-cancel">Cancelar</button><button type="button" class="apex-redeem-accept">Confirmar canje</button></div></div>';document.body.appendChild(back);back.querySelector('.apex-redeem-cancel').onclick=function(){back.remove()};back.querySelector('.apex-redeem-accept').onclick=async function(){var ok=back.querySelector('.apex-redeem-accept');ok.disabled=true;ok.textContent='Procesando…';back.remove();try{var token=localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||'';var res=await fetch(API_URL+'/api/user/redeem',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({canjeId:c.id||c.codigo})});var data=await res.json();if(!res.ok||data.error)throw new Error(data.error||'No se pudo procesar el canje');if(!data.pendienteAprobacion)throw new Error('El servidor no devolvió la solicitud como pendiente');user=Object.assign(user,data.user||{});localStorage.setItem('apex_user',JSON.stringify(user));sessionStorage.setItem('apex_user',JSON.stringify(user));if(typeof calcularGanancias==='function')calcularGanancias();if(typeof renderDashboard==='function')renderDashboard();back.remove();showAlert('✅ Solicitud enviada. Queda pendiente de aprobación del administrador.','success')}catch(e){ok.disabled=false;ok.textContent='Confirmar canje';showAlert('❌ '+e.message,'danger')}};};});};})();</script>
 <style id="apex-last-v3-style">#notifTabBtn,#tab-notificaciones,[data-tab="notificaciones"]{display:none!important}</style><script id="apex-last-v3-script">(function(){
 function token(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||localStorage.getItem('token')||sessionStorage.getItem('token')||'';}
@@ -341,4 +341,198 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   function hook(){if(typeof window.renderTareas==='function'&&!window.renderTareas.__apexThree){var f=window.renderTareas;window.renderTareas=function(){var r=f.apply(this,arguments);setTimeout(limit,0);return r;};window.renderTareas.__apexThree=true;} limit();}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',hook);else hook(); window.addEventListener('load',function(){hook();setTimeout(limit,300)}); setInterval(limit,1500);
 })();
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  const apiBase = (typeof API_URL !== 'undefined' && API_URL) || window.API_URL || '';
+  const token = () => localStorage.getItem('apex_token') || sessionStorage.getItem('apex_token') || '';
+  const money = (value) => Number(value || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+  const escapeHtml = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+  let loanDataKnown = false;
+  let confirmedHasLoans = false;
+  let loading = false;
+
+  const dateText = (value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? escapeHtml(value) : date.toLocaleString('es-PE');
+  };
+
+  function updateActivityVisibility() {
+    const tile = document.querySelector('[data-apex-loans-activity]');
+    if (tile) tile.style.display = loanDataKnown && confirmedHasLoans ? '' : 'none';
+    if (loanDataKnown && !confirmedHasLoans) {
+      const card = document.getElementById('apexUserLoansCard');
+      const grid = document.getElementById('actividadesGrid');
+      if (card) card.style.display = 'none';
+      if (grid) grid.style.display = '';
+    }
+  }
+
+  function showMessage(message, isError) {
+    const list = document.getElementById('apexUserLoansList');
+    if (!list) return;
+    list.innerHTML = `<div style="text-align:center;padding:14px;color:${isError ? '#b71c1c' : '#777'}">${escapeHtml(message)}</div>`;
+  }
+
+  function render(data) {
+    const principal = document.getElementById('apexUserLoansPrincipal');
+    const paid = document.getElementById('apexUserLoansPaid');
+    const due = document.getElementById('apexUserLoansDue');
+    const list = document.getElementById('apexUserLoansList');
+    if (!principal || !paid || !due || !list) return;
+
+    const currentBalance = Number(data.balance);
+    if (Number.isFinite(currentBalance)) {
+      const balanceNode = document.getElementById('balanceAmount');
+      if (balanceNode) balanceNode.textContent = '$' + currentBalance.toFixed(2);
+      if (window.user && typeof window.user === 'object') window.user.balance = currentBalance;
+      ['localStorage', 'sessionStorage'].forEach((storageName) => {
+        try {
+          const storage = window[storageName];
+          const stored = JSON.parse(storage.getItem('apex_user') || 'null');
+          if (stored) {
+            stored.balance = currentBalance;
+            storage.setItem('apex_user', JSON.stringify(stored));
+          }
+        } catch (_) {}
+      });
+    }
+
+    const summary = data.summary || {};
+    const loans = Array.isArray(data.loans) ? data.loans : [];
+    loanDataKnown = true;
+    confirmedHasLoans = loans.length > 0;
+    updateActivityVisibility();
+    principal.textContent = '$' + money(summary.principal);
+    paid.textContent = '$' + money(summary.abonado);
+    due.textContent = '$' + money(summary.pendiente);
+
+    if (!loans.length) {
+      list.innerHTML = '<div style="text-align:center;padding:14px;color:#777">No tienes préstamos registrados.</div>';
+      return;
+    }
+    list.innerHTML = loans.map((loan) => {
+      const isPaid = loan.status === 'pagado' || Number(loan.outstanding) <= 0;
+      const payments = Array.isArray(loan.payments) ? loan.payments : [];
+      return `<article style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-top:10px;background:#fff">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
+          <strong>Préstamo #${escapeHtml(loan.id)}</strong>
+          <span style="font-size:10px;font-weight:700;border-radius:12px;padding:4px 8px;background:${isPaid ? '#e8f5e9' : '#fff8e1'};color:${isPaid ? '#2e7d32' : '#e65100'}">${isPaid ? 'PAGADO' : 'PENDIENTE'}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;font-size:12px;color:#444">
+          <span>Monto: <b>$${money(loan.principal)}</b></span>
+          <span>Abonado: <b>$${money(Number(loan.principal) - Number(loan.outstanding))}</b></span>
+          <span>Saldo pendiente: <b>$${money(loan.outstanding)}</b></span>
+        </div>
+        <div style="font-size:11px;color:#777;margin-top:6px">Fecha: ${dateText(loan.issued_at)} · Registrado por: ${escapeHtml(loan.recorded_by_name || (loan.created_by ? 'Admin #' + loan.created_by : '—'))}</div>
+        ${payments.length ? `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:11px;color:#555">Historial de ${payments.length} abono(s)</summary><ul style="margin:7px 0 0 18px;font-size:11px;color:#555">${payments.map((payment) => `<li>$${money(payment.amount)} · ${dateText(payment.paid_at)} · Registró: ${escapeHtml(payment.recorded_by_name || (payment.created_by ? 'Admin #' + payment.created_by : '—'))}</li>`).join('')}</ul></details>` : '<div style="font-size:11px;color:#777;margin-top:7px">Todavía no hay abonos registrados.</div>'}
+      </article>`;
+    }).join('');
+  }
+
+  async function loadUserLoans() {
+    const list = document.getElementById('apexUserLoansList');
+    if (!list || loading) return;
+    const currentToken = token();
+    if (!currentToken) {
+      showMessage('Inicia sesión para consultar tus préstamos.', false);
+      return;
+    }
+    if (!apiBase) {
+      loanDataKnown = true;
+      confirmedHasLoans = true;
+      updateActivityVisibility();
+      showMessage('No se encontró la URL del servicio.', true);
+      return;
+    }
+
+    loading = true;
+    try {
+      const response = await fetch(apiBase + '/api/me/loans?t=' + Date.now(), {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { Authorization: 'Bearer ' + currentToken, Accept: 'application/json' }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = data.error
+          ? `${data.error}${data.code ? ` (${data.code})` : ''}`
+          : `Error HTTP ${response.status}`;
+        throw new Error(response.status >= 500
+          ? `${detail}. El backend respondió HTTP ${response.status}; la causa concreta debe aparecer en los logs de Render bajo APEX_LOANS_LOAD_FAILED.`
+          : detail);
+      }
+      render(data);
+    } catch (error) {
+      loanDataKnown = true;
+      confirmedHasLoans = true;
+      updateActivityVisibility();
+      showMessage(error.message || 'No se pudieron cargar tus préstamos.', true);
+    } finally {
+      loading = false;
+    }
+  }
+
+  function openLoansActivity() {
+    const grid = document.getElementById('actividadesGrid');
+    const card = document.getElementById('apexUserLoansCard');
+    if (grid) grid.style.display = 'none';
+    if (card) {
+      card.style.display = 'block';
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    loadUserLoans();
+  }
+
+  function closeLoansActivity() {
+    const grid = document.getElementById('actividadesGrid');
+    const card = document.getElementById('apexUserLoansCard');
+    if (card) card.style.display = 'none';
+    if (grid) grid.style.display = '';
+    loadUserLoans();
+  }
+
+  function installLoansActivity() {
+    const baseRender = window.renderActividades;
+    if (typeof baseRender === 'function' && !baseRender.__apexLoansActivity) {
+      const wrappedRender = function () {
+        const result = baseRender.apply(this, arguments);
+        const grid = document.getElementById('actividadesGrid');
+        if (grid && !grid.querySelector('[data-apex-loans-activity]')) {
+          grid.insertAdjacentHTML('beforeend', '<div class="actividad-card" data-apex-loans-activity style="display:none" onclick="apexOpenUserLoansActivity()"><span class="badge-prox">Consultar</span><span class="icono">💳</span><div class="nombre">Mis préstamos</div><div class="desc">Consulta tus abonos y deuda pendiente</div><div class="estado">Ver estado</div></div>');
+        }
+        updateActivityVisibility();
+        return result;
+      };
+      wrappedRender.__apexLoansActivity = true;
+      window.renderActividades = wrappedRender;
+    }
+
+    const baseSwitchTab = window.switchTab;
+    if (typeof baseSwitchTab === 'function' && !baseSwitchTab.__apexLoansActivity) {
+      const wrappedSwitchTab = function () {
+        const result = baseSwitchTab.apply(this, arguments);
+        if (arguments[0] === 'actividades') closeLoansActivity();
+        return result;
+      };
+      wrappedSwitchTab.__apexLoansActivity = true;
+      window.switchTab = wrappedSwitchTab;
+    }
+
+    window.apexOpenUserLoansActivity = openLoansActivity;
+    window.apexCloseUserLoansActivity = closeLoansActivity;
+  }
+
+  installLoansActivity();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadUserLoans, { once: true });
+  else loadUserLoans();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) loadUserLoans(); });
+  window.addEventListener('focus', loadUserLoans);
+  window.setInterval(() => { if (!document.hidden) loadUserLoans(); }, 10000);
+})();
+
 </script>
