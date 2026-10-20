@@ -3005,8 +3005,15 @@ app.get('/api/me/loans', authenticate, async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error cargando préstamos del usuario:', error.message);
-        res.status(500).json({ error: 'No se pudieron cargar tus préstamos' });
+        console.error('[APEX_LOANS_LOAD_FAILED]', {
+            userId: req.userId,
+            code: error.code || null,
+            message: error.message,
+            detail: error.detail || null,
+            table: error.table || null,
+            constraint: error.constraint || null
+        });
+        res.status(500).json({ error: 'No se pudieron cargar tus préstamos', code: 'APEX_LOANS_LOAD_FAILED' });
     }
 });
 

@@ -330,11 +330,17 @@
 
   function init() {
     ensureModal();
+    const baseRenderUsers = window.renderUsuarios;
+    if (typeof baseRenderUsers === 'function' && !baseRenderUsers.__apexLoanActions) {
+      const wrappedRenderUsers = function () {
+        const result = baseRenderUsers.apply(this, arguments);
+        enhanceUsersTable();
+        return result;
+      };
+      wrappedRenderUsers.__apexLoanActions = true;
+      window.renderUsuarios = wrappedRenderUsers;
+    }
     enhanceUsersTable();
-    const usersBody = document.getElementById('usersTableBody');
-    // Observe only direct row insertions. Subtree observation re-triggered forever when
-    // this module formatted the debt cell, freezing the original admin interface.
-    if (usersBody && window.MutationObserver) new MutationObserver(enhanceUsersTable).observe(usersBody, { childList: true });
   }
 
   window.apexOpenLoansForUser = openForUser;
