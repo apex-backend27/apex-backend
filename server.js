@@ -321,7 +321,25 @@ async function ensureApexLoanSchema() {
             idempotency_key TEXT,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`);
+        // Bring forward tables created by earlier loan-module versions. CREATE TABLE
+        // IF NOT EXISTS does not add columns to an already-existing table.
+        await pool.query('ALTER TABLE apex_loans ADD COLUMN IF NOT EXISTS user_id INTEGER');
+        await pool.query('ALTER TABLE apex_loans ADD COLUMN IF NOT EXISTS principal NUMERIC(18,6)');
+        await pool.query('ALTER TABLE apex_loans ADD COLUMN IF NOT EXISTS outstanding NUMERIC(18,6)');
+        await pool.query("ALTER TABLE apex_loans ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'pendiente'");
+        await pool.query('ALTER TABLE apex_loans ADD COLUMN IF NOT EXISTS issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW()');
+        await pool.query('ALTER TABLE apex_loans ADD COLUMN IF NOT EXISTS created_by INTEGER');
+        await pool.query('ALTER TABLE apex_loans ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()');
+        await pool.query('ALTER TABLE apex_loans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()');
+        await pool.query('ALTER TABLE apex_loan_payments ADD COLUMN IF NOT EXISTS loan_id BIGINT');
+        await pool.query('ALTER TABLE apex_loan_payments ADD COLUMN IF NOT EXISTS user_id INTEGER');
+        await pool.query('ALTER TABLE apex_loan_payments ADD COLUMN IF NOT EXISTS amount NUMERIC(18,6)');
+        await pool.query('ALTER TABLE apex_loan_payments ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW()');
+        await pool.query('ALTER TABLE apex_loan_payments ADD COLUMN IF NOT EXISTS created_by INTEGER');
+        await pool.query('ALTER TABLE apex_loan_payments ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()');
         await pool.query('ALTER TABLE apex_loan_payments ADD COLUMN IF NOT EXISTS idempotency_key TEXT');
+        await pool.query(`UPDATE apex_loan_payments p SET user_id = l.user_id
+            FROM apex_loans l WHERE p.loan_id = l.id AND p.user_id IS NULL`);
         await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loans_user ON apex_loans(user_id, issued_at DESC)');
         await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loan_payments_loan ON apex_loan_payments(loan_id, paid_at DESC)');
         await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_apex_loan_payments_idempotency ON apex_loan_payments(idempotency_key) WHERE idempotency_key IS NOT NULL');
