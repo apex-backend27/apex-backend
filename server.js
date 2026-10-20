@@ -244,6 +244,7 @@ function permisoRequeridoParaRuta(req) {
     if (/config|catalog|code|codigo/i.test(path)) return 'configuracion';
     if (/activ|premio|logro|cupon/i.test(path)) return 'actividades';
     if (/refer/i.test(path)) return 'referidos';
+    if (/loan|prestam|abono|payment/i.test(path)) return 'usuarios';
     if (/user|usuario/i.test(path)) return 'usuarios';
     return null;
 }
@@ -292,6 +293,42 @@ const pool = new Pool({
   statement_timeout: 15000,
   idle_in_transaction_session_timeout: 30000
 });
+let apexLoanSchemaReady = false;
+let apexLoanSchemaInFlight = null;
+async function ensureApexLoanSchema() {
+    if (apexLoanSchemaReady) return;
+    if (apexLoanSchemaInFlight) return apexLoanSchemaInFlight;
+    apexLoanSchemaInFlight = (async () => {
+        await pool.query(`CREATE TABLE IF NOT EXISTS apex_loans (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            principal NUMERIC(18,6) NOT NULL CHECK (principal > 0),
+            outstanding NUMERIC(18,6) NOT NULL CHECK (outstanding >= 0),
+            status VARCHAR(16) NOT NULL DEFAULT 'pendiente'
+                CHECK (status IN ('pendiente','pagado')),
+            issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS apex_loan_payments (
+            id BIGSERIAL PRIMARY KEY,
+            loan_id BIGINT NOT NULL REFERENCES apex_loans(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            amount NUMERIC(18,6) NOT NULL CHECK (amount > 0),
+            paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            created_by INTEGER REFERENCES users(id),
+            idempotency_key TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await pool.query('ALTER TABLE apex_loan_payments ADD COLUMN IF NOT EXISTS idempotency_key TEXT');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loans_user ON apex_loans(user_id, issued_at DESC)');
+        await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loan_payments_loan ON apex_loan_payments(loan_id, paid_at DESC)');
+        await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS uq_apex_loan_payments_idempotency ON apex_loan_payments(idempotency_key) WHERE idempotency_key IS NOT NULL');
+        apexLoanSchemaReady = true;
+    })().finally(() => { apexLoanSchemaInFlight = null; });
+    return apexLoanSchemaInFlight;
+}
 const REFERIDO_CARACTERES = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function generarCandidatoCodigoReferido() {
     const bytes = randomBytes(6);
@@ -1247,7 +1284,7 @@ app.put('/api/user/update', async (req, res) => {
                 'referidos_directos', 'fechas_invito',
                 'historial_codigos', 'descuentoRetiroActivo', 'bonusReferidoActivo',
                 'direccion_retiro', 'password_retiro',
-                'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado', 'es_admin', 'es_super_admin'
+                'cuenta_habilitada', 'produccion_pausada', 'nivel_autorizado'
             ];
             
             if (camposPermitidos.includes(key)) {
@@ -1977,7 +2014,18 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
             return res.status(403).json({ error: 'Acceso denegado' });
         }
         
-        const result = await pool.query('SELECT * FROM users ORDER BY id ASC');
+        await ensureApexLoanSchema();
+        const result = await pool.query(`
+            SELECT u.*, COALESCE(l.deuda_pendiente, 0)::numeric AS deuda_pendiente
+            FROM users u
+            LEFT JOIN (
+                SELECT user_id, SUM(outstanding) AS deuda_pendiente
+                FROM apex_loans
+                WHERE outstanding > 0
+                GROUP BY user_id
+            ) l ON l.user_id = u.id
+            ORDER BY u.id ASC
+        `);
         res.json(result.rows);
         
     } catch (error) {
@@ -2670,6 +2718,296 @@ app.post('/api/user/achievements/claim', authenticate, async (req,res)=>{
   const logroId=String(req.body?.logroId||req.body?.id||'').trim(); if(!logroId)return res.status(400).json({error:'Logro requerido'});
   const client=await pool.connect();
   try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],assigned=Array.isArray(u.logros_asignados)?u.logros_asignados:[],index=assigned.findIndex(x=>String(x?.id??x?.logroId??x?.logro_id??x)===logroId);if(index<0)throw new Error('Logro no encontrado');const logro=typeof assigned[index]==='object'?{...assigned[index]}:{id:logroId},reclaimed=Array.isArray(u.logros_reclamados)?u.logros_reclamados:[];if(logro.reclamado||reclaimed.some(x=>String(typeof x==='object'?(x.id||x.logroId):x)===logroId))throw new Error('Este logro ya fue reclamado');const tipo=String(logro.tipo||'').toLowerCase(),isPlan=tipo==='plan'||/tener\s*plan/i.test(String(logro.nombre||'')),completed=['completado','completada','completed'].includes(String(logro.estado||'').toLowerCase())||logro.completado===true||isPlan&&u.plan&&!/^sin[_ ]?plan$/i.test(String(u.plan));if(!completed)throw new Error('El logro aún no está completado');const reward=Math.max(0,Number(logro.recompensa??logro.cantidad??logro.premio??0)||0);if(reward<=0)throw new Error('El logro no tiene recompensa válida');const rewardType=String(logro.recompensa_tipo||logro.tipo_recompensa||'puntos').toLowerCase(),liquidacion=rewardType==='usdt'?liquidarRecompensaUSDT(reward):{montoBruto:0,comision:0,montoNeto:0},neto=rewardType==='usdt'?liquidacion.montoNeto:0,pts=rewardType==='usdt'?0:Math.floor(reward),now=new Date().toISOString();logro.estado='reclamado';logro.reclamado=true;logro.reclamadoEn=now;assigned[index]=logro;const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,DATE '1900-01-01')<DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END,ganado_semanal_inicio=DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date,logros_asignados=$3::jsonb,logros_reclamados=$4::jsonb WHERE id=$5 RETURNING *`,[neto,pts,JSON.stringify(assigned),JSON.stringify(reclaimed.concat({id:logroId,nombre:logro.nombre||'',recompensa:reward,montoNeto:neto,comision:liquidacion.comision,recompensa_tipo:rewardType,fecha:now})),req.userId]);const item={tipo:'logro',concepto:rewardType==='usdt'?`Recompensa de logro: ${logro.nombre||logroId} · ${reward.toFixed(2)} - 23% = ${neto.toFixed(2)} USDT`:`Recompensa de logro: ${logro.nombre||logroId}`,monto:neto,montoBruto:liquidacion.montoBruto,comision:liquidacion.comision,porcentajeComision:rewardType==='usdt'?APEX_REWARD_COMMISSION_PERCENT:0,puntos:pts,fecha:now,estado:'acreditado'};const row=out.rows[0],hist=Array.isArray(row.historial_detallado)?row.historial_detallado:[],saved=await client.query('UPDATE users SET historial_detallado=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(hist.concat(item)),req.userId]);await client.query('COMMIT');res.json({message:'Recompensa reclamada',premio:reward,montoNeto:neto,comision:liquidacion.comision,tipo_recompensa:rewardType,user:publicUserData(saved.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('achievement claim',e);res.status(400).json({error:e.message||'No se pudo reclamar el logro'});}finally{client.release();}
+});
+
+function validarMontoPrestamo(value) {
+    const raw = String(value ?? '').trim();
+    if (!/^\d+(?:\.\d{1,6})?$/.test(raw)) return null;
+    if ((raw.split('.')[0].replace(/^0+/, '') || '0').length > 12) return null;
+    const amount = Number(raw);
+    return Number.isFinite(amount) && amount > 0 ? raw : null;
+}
+
+async function apexObtenerPrestamosUsuario(userId, db = pool) {
+    await ensureApexLoanSchema();
+    const loansResult = await db.query(`
+        SELECT l.id, l.user_id, l.principal, l.outstanding, l.status, l.issued_at,
+               l.created_at, l.created_by,
+               NULLIF(CONCAT_WS(' ', admin.nombre, admin.apellido), '') AS recorded_by_name
+        FROM apex_loans l
+        LEFT JOIN users admin ON admin.id = l.created_by
+        WHERE l.user_id = $1
+        ORDER BY l.issued_at DESC, l.id DESC
+    `, [userId]);
+    const paymentsResult = await db.query(`
+        SELECT p.id, p.loan_id, p.amount, p.paid_at, p.created_by,
+               NULLIF(CONCAT_WS(' ', admin.nombre, admin.apellido), '') AS recorded_by_name
+        FROM apex_loan_payments p
+        LEFT JOIN users admin ON admin.id = p.created_by
+        WHERE p.user_id = $1
+        ORDER BY p.paid_at DESC, p.id DESC
+    `, [userId]);
+    const paymentsByLoan = new Map();
+    for (const payment of paymentsResult.rows) {
+        const key = String(payment.loan_id);
+        if (!paymentsByLoan.has(key)) paymentsByLoan.set(key, []);
+        paymentsByLoan.get(key).push({
+            id: payment.id,
+            amount: Number(payment.amount),
+            paid_at: payment.paid_at,
+            created_by: payment.created_by,
+            recorded_by_name: payment.recorded_by_name || null
+        });
+    }
+    return loansResult.rows.map(loan => ({
+        id: loan.id,
+        user_id: loan.user_id,
+        principal: Number(loan.principal),
+        outstanding: Number(loan.outstanding),
+        status: loan.status,
+        issued_at: loan.issued_at,
+        created_at: loan.created_at,
+        created_by: loan.created_by,
+        recorded_by_name: loan.recorded_by_name || null,
+        payments: paymentsByLoan.get(String(loan.id)) || []
+    }));
+}
+
+app.get('/api/admin/loans/users', authenticate, isAdmin, async (req, res) => {
+    try {
+        await ensureApexLoanSchema();
+        const search = String(req.query.search || '').trim().slice(0, 100);
+        const pattern = `%${search}%`;
+        const result = await pool.query(`
+            SELECT id, nombre, apellido, telefono
+            FROM users
+            WHERE $1 = '' OR id::text ILIKE $2
+               OR COALESCE(telefono, '') ILIKE $2
+               OR CONCAT_WS(' ', nombre, apellido) ILIKE $2
+            ORDER BY id DESC
+            LIMIT 100
+        `, [search, pattern]);
+        res.json({ users: result.rows });
+    } catch (error) {
+        console.error('Error buscando usuarios para préstamos:', error.message);
+        res.status(500).json({ error: 'No se pudieron cargar los usuarios' });
+    }
+});
+
+app.get('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => {
+    try {
+        const userId = String(req.params.id || '');
+        if (!/^\d+$/.test(userId)) return res.status(400).json({ error: 'ID de usuario inválido' });
+        await ensureApexLoanSchema();
+        const userResult = await pool.query(
+            'SELECT id, nombre, apellido, telefono, balance FROM users WHERE id = $1', [userId]
+        );
+        if (!userResult.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const loans = await apexObtenerPrestamosUsuario(userId);
+        const totals = await pool.query(`
+            SELECT COALESCE(SUM(principal), 0) AS principal,
+                   COALESCE(SUM(principal - outstanding), 0) AS abonado,
+                   COALESCE(SUM(outstanding), 0) AS pendiente
+            FROM apex_loans WHERE user_id = $1
+        `, [userId]);
+        const row = userResult.rows[0];
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            user: { ...row, balance: Number(row.balance || 0) },
+            loans,
+            summary: {
+                principal: Number(totals.rows[0].principal),
+                abonado: Number(totals.rows[0].abonado),
+                pendiente: Number(totals.rows[0].pendiente)
+            }
+        });
+    } catch (error) {
+        console.error('Error cargando préstamos del usuario:', error.message);
+        res.status(500).json({ error: 'No se pudieron cargar los préstamos' });
+    }
+});
+
+app.post('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => {
+    const userId = String(req.params.id || '');
+    const principal = validarMontoPrestamo(req.body?.amount);
+    if (!/^\d+$/.test(userId)) return res.status(400).json({ error: 'ID de usuario inválido' });
+    if (!principal) return res.status(400).json({ error: 'Ingresa un monto mayor que cero, con hasta 6 decimales' });
+    let issuedAt = new Date();
+    if (req.body?.issuedAt) {
+        const suppliedDate = String(req.body.issuedAt).trim();
+        issuedAt = /^\d{4}-\d{2}-\d{2}$/.test(suppliedDate)
+            ? new Date(`${suppliedDate}T12:00:00.000Z`)
+            : new Date(suppliedDate);
+        if (Number.isNaN(issuedAt.getTime())) return res.status(400).json({ error: 'Fecha del préstamo inválida' });
+    }
+    const client = await pool.connect();
+    try {
+        await ensureApexLoanSchema();
+        await client.query('BEGIN');
+        const userResult = await client.query(
+            'SELECT id, balance FROM users WHERE id = $1 FOR UPDATE', [userId]
+        );
+        if (!userResult.rows.length) {
+            const error = new Error('Usuario no encontrado'); error.status = 404; throw error;
+        }
+        const loanResult = await client.query(`
+            INSERT INTO apex_loans (user_id, principal, outstanding, issued_at, created_by)
+            VALUES ($1, $2::numeric, $2::numeric, $3, $4)
+            RETURNING id, user_id, principal, outstanding, status, issued_at, created_at, created_by
+        `, [userId, principal, issuedAt, req.userId]);
+        const balanceResult = await client.query(`
+            UPDATE users SET balance = COALESCE(balance, 0) + $1::numeric
+            WHERE id = $2
+            RETURNING balance
+        `, [principal, userId]);
+        await client.query('COMMIT');
+        const loan = loanResult.rows[0];
+        res.status(201).json({
+            message: 'Préstamo registrado y acreditado al balance del usuario',
+            loan: { ...loan, principal: Number(loan.principal), outstanding: Number(loan.outstanding) },
+            user: { id: Number(userId), balance: Number(balanceResult.rows[0].balance) }
+        });
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        const status = error.status || 500;
+        if (status === 500) console.error('Error registrando préstamo:', error.message);
+        res.status(status).json({ error: status === 500 ? 'No se pudo registrar el préstamo' : error.message });
+    } finally {
+        client.release();
+    }
+});
+
+app.post('/api/admin/loans/:loanId/payments', authenticate, isAdmin, async (req, res) => {
+    const loanId = String(req.params.loanId || '');
+    const amount = validarMontoPrestamo(req.body?.amount);
+    const idempotencyKey = String(req.body?.idempotencyKey || '').trim();
+    if (!/^\d+$/.test(loanId)) return res.status(400).json({ error: 'ID de préstamo inválido' });
+    if (!amount) return res.status(400).json({ error: 'Ingresa un abono mayor que cero, con hasta 6 decimales' });
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
+        return res.status(400).json({ error: 'No se recibió una clave válida para evitar abonos duplicados' });
+    }
+    const client = await pool.connect();
+    try {
+        await ensureApexLoanSchema();
+        await client.query('BEGIN');
+        const locked = await client.query(
+            'SELECT id, user_id, principal, outstanding, status FROM apex_loans WHERE id = $1 FOR UPDATE',
+            [loanId]
+        );
+        if (!locked.rows.length) {
+            const error = new Error('Préstamo no encontrado'); error.status = 404; throw error;
+        }
+        const loan = locked.rows[0];
+        const priorPayment = await client.query(
+            'SELECT id, loan_id, user_id, amount, paid_at, created_by FROM apex_loan_payments WHERE idempotency_key = $1',
+            [idempotencyKey]
+        );
+        if (priorPayment.rows.length) {
+            const prior = priorPayment.rows[0];
+            const sameAmountResult = await client.query(
+                'SELECT $1::numeric = $2::numeric AS same_amount', [prior.amount, amount]
+            );
+            const sameRequest = String(prior.loan_id) === String(loanId)
+                && String(prior.user_id) === String(loan.user_id)
+                && sameAmountResult.rows[0].same_amount;
+            if (!sameRequest) {
+                const error = new Error('La clave de operación ya fue usada para otro abono'); error.status = 409; throw error;
+            }
+            const user = await client.query('SELECT balance FROM users WHERE id = $1', [loan.user_id]);
+            await client.query('COMMIT');
+            return res.status(200).json({
+                message: 'Este abono ya había sido registrado',
+                idempotent: true,
+                payment: { ...prior, amount: Number(prior.amount) },
+                loan: { ...loan, principal: Number(loan.principal), outstanding: Number(loan.outstanding) },
+                user: { id: Number(loan.user_id), balance: Number(user.rows[0]?.balance || 0) }
+            });
+        }
+        if (loan.status === 'pagado' || Number(loan.outstanding) <= 0) {
+            const error = new Error('Este préstamo ya está pagado'); error.status = 400; throw error;
+        }
+        const userResult = await client.query(
+            'SELECT id, balance FROM users WHERE id = $1 FOR UPDATE', [loan.user_id]
+        );
+        if (!userResult.rows.length) {
+            const error = new Error('No se encontró el usuario asociado al préstamo'); error.status = 404; throw error;
+        }
+        const checks = await client.query(`
+            SELECT $1::numeric <= $2::numeric AS within_debt,
+                   $1::numeric <= COALESCE($3::numeric, 0) AS within_balance
+        `, [amount, loan.outstanding, userResult.rows[0].balance]);
+        if (!checks.rows[0].within_debt) {
+            const error = new Error('El abono supera la deuda pendiente de este préstamo'); error.status = 400; throw error;
+        }
+        if (!checks.rows[0].within_balance) {
+            const error = new Error('El balance disponible del usuario no alcanza para este abono'); error.status = 400; throw error;
+        }
+        const paymentResult = await client.query(`
+            INSERT INTO apex_loan_payments (loan_id, user_id, amount, created_by, idempotency_key)
+            VALUES ($1, $2, $3::numeric, $4, $5)
+            RETURNING id, loan_id, user_id, amount, paid_at, created_by
+        `, [loanId, loan.user_id, amount, req.userId, idempotencyKey]);
+        const updatedLoan = await client.query(`
+            UPDATE apex_loans
+            SET outstanding = outstanding - $1::numeric,
+                status = CASE WHEN outstanding - $1::numeric = 0 THEN 'pagado' ELSE 'pendiente' END,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING id, user_id, principal, outstanding, status, issued_at, created_at, created_by
+        `, [amount, loanId]);
+        const updatedUser = await client.query(`
+            UPDATE users SET balance = balance - $1::numeric
+            WHERE id = $2 AND COALESCE(balance, 0) >= $1::numeric
+            RETURNING balance
+        `, [amount, loan.user_id]);
+        if (!updatedUser.rows.length) {
+            const error = new Error('El balance cambió durante la operación; vuelve a consultar el saldo'); error.status = 409; throw error;
+        }
+        await client.query('COMMIT');
+        const saved = updatedLoan.rows[0];
+        res.status(201).json({
+            message: 'Abono registrado; se descontó del balance y de la deuda pendiente',
+            payment: { ...paymentResult.rows[0], amount: Number(paymentResult.rows[0].amount) },
+            loan: { ...saved, principal: Number(saved.principal), outstanding: Number(saved.outstanding) },
+            user: { id: Number(loan.user_id), balance: Number(updatedUser.rows[0].balance) }
+        });
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch (_) {}
+        const status = error.status || 500;
+        if (status === 500) console.error('Error registrando abono:', error.message);
+        res.status(status).json({ error: status === 500 ? 'No se pudo registrar el abono' : error.message });
+    } finally {
+        client.release();
+    }
+});
+
+app.get('/api/me/loans', authenticate, async (req, res) => {
+    try {
+        await ensureApexLoanSchema();
+        const [loans, totals, userResult] = await Promise.all([
+            apexObtenerPrestamosUsuario(req.userId),
+            pool.query(`
+                SELECT COALESCE(SUM(principal), 0) AS principal,
+                       COALESCE(SUM(principal - outstanding), 0) AS abonado,
+                       COALESCE(SUM(outstanding), 0) AS pendiente
+                FROM apex_loans WHERE user_id = $1
+            `, [req.userId]),
+            pool.query('SELECT balance FROM users WHERE id = $1', [req.userId])
+        ]);
+        res.set('Cache-Control', 'no-store');
+        res.json({
+            balance: Number(userResult.rows[0]?.balance || 0),
+            loans,
+            summary: {
+                principal: Number(totals.rows[0].principal),
+                abonado: Number(totals.rows[0].abonado),
+                pendiente: Number(totals.rows[0].pendiente)
+            }
+        });
+    } catch (error) {
+        console.error('Error cargando préstamos del usuario:', error.message);
+        res.status(500).json({ error: 'No se pudieron cargar tus préstamos' });
+    }
 });
 
 app.listen(port, '0.0.0.0', () => {
