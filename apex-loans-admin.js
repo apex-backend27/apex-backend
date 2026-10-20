@@ -12,6 +12,7 @@
   };
   let activeMode = 'history';
   let currentUserId = '';
+  let modal;
 
   async function api(path, options) {
     if (!apiBase) throw new Error('No se encontró la URL de la API.');
@@ -20,24 +21,92 @@
     const response = await fetch(apiBase + path, {
       cache: 'no-store',
       ...(options || {}),
-      headers: {
-        Accept: 'application/json',
-        ...(options && options.headers ? options.headers : {}),
-        Authorization: 'Bearer ' + currentToken
-      }
+      headers: { Accept: 'application/json', ...(options && options.headers ? options.headers : {}), Authorization: 'Bearer ' + currentToken }
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error || 'No se pudo completar la solicitud.');
     return body;
   }
 
+  function ensureModal() {
+    if (modal && modal.isConnected) return modal;
+    modal = document.createElement('div');
+    modal.id = 'apexLoanModal';
+    modal.className = 'modal-overlay';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'apexLoanModalTitle');
+    modal.style.zIndex = '5000';
+    modal.innerHTML = `<div class="modal" style="max-width:820px;width:min(820px,96vw);padding:0;overflow:hidden;max-height:92vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #edf0f4;background:#fff;position:sticky;top:0;z-index:2">
+        <div><div id="apexLoanModalTitle" style="font-size:18px;font-weight:800;color:#172033">Préstamos del usuario</div><div id="apexLoanModalUser" style="font-size:12px;color:#718096;margin-top:3px">Gestiona préstamo, abono e historial</div></div>
+        <button type="button" id="apexLoanModalClose" aria-label="Cerrar" style="width:36px;height:36px;border:0;border-radius:50%;background:#f1f3f6;color:#555;font-size:23px;cursor:pointer">×</button>
+      </div>
+      <div style="padding:16px 20px;overflow:auto">
+        <div id="apexLoanSearchArea" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+          <input id="apexLoanSearch" type="search" placeholder="Buscar usuario por nombre, teléfono o ID" style="flex:1;min-width:220px;padding:10px 12px;border:1px solid #dce2ea;border-radius:9px;font-size:13px">
+          <button id="apexLoanSearchButton" type="button" class="btn btn-secondary" style="padding:10px 14px;border:1px solid #dce2ea;border-radius:9px">Buscar</button>
+          <select id="apexLoanUserSelect" aria-label="Seleccionar usuario" style="flex:1;min-width:220px;padding:10px;border:1px solid #dce2ea;border-radius:9px"><option value="">Selecciona un usuario…</option></select>
+        </div>
+        <div id="apexLoanNotice" role="status" aria-live="polite" style="display:none"></div>
+        <div id="apexLoanWorkspace"><p style="color:#777;text-align:center;padding:18px">Cargando datos del usuario…</p></div>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#apexLoanModalClose').addEventListener('click', closeModal);
+    modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
+    modal.querySelector('#apexLoanSearchButton').addEventListener('click', searchUsers);
+    modal.querySelector('#apexLoanSearch').addEventListener('input', (event) => {
+      if (event.target.value.trim() !== String(currentUserId)) currentUserId = '';
+    });
+    modal.querySelector('#apexLoanSearch').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') { event.preventDefault(); searchUsers(); }
+    });
+    modal.querySelector('#apexLoanUserSelect').addEventListener('change', (event) => {
+      currentUserId = event.target.value;
+      activeMode = 'history';
+      if (currentUserId) loadUserLoans(currentUserId);
+    });
+    const workspace = modal.querySelector('#apexLoanWorkspace');
+    workspace.addEventListener('click', (event) => {
+      const button = event.target.closest('.apex-loan-mode');
+      if (button) { activeMode = button.dataset.mode; loadUserLoans(currentUserId); }
+    });
+    workspace.addEventListener('input', (event) => {
+      if (event.target.name === 'amount') {
+        const key = event.target.closest('form')?.querySelector('[name="idempotencyKey"]');
+        if (key) key.value = '';
+      }
+    });
+    workspace.addEventListener('change', (event) => {
+      if (event.target.name === 'loanId') {
+        const key = event.target.closest('form')?.querySelector('[name="idempotencyKey"]');
+        if (key) key.value = '';
+      }
+    });
+    workspace.addEventListener('submit', async (event) => {
+      const form = event.target.closest('form');
+      if (!form) return;
+      event.preventDefault();
+      try {
+        if (form.id === 'apexLoanCreateForm') await submitLoanForm(form);
+        if (form.id === 'apexLoanPaymentForm') await submitPaymentForm(form);
+      } catch (error) { notice(error.message, 'error'); }
+    });
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal.classList.contains('show')) closeModal(); });
+    return modal;
+  }
+
+  function closeModal() {
+    if (modal) modal.classList.remove('show');
+  }
+
   function notice(message, kind) {
-    const node = document.getElementById('apexLoanNotice');
-    if (!node) return;
+    const node = ensureModal().querySelector('#apexLoanNotice');
     node.textContent = message || '';
     node.style.display = message ? 'block' : 'none';
     node.style.padding = message ? '10px 12px' : '0';
-    node.style.marginTop = message ? '12px' : '0';
+    node.style.margin = message ? '0 0 12px' : '0';
     node.style.borderRadius = '8px';
     node.style.background = kind === 'error' ? '#ffebee' : kind === 'success' ? '#e8f5e9' : '#e3f2fd';
     node.style.color = kind === 'error' ? '#b71c1c' : kind === 'success' ? '#1b5e20' : '#0d47a1';
@@ -50,26 +119,25 @@
 
   async function refreshAdminUsers() {
     try {
-      const result = await api('/api/admin/users');
-      const users = Array.isArray(result) ? result : [];
+      const users = await api('/api/admin/users');
       const storageKey = (typeof STORAGE_KEY !== 'undefined' && STORAGE_KEY) || 'apex_users';
       localStorage.setItem(storageKey, JSON.stringify(users));
-      sessionStorage.setItem(storageKey, JSON.stringify(users));
       if (typeof usuariosCache !== 'undefined') usuariosCache = users;
       if (typeof window.renderUsuarios === 'function') window.renderUsuarios();
     } catch (error) {
-      console.warn('No se pudo refrescar la tabla después del préstamo:', error.message);
+      console.warn('No se pudo actualizar la tabla de usuarios después del movimiento:', error.message);
     }
   }
 
   async function searchUsers() {
-    const select = document.getElementById('apexLoanUserSelect');
-    const search = document.getElementById('apexLoanSearch');
-    if (!select || !search) return;
-    const previous = select.value || currentUserId;
+    const root = ensureModal();
+    const select = root.querySelector('#apexLoanUserSelect');
+    const search = root.querySelector('#apexLoanSearch');
+    const requestedUserId = currentUserId;
+    const searchText = search.value.trim();
     select.innerHTML = '<option value="">Cargando usuarios…</option>';
     try {
-      const data = await api('/api/admin/loans/users?search=' + encodeURIComponent(search.value.trim()));
+      const data = await api('/api/admin/loans/users?search=' + encodeURIComponent(searchText));
       select.innerHTML = '<option value="">Selecciona un usuario…</option>';
       (data.users || []).forEach((user) => {
         const option = document.createElement('option');
@@ -77,13 +145,14 @@
         option.textContent = userLabel(user);
         select.appendChild(option);
       });
-      if (previous && Array.from(select.options).some((option) => option.value === String(previous))) {
-        select.value = String(previous);
-        currentUserId = select.value;
-        await loadUserLoans(select.value);
+      const match = (data.users || []).find((user) => String(user.id) === String(requestedUserId));
+      if (match) {
+        select.value = String(match.id);
+        currentUserId = String(match.id);
+        await loadUserLoans(currentUserId);
       } else {
-        const workspace = document.getElementById('apexLoanWorkspace');
-        if (workspace) workspace.innerHTML = '<p style="color:#777;text-align:center;padding:18px">Selecciona un usuario para consultar o registrar sus préstamos.</p>';
+        currentUserId = '';
+        root.querySelector('#apexLoanWorkspace').innerHTML = '<p style="color:#777;text-align:center;padding:18px">Selecciona un usuario para consultar o gestionar sus préstamos.</p>';
       }
       notice((data.users || []).length ? '' : 'No se encontraron usuarios con esa búsqueda.', 'info');
     } catch (error) {
@@ -93,12 +162,15 @@
   }
 
   async function loadUserLoans(userId) {
-    const workspace = document.getElementById('apexLoanWorkspace');
+    const root = ensureModal();
+    const workspace = root.querySelector('#apexLoanWorkspace');
     if (!workspace || !userId) return;
     currentUserId = String(userId);
     workspace.innerHTML = '<p style="color:#777;text-align:center;padding:18px">Cargando préstamos…</p>';
     try {
       const data = await api('/api/admin/user/' + encodeURIComponent(userId) + '/loans');
+      const user = data.user || {};
+      root.querySelector('#apexLoanModalUser').textContent = `${[user.nombre, user.apellido].filter(Boolean).join(' ') || 'Usuario'} · ${user.telefono || 'ID ' + user.id}`;
       renderUserLoans(data);
       notice('', 'info');
     } catch (error) {
@@ -113,8 +185,7 @@
   }
 
   function renderUserLoans(data) {
-    const workspace = document.getElementById('apexLoanWorkspace');
-    if (!workspace) return;
+    const workspace = ensureModal().querySelector('#apexLoanWorkspace');
     const user = data.user || {};
     const summary = data.summary || {};
     const loans = Array.isArray(data.loans) ? data.loans : [];
@@ -144,7 +215,7 @@
         <label style="font-size:11px;color:#555;min-width:230px">Préstamo al que se aplica el abono<select name="loanId" required style="display:block;padding:9px;border:1px solid #ddd;border-radius:8px;width:100%;margin-top:4px">${activeLoans.map((loan) => `<option value="${escapeHtml(loan.id)}" data-outstanding="${Number(loan.outstanding)}">#${escapeHtml(loan.id)} · Debe $${money(loan.outstanding)}</option>`).join('')}</select></label>
         <label style="font-size:11px;color:#555">Monto del abono<input name="amount" type="number" min="0.000001" step="0.000001" required placeholder="0.00" style="display:block;padding:9px;border:1px solid #ddd;border-radius:8px;width:190px"></label>
         <button type="submit" class="btn btn-primary">Confirmar abono</button>
-        <div style="flex-basis:100%;font-size:11px;color:#666">Balance disponible: <b>$${money(user.balance)}</b>. El sistema rechazará abonos mayores que el balance o la deuda elegida.</div>
+        <div style="flex-basis:100%;font-size:11px;color:#666">Balance disponible: <b>$${money(user.balance)}</b>. El abono no puede superar el balance ni la deuda del préstamo elegido.</div>
       </form>` : '<div style="padding:14px;background:#f8f9fa;border-radius:10px;color:#666">No hay préstamos pendientes a los que aplicar abonos.</div>';
     } else {
       actionContent = `<div><strong>Historial de préstamo</strong>${history}</div>`;
@@ -178,15 +249,11 @@
     if (issuedAt) payload.issuedAt = issuedAt;
     if (submit) submit.disabled = true;
     try {
-      await api('/api/admin/user/' + encodeURIComponent(currentUserId) + '/loans', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
+      await api('/api/admin/user/' + encodeURIComponent(currentUserId) + '/loans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       await refreshAdminUsers();
       await loadUserLoans(currentUserId);
       notice('Préstamo registrado y acreditado al balance disponible.', 'success');
-    } finally {
-      if (submit) submit.disabled = false;
-    }
+    } finally { if (submit) submit.disabled = false; }
   }
 
   function makeIdempotencyKey() {
@@ -203,16 +270,11 @@
     const loanId = String(formData.get('loanId') || '').trim();
     const amount = String(formData.get('amount') || '').trim();
     let keyField = form.querySelector('[name="idempotencyKey"]');
-    if (!keyField) {
-      keyField = document.createElement('input'); keyField.type = 'hidden'; keyField.name = 'idempotencyKey'; form.appendChild(keyField);
-    }
+    if (!keyField) { keyField = document.createElement('input'); keyField.type = 'hidden'; keyField.name = 'idempotencyKey'; form.appendChild(keyField); }
     if (!keyField.value) keyField.value = makeIdempotencyKey();
     if (submit) submit.disabled = true;
     try {
-      await api('/api/admin/loans/' + encodeURIComponent(loanId) + '/payments', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, idempotencyKey: keyField.value })
-      });
+      await api('/api/admin/loans/' + encodeURIComponent(loanId) + '/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, idempotencyKey: keyField.value }) });
       await refreshAdminUsers();
       activeMode = 'history';
       await loadUserLoans(currentUserId);
@@ -220,21 +282,19 @@
     } catch (error) {
       if (/balance|deuda|supera|mayor/i.test(error.message)) keyField.value = '';
       throw error;
-    } finally {
-      if (submit) submit.disabled = false;
-    }
+    } finally { if (submit) submit.disabled = false; }
   }
 
   function openForUser(userId) {
     const id = String(userId || '').trim();
-    if (!/^\d+$/.test(id)) { notice('No se encontró un ID de usuario válido.', 'error'); return; }
+    if (!/^\d+$/.test(id)) return;
     currentUserId = id;
     activeMode = 'history';
-    if (typeof window.switchTab === 'function') window.switchTab('prestamos');
-    const search = document.getElementById('apexLoanSearch');
-    const select = document.getElementById('apexLoanUserSelect');
-    if (select) select.value = '';
-    if (search) search.value = id;
+    const root = ensureModal();
+    root.classList.add('show');
+    root.querySelector('#apexLoanSearch').value = id;
+    root.querySelector('#apexLoanUserSelect').innerHTML = '<option value="">Cargando usuario…</option>';
+    root.querySelector('#apexLoanWorkspace').innerHTML = '<p style="color:#777;text-align:center;padding:18px">Cargando datos del usuario…</p>';
     searchUsers();
   }
 
@@ -243,14 +303,18 @@
     if (!body) return;
     const table = body.closest('table');
     const headers = table && table.querySelectorAll('thead th');
-    if (headers && headers[5]) headers[5].textContent = 'Debe';
+    if (headers && headers[5] && headers[5].textContent.trim() !== 'Debe') headers[5].textContent = 'Debe';
     let users = [];
     try { users = typeof getUsers === 'function' ? getUsers() : []; } catch (_) {}
     body.querySelectorAll('tr').forEach((row) => {
       if (!row.cells || row.cells.length < 11) return;
       const phone = String(row.cells[2].textContent || '').trim();
       const user = users.find((item) => String(item.telefono || '') === phone);
-      row.cells[5].innerHTML = `<strong style="white-space:nowrap;color:${Number(user?.deuda_pendiente || 0) > 0 ? '#b45309' : '#444'}">$${money(user?.deuda_pendiente || 0)}</strong>`;
+      const dueText = '$' + money(user?.deuda_pendiente || 0);
+      const debtCell = row.cells[5];
+      if (debtCell.textContent.trim() !== dueText) {
+        debtCell.innerHTML = `<strong style="white-space:nowrap;color:${Number(user?.deuda_pendiente || 0) > 0 ? '#b45309' : '#444'}">${dueText}</strong>`;
+      }
       const actionBox = row.cells[row.cells.length - 1].querySelector('.action-buttons');
       if (!actionBox || actionBox.dataset.apexLoansEnhanced === '1') return;
       actionBox.dataset.apexLoansEnhanced = '1';
@@ -258,54 +322,21 @@
       historyButton.type = 'button'; historyButton.className = 'btn btn-info btn-sm'; historyButton.textContent = '📜 Historial'; historyButton.title = 'Ver historial';
       historyButton.addEventListener('click', () => { if (typeof window.verIngresosUsuario === 'function') window.verIngresosUsuario(phone); });
       const loansButton = document.createElement('button');
-      loansButton.type = 'button'; loansButton.className = 'btn btn-primary btn-sm'; loansButton.textContent = '💳 Préstamos'; loansButton.title = 'Otorgar préstamo, abonar o ver historial de préstamo';
+      loansButton.type = 'button'; loansButton.className = 'btn btn-primary btn-sm'; loansButton.textContent = '💳 Préstamos'; loansButton.title = 'Otorgar préstamo, abonar o consultar el historial de préstamo';
       loansButton.addEventListener('click', () => openForUser(user?.id || row.cells[0].textContent.trim()));
       actionBox.append(historyButton, loansButton);
     });
   }
 
   function init() {
-    const search = document.getElementById('apexLoanSearch');
-    const searchButton = document.getElementById('apexLoanSearchButton');
-    const userSelect = document.getElementById('apexLoanUserSelect');
-    const workspace = document.getElementById('apexLoanWorkspace');
-    if (!search || !searchButton || !userSelect || !workspace) return;
-    searchButton.addEventListener('click', searchUsers);
-    search.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); searchUsers(); } });
-    userSelect.addEventListener('change', () => { currentUserId = userSelect.value; activeMode = 'history'; loadUserLoans(userSelect.value); });
-    workspace.addEventListener('click', (event) => {
-      const button = event.target.closest('.apex-loan-mode');
-      if (button) { activeMode = button.dataset.mode; loadUserLoans(currentUserId); }
-    });
-    workspace.addEventListener('input', (event) => {
-      if (event.target.name === 'amount') {
-        const form = event.target.closest('form');
-        const key = form && form.querySelector('[name="idempotencyKey"]');
-        if (key) key.value = '';
-      }
-    });
-    workspace.addEventListener('change', (event) => {
-      if (event.target.name === 'loanId') {
-        const form = event.target.closest('form');
-        const key = form && form.querySelector('[name="idempotencyKey"]');
-        if (key) key.value = '';
-      }
-    });
-    workspace.addEventListener('submit', async (event) => {
-      const form = event.target.closest('form');
-      if (!form) return;
-      event.preventDefault();
-      try {
-        if (form.id === 'apexLoanCreateForm') await submitLoanForm(form);
-        else if (form.id === 'apexLoanPaymentForm') await submitPaymentForm(form);
-      } catch (error) { notice(error.message, 'error'); }
-    });
+    ensureModal();
     enhanceUsersTable();
     const usersBody = document.getElementById('usersTableBody');
-    if (usersBody && window.MutationObserver) new MutationObserver(enhanceUsersTable).observe(usersBody, { childList: true, subtree: true });
+    // Observe only direct row insertions. Subtree observation re-triggered forever when
+    // this module formatted the debt cell, freezing the original admin interface.
+    if (usersBody && window.MutationObserver) new MutationObserver(enhanceUsersTable).observe(usersBody, { childList: true });
   }
 
-  window.apexLoadLoansAdmin = searchUsers;
   window.apexOpenLoansForUser = openForUser;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();

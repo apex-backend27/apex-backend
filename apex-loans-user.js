@@ -90,6 +90,56 @@
     }
   }
 
+  function openLoansActivity() {
+    const grid = document.getElementById('actividadesGrid');
+    const card = document.getElementById('apexUserLoansCard');
+    if (grid) grid.style.display = 'none';
+    if (card) {
+      card.style.display = 'block';
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    loadUserLoans();
+  }
+
+  function closeLoansActivity() {
+    const grid = document.getElementById('actividadesGrid');
+    const card = document.getElementById('apexUserLoansCard');
+    if (card) card.style.display = 'none';
+    if (grid) grid.style.display = '';
+    loadUserLoans();
+  }
+
+  function installLoansActivity() {
+    const baseRender = window.renderActividades;
+    if (typeof baseRender === 'function' && !baseRender.__apexLoansActivity) {
+      const wrappedRender = function () {
+        const result = baseRender.apply(this, arguments);
+        const grid = document.getElementById('actividadesGrid');
+        if (grid && !grid.querySelector('[data-apex-loans-activity]')) {
+          grid.insertAdjacentHTML('beforeend', '<div class="actividad-card" data-apex-loans-activity onclick="apexOpenUserLoansActivity()"><span class="badge-prox">Consultar</span><span class="icono">💳</span><div class="nombre">Mis préstamos</div><div class="desc">Consulta tus abonos y deuda pendiente</div><div class="estado">📄 Ver estado</div></div>');
+        }
+        return result;
+      };
+      wrappedRender.__apexLoansActivity = true;
+      window.renderActividades = wrappedRender;
+    }
+
+    const baseSwitchTab = window.switchTab;
+    if (typeof baseSwitchTab === 'function' && !baseSwitchTab.__apexLoansActivity) {
+      const wrappedSwitchTab = function () {
+        const result = baseSwitchTab.apply(this, arguments);
+        if (arguments[0] === 'actividades') closeLoansActivity();
+        return result;
+      };
+      wrappedSwitchTab.__apexLoansActivity = true;
+      window.switchTab = wrappedSwitchTab;
+    }
+
+    window.apexOpenUserLoansActivity = openLoansActivity;
+    window.apexCloseUserLoansActivity = closeLoansActivity;
+  }
+
+  installLoansActivity();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadUserLoans, { once: true });
   else loadUserLoans();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) loadUserLoans(); });
