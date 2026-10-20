@@ -2879,6 +2879,20 @@ app.post('/api/user/achievements/claim', authenticate, async (req,res)=>{
 // Se mantiene separado del historial general: loans registra la deuda
 // y loan_payments registra cada abono con su fecha.
 // ============================================================
+function apexLoansFromHistory(history) {
+    const rows = Array.isArray(history) ? history : [], loans = new Map();
+    for (const item of rows) {
+        const type=String(item?.tipo||item?.type||'').toLowerCase(), id=item?.loanId||item?.loan_id||item?.id;
+        if (!id || !['prestamo_otorgado','abono_prestamo','ajuste_prestamo'].includes(type)) continue;
+        if (!loans.has(String(id))) loans.set(String(id), { id, amount: 0, outstanding: 0, status: 'pendiente', issued_at: item.fecha||item.date||new Date().toISOString(), payments: [] });
+        const loan=loans.get(String(id)), amount=Number(String(item.monto??item.amount??0).replace(',','.'))||0;
+        if (type==='prestamo_otorgado') { loan.amount += amount; loan.outstanding += amount; }
+        if (type==='abono_prestamo') { loan.outstanding -= amount; loan.payments.push({id:item.paymentId||('history-'+loan.payments.length),amount,paidAt:item.fecha||item.date}); }
+        if (type==='ajuste_prestamo') loan.outstanding += amount;
+    }
+    return Array.from(loans.values()).map(loan=>({...loan, outstanding:Math.max(0,loan.outstanding), status:loan.outstanding<=0.000001?'pagado':'pendiente'}));
+}
+
 async function apexLoanSummaryForUsers(userIds = null) {
     const params = [];
     let filter = '';
@@ -2916,9 +2930,12 @@ app.get('/api/admin/user/:id/loans', authenticate, isAdmin, async (req, res) => 
         const paymentsQ = await pool.query('SELECT id, loan_id, amount, paid_at FROM apex_loan_payments WHERE user_id=$1 ORDER BY paid_at DESC', [userId]);
         const paymentsByLoan = {};
         paymentsQ.rows.forEach(payment => { (paymentsByLoan[payment.loan_id] ||= []).push({ id: payment.id, amount: payment.amount, paidAt: payment.paid_at }); });
-        const loans = loansQ.rows.map(loan => ({ ...loan, payments: paymentsByLoan[loan.id] || [] }));
+        const userHistory=Array.isArray(user.rows[0].historial_detallado)?user.rows[0].historial_detallado:[];
+        let loans = loansQ.rows.map(loan => ({ ...loan, payments: paymentsByLoan[loan.id] || [] }));
+        if(!loans.length) loans=apexLoansFromHistory(userHistory);
         const summary = await apexLoanSummaryForUsers([userId]);
-        res.json({ user: user.rows[0], loans, summary: summary[0] || { total_prestado:0,total_abonado:0,debe:0,prestamos:0 } });
+        const fallbackSummary=loans.reduce((a,l)=>({total_prestado:a.total_prestado+Number(l.amount||0),total_abonado:a.total_abonado+(l.payments||[]).reduce((x,p)=>x+Number(p.amount||0),0),debe:a.debe+Number(l.outstanding||0),prestamos:a.prestamos+1}),{total_prestado:0,total_abonado:0,debe:0,prestamos:0});
+        res.json({ user: user.rows[0], loans, summary: summary[0] || fallbackSummary });
     } catch (error) { console.error('Apex user loans:', error); res.status(500).json({ error: 'No se pudo cargar el historial de préstamos' }); }
 });
 
@@ -2998,9 +3015,12 @@ app.get('/api/user/loans', authenticate, async (req,res)=>{
         const paymentsQ=await pool.query('SELECT id, loan_id, amount, paid_at FROM apex_loan_payments WHERE user_id=$1 ORDER BY paid_at DESC',[req.userId]);
         const userQ=await pool.query('SELECT historial_detallado FROM users WHERE id=$1',[req.userId]);
         const paymentsByLoan={};paymentsQ.rows.forEach(payment=>{(paymentsByLoan[payment.loan_id] ||= []).push({id:payment.id,amount:payment.amount,paidAt:payment.paid_at})});
-        const loans=loansQ.rows.map(loan=>({...loan,payments:paymentsByLoan[loan.id]||[]}));
-        const summary=(await apexLoanSummaryForUsers([req.userId]))[0]||{total_prestado:0,total_abonado:0,debe:0,prestamos:0};
         const history=userQ.rows[0]&&Array.isArray(userQ.rows[0].historial_detallado)?userQ.rows[0].historial_detallado:[];
+        let loans=loansQ.rows.map(loan=>({...loan,payments:paymentsByLoan[loan.id]||[]}));
+        if(!loans.length) loans=apexLoansFromHistory(history);
+        const rawSummary=(await apexLoanSummaryForUsers([req.userId]))[0];
+        const fallbackSummary=loans.reduce((a,l)=>({total_prestado:a.total_prestado+Number(l.amount||0),total_abonado:a.total_abonado+(l.payments||[]).reduce((x,p)=>x+Number(p.amount||0),0),debe:a.debe+Number(l.outstanding||0)}),{total_prestado:0,total_abonado:0,debe:0});
+        const summary=rawSummary||fallbackSummary;
         res.json({loans,history,summary:{totalPrestado:Number(summary.total_prestado||0),totalAbonado:Number(summary.total_abonado||0),debe:Number(summary.debe||0)}});
     } catch(error){console.error('Apex dashboard loans:',error);res.status(500).json({error:'No se pudo cargar tus préstamos'});}
 });

@@ -245,7 +245,7 @@
   'use strict';
   function token(){return localStorage.getItem('apex_token')||sessionStorage.getItem('apex_token')||''}
   function base(){return (window.API_URL||'https://apex-backend-cj21.onrender.com').replace(/\/$/,'')}
-  function money(v){return '$'+Number(v||0).toFixed(2)}
+  function money(v){var n=Number(String(v==null?0:v).replace(',','.'));return '$'+(Number.isFinite(n)?n:0).toFixed(2)}
   function date(v){if(!v)return '—';try{return new Date(v).toLocaleDateString('es-CO',{year:'numeric',month:'2-digit',day:'2-digit'})}catch(_){return v}}
   window.abrirMisPrestamos=async function(){
     var modal=typeof apexModal==='function'?apexModal('💳 Mis préstamos','Cargando...'):null;
