@@ -339,11 +339,13 @@ async function ensureApexLoansSchema() {
 function loanHistoryItem(type, amount, concept, date, loanId) { return { tipo:type, monto:Number(amount), concepto:concept, fecha:new Date(date).toISOString(), estado:'completado', loanId:Number(loanId) }; }
 async function apexUserLoans(userId) {
     const loansQ=await pool.query('SELECT * FROM apex_loans WHERE user_id=$1 ORDER BY issued_at DESC',[userId]);
+    const userHistoryQ=await pool.query('SELECT historial_detallado FROM users WHERE id=$1',[userId]);
     const paymentsQ=await pool.query('SELECT id,loan_id,amount,paid_at FROM apex_loan_payments WHERE user_id=$1 ORDER BY paid_at DESC',[userId]);
     const byLoan={}; paymentsQ.rows.forEach(x=>{(byLoan[x.loan_id] ||= []).push({id:x.id,amount:Number(x.amount),paidAt:x.paid_at})});
     const loans=loansQ.rows.map(x=>({...x,amount:Number(x.amount),outstanding:Number(x.outstanding),payments:byLoan[x.id]||[]}));
     const totalPrestado=loans.reduce((a,x)=>a+x.amount,0), totalAbonado=loans.reduce((a,x)=>a+x.payments.reduce((b,y)=>b+y.amount,0),0), debe=loans.reduce((a,x)=>a+x.outstanding,0);
-    return {loans,summary:{totalPrestado,totalAbonado,debe}};
+    const history=Array.isArray(userHistoryQ.rows[0]?.historial_detallado)?userHistoryQ.rows[0].historial_detallado.filter(x=>['prestamo_otorgado','abono_prestamo','ajuste_prestamo'].includes(String(x?.tipo||''))):[];
+    return {loans,history,summary:{totalPrestado,totalAbonado,debe}};
 }
 ensureApexLoansSchema().catch(error=>console.error('Apex loans schema:',error.message));
 
