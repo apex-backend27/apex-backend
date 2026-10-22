@@ -314,6 +314,39 @@ async function generarCodigoReferidoCorto() {
     throw new Error('No se pudo generar un código de referido disponible');
 }
 ensureTaskColumns();
+async function ensureApexLoansSchema() {
+    await pool.query(`CREATE TABLE IF NOT EXISTS apex_loans (
+        id BIGSERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount NUMERIC(14,2) NOT NULL CHECK (amount > 0),
+        outstanding NUMERIC(14,2) NOT NULL CHECK (outstanding >= 0),
+        status TEXT NOT NULL DEFAULT 'pendiente',
+        issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_by INTEGER REFERENCES users(id),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS apex_loan_payments (
+        id BIGSERIAL PRIMARY KEY,
+        loan_id BIGINT NOT NULL REFERENCES apex_loans(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount NUMERIC(14,2) NOT NULL CHECK (amount > 0),
+        paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_by INTEGER REFERENCES users(id)
+    )`);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loans_user ON apex_loans(user_id, issued_at DESC)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_apex_loan_payments_loan ON apex_loan_payments(loan_id, paid_at DESC)');
+}
+function loanHistoryItem(type, amount, concept, date, loanId) { return { tipo:type, monto:Number(amount), concepto:concept, fecha:new Date(date).toISOString(), estado:'completado', loanId:Number(loanId) }; }
+async function apexUserLoans(userId) {
+    const loansQ=await pool.query('SELECT * FROM apex_loans WHERE user_id=$1 ORDER BY issued_at DESC',[userId]);
+    const paymentsQ=await pool.query('SELECT id,loan_id,amount,paid_at FROM apex_loan_payments WHERE user_id=$1 ORDER BY paid_at DESC',[userId]);
+    const byLoan={}; paymentsQ.rows.forEach(x=>{(byLoan[x.loan_id] ||= []).push({id:x.id,amount:Number(x.amount),paidAt:x.paid_at})});
+    const loans=loansQ.rows.map(x=>({...x,amount:Number(x.amount),outstanding:Number(x.outstanding),payments:byLoan[x.id]||[]}));
+    const totalPrestado=loans.reduce((a,x)=>a+x.amount,0), totalAbonado=loans.reduce((a,x)=>a+x.payments.reduce((b,y)=>b+y.amount,0),0), debe=loans.reduce((a,x)=>a+x.outstanding,0);
+    return {loans,summary:{totalPrestado,totalAbonado,debe}};
+}
+ensureApexLoansSchema().catch(error=>console.error('Apex loans schema:',error.message));
+
 
 async function ensureNotificationTable() {
     try {
@@ -2671,6 +2704,26 @@ app.post('/api/user/achievements/claim', authenticate, async (req,res)=>{
   const client=await pool.connect();
   try{await client.query('BEGIN');const q=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw new Error('Usuario no encontrado');const u=q.rows[0],assigned=Array.isArray(u.logros_asignados)?u.logros_asignados:[],index=assigned.findIndex(x=>String(x?.id??x?.logroId??x?.logro_id??x)===logroId);if(index<0)throw new Error('Logro no encontrado');const logro=typeof assigned[index]==='object'?{...assigned[index]}:{id:logroId},reclaimed=Array.isArray(u.logros_reclamados)?u.logros_reclamados:[];if(logro.reclamado||reclaimed.some(x=>String(typeof x==='object'?(x.id||x.logroId):x)===logroId))throw new Error('Este logro ya fue reclamado');const tipo=String(logro.tipo||'').toLowerCase(),isPlan=tipo==='plan'||/tener\s*plan/i.test(String(logro.nombre||'')),completed=['completado','completada','completed'].includes(String(logro.estado||'').toLowerCase())||logro.completado===true||isPlan&&u.plan&&!/^sin[_ ]?plan$/i.test(String(u.plan));if(!completed)throw new Error('El logro aún no está completado');const reward=Math.max(0,Number(logro.recompensa??logro.cantidad??logro.premio??0)||0);if(reward<=0)throw new Error('El logro no tiene recompensa válida');const rewardType=String(logro.recompensa_tipo||logro.tipo_recompensa||'puntos').toLowerCase(),liquidacion=rewardType==='usdt'?liquidarRecompensaUSDT(reward):{montoBruto:0,comision:0,montoNeto:0},neto=rewardType==='usdt'?liquidacion.montoNeto:0,pts=rewardType==='usdt'?0:Math.floor(reward),now=new Date().toISOString();logro.estado='reclamado';logro.reclamado=true;logro.reclamadoEn=now;assigned[index]=logro;const out=await client.query(`UPDATE users SET balance=COALESCE(balance,0)+$1,puntos=COALESCE(puntos,0)+$2,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN COALESCE(ganado_semanal_inicio,DATE '1900-01-01')<DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date THEN $1 ELSE COALESCE(ganado_semanal,0)+$1 END,ganado_semanal_inicio=DATE_TRUNC('week',CURRENT_TIMESTAMP AT TIME ZONE 'America/Lima')::date,logros_asignados=$3::jsonb,logros_reclamados=$4::jsonb WHERE id=$5 RETURNING *`,[neto,pts,JSON.stringify(assigned),JSON.stringify(reclaimed.concat({id:logroId,nombre:logro.nombre||'',recompensa:reward,montoNeto:neto,comision:liquidacion.comision,recompensa_tipo:rewardType,fecha:now})),req.userId]);const item={tipo:'logro',concepto:rewardType==='usdt'?`Recompensa de logro: ${logro.nombre||logroId} · ${reward.toFixed(2)} - 23% = ${neto.toFixed(2)} USDT`:`Recompensa de logro: ${logro.nombre||logroId}`,monto:neto,montoBruto:liquidacion.montoBruto,comision:liquidacion.comision,porcentajeComision:rewardType==='usdt'?APEX_REWARD_COMMISSION_PERCENT:0,puntos:pts,fecha:now,estado:'acreditado'};const row=out.rows[0],hist=Array.isArray(row.historial_detallado)?row.historial_detallado:[],saved=await client.query('UPDATE users SET historial_detallado=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(hist.concat(item)),req.userId]);await client.query('COMMIT');res.json({message:'Recompensa reclamada',premio:reward,montoNeto:neto,comision:liquidacion.comision,tipo_recompensa:rewardType,user:publicUserData(saved.rows[0])});}catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('achievement claim',e);res.status(400).json({error:e.message||'No se pudo reclamar el logro'});}finally{client.release();}
 });
+
+
+app.get('/api/admin/loans/summary', authenticate, isAdmin, async (req,res)=>{
+    try { await ensureApexLoansSchema(); const q=await pool.query(`SELECT u.id AS "userId", COALESCE(SUM(l.amount),0)::float AS total_prestado, COALESCE(SUM(l.amount-l.outstanding),0)::float AS total_abonado, COALESCE(SUM(l.outstanding),0)::float AS debe FROM users u LEFT JOIN apex_loans l ON l.user_id=u.id GROUP BY u.id`); res.json({summaries:q.rows}); }
+    catch(e){console.error('Apex loan summary:',e);res.status(500).json({error:'No se pudo cargar DEBE'});}
+});
+app.get('/api/admin/user/:id/loans', authenticate, isAdmin, async (req,res)=>{
+    try { await ensureApexLoansSchema(); const userQ=await pool.query('SELECT * FROM users WHERE id=$1',[req.params.id]); if(!userQ.rows.length)return res.status(404).json({error:'Usuario no encontrado'}); const data=await apexUserLoans(req.params.id); res.json({user:userQ.rows[0],...data}); }
+    catch(e){console.error('Apex admin loans:',e);res.status(500).json({error:'No se pudo cargar los préstamos'});}
+});
+app.post('/api/admin/user/:id/loans', authenticate, isAdmin, async (req,res)=>{
+    const client=await pool.connect(); try { await ensureApexLoansSchema(); const userId=Number(req.params.id),amount=Number(String(req.body.amount??'').replace(',','.')),issuedAt=req.body.issuedAt?new Date(req.body.issuedAt):new Date(); if(!Number.isInteger(userId)||!Number.isFinite(amount)||amount<=0||Number.isNaN(issuedAt.getTime()))return res.status(400).json({error:'Usuario, monto y fecha válidos son obligatorios'}); await client.query('BEGIN'); const uq=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[userId]); if(!uq.rows.length)throw Error('Usuario no encontrado'); const inserted=await client.query('INSERT INTO apex_loans(user_id,amount,outstanding,issued_at,created_by) VALUES($1,$2,$2,$3,$4) RETURNING *',[userId,amount,issuedAt,req.userId]); const u=uq.rows[0],hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];hist.push(loanHistoryItem('prestamo_otorgado',amount,'Préstamo otorgado',issuedAt,inserted.rows[0].id)); const updated=await client.query('UPDATE users SET balance=COALESCE(balance,0)+$1,historial_detallado=$2::jsonb WHERE id=$3 RETURNING *',[amount,JSON.stringify(hist),userId]); await client.query('COMMIT');res.json({loan:inserted.rows[0],user:updated.rows[0]}); } catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('Apex create loan:',e);res.status(500).json({error:e.message||'No se pudo registrar el préstamo'});} finally{client.release();}
+});
+app.post('/api/admin/loans/:loanId/payments', authenticate, isAdmin, async (req,res)=>{
+    const client=await pool.connect(); try { await ensureApexLoansSchema(); const loanId=Number(req.params.loanId),amount=Number(String(req.body.amount??'').replace(',','.')),paidAt=req.body.paidAt?new Date(req.body.paidAt):new Date(); if(!Number.isInteger(loanId)||!Number.isFinite(amount)||amount<=0||Number.isNaN(paidAt.getTime()))return res.status(400).json({error:'Préstamo, monto y fecha válidos son obligatorios'}); await client.query('BEGIN'); const lq=await client.query('SELECT * FROM apex_loans WHERE id=$1 FOR UPDATE',[loanId]);if(!lq.rows.length)throw Error('Préstamo no encontrado');const loan=lq.rows[0],outstanding=Number(loan.outstanding);if(amount>outstanding+0.000001)throw Error('El abono supera la deuda pendiente');const uq=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[loan.user_id]);const u=uq.rows[0],balance=Number(u.balance||0);if(amount>balance+0.000001)throw Error('Saldo insuficiente para realizar el abono');await client.query('INSERT INTO apex_loan_payments(loan_id,user_id,amount,paid_at,created_by) VALUES($1,$2,$3,$4,$5)',[loanId,loan.user_id,amount,paidAt,req.userId]);const next=Math.max(0,outstanding-amount),hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];hist.push(loanHistoryItem('abono_prestamo',amount,'Abono de préstamo',paidAt,loanId));await client.query('UPDATE apex_loans SET outstanding=$1,status=$2,updated_at=NOW() WHERE id=$3',[next,next<=0.000001?'pagado':'pendiente',loanId]);const updated=await client.query('UPDATE users SET balance=COALESCE(balance,0)-$1,historial_detallado=$2::jsonb WHERE id=$3 RETURNING *',[amount,JSON.stringify(hist),loan.user_id]);await client.query('COMMIT');res.json({success:true,debe:next,user:updated.rows[0]||null}); } catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('Apex payment:',e);res.status(400).json({error:e.message||'No se pudo registrar el abono'});} finally{client.release();}
+});
+app.post('/api/admin/loans/:loanId/adjust', authenticate, isAdmin, async (req,res)=>{
+    const client=await pool.connect(); try { await ensureApexLoansSchema();const loanId=Number(req.params.loanId),delta=Number(String(req.body.delta??'').replace(',','.')),date=req.body.date?new Date(req.body.date):new Date(),note=String(req.body.note||'Ajuste de préstamo').trim();if(!Number.isInteger(loanId)||!Number.isFinite(delta)||delta===0||Number.isNaN(date.getTime()))return res.status(400).json({error:'Ajuste y fecha válidos son obligatorios'});await client.query('BEGIN');const lq=await client.query('SELECT * FROM apex_loans WHERE id=$1 FOR UPDATE',[loanId]);if(!lq.rows.length)throw Error('Préstamo no encontrado');const loan=lq.rows[0],next=Number(loan.outstanding)+delta;if(next<0)throw Error('El ajuste no puede dejar la deuda negativa');const uq=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[loan.user_id]),u=uq.rows[0],nextBalance=Number(u.balance||0)+delta;if(nextBalance<0)throw Error('El ajuste no puede dejar el saldo negativo');const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];hist.push(loanHistoryItem('ajuste_prestamo',delta,note,date,loanId));await client.query('UPDATE apex_loans SET outstanding=$1,status=$2,updated_at=NOW() WHERE id=$3',[next,next<=0.000001?'pagado':'pendiente',loanId]);const updated=await client.query('UPDATE users SET balance=$1,historial_detallado=$2::jsonb WHERE id=$3 RETURNING *',[nextBalance,JSON.stringify(hist),loan.user_id]);await client.query('COMMIT');res.json({success:true,debe:next,balance:nextBalance,user:updated.rows[0]||null});}catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('Apex adjustment:',e);res.status(400).json({error:e.message||'No se pudo aplicar el ajuste'});}finally{client.release();}
+});
+app.get('/api/user/loans', authenticate, async (req,res)=>{try{await ensureApexLoansSchema();res.json(await apexUserLoans(req.userId));}catch(e){console.error('Apex user loans:',e);res.status(500).json({error:'No se pudo cargar tus préstamos'});}});
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor corriendo en puerto ${port}`);
