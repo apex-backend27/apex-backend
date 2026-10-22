@@ -1166,6 +1166,8 @@ app.post('/api/me/deposits/sync', authenticate, async (req, res) => {
   }
 });
 
+app.get('/api/user/loans', authenticate, async (req,res)=>{try{await ensureApexLoansSchema();res.json(await apexUserLoans(req.userId));}catch(e){console.error('Apex user loans:',e);res.status(500).json({error:'No se pudo cargar tus préstamos'});}});
+
 app.get('/api/user/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
@@ -2723,7 +2725,7 @@ app.post('/api/admin/loans/:loanId/payments', authenticate, isAdmin, async (req,
 app.post('/api/admin/loans/:loanId/adjust', authenticate, isAdmin, async (req,res)=>{
     const client=await pool.connect(); try { await ensureApexLoansSchema();const loanId=Number(req.params.loanId),delta=Number(String(req.body.delta??'').replace(',','.')),date=req.body.date?new Date(req.body.date):new Date(),note=String(req.body.note||'Ajuste de préstamo').trim();if(!Number.isInteger(loanId)||!Number.isFinite(delta)||delta===0||Number.isNaN(date.getTime()))return res.status(400).json({error:'Ajuste y fecha válidos son obligatorios'});await client.query('BEGIN');const lq=await client.query('SELECT * FROM apex_loans WHERE id=$1 FOR UPDATE',[loanId]);if(!lq.rows.length)throw Error('Préstamo no encontrado');const loan=lq.rows[0],next=Number(loan.outstanding)+delta;if(next<0)throw Error('El ajuste no puede dejar la deuda negativa');const uq=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[loan.user_id]),u=uq.rows[0],nextBalance=Number(u.balance||0)+delta;if(nextBalance<0)throw Error('El ajuste no puede dejar el saldo negativo');const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];hist.push(loanHistoryItem('ajuste_prestamo',delta,note,date,loanId));await client.query('UPDATE apex_loans SET outstanding=$1,status=$2,updated_at=NOW() WHERE id=$3',[next,next<=0.000001?'pagado':'pendiente',loanId]);const updated=await client.query('UPDATE users SET balance=$1,historial_detallado=$2::jsonb WHERE id=$3 RETURNING *',[nextBalance,JSON.stringify(hist),loan.user_id]);await client.query('COMMIT');res.json({success:true,debe:next,balance:nextBalance,user:updated.rows[0]||null});}catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('Apex adjustment:',e);res.status(400).json({error:e.message||'No se pudo aplicar el ajuste'});}finally{client.release();}
 });
-app.get('/api/user/loans', authenticate, async (req,res)=>{try{await ensureApexLoansSchema();res.json(await apexUserLoans(req.userId));}catch(e){console.error('Apex user loans:',e);res.status(500).json({error:'No se pudo cargar tus préstamos'});}});
+
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor corriendo en puerto ${port}`);
