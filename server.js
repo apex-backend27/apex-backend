@@ -1168,6 +1168,26 @@ app.post('/api/me/deposits/sync', authenticate, async (req, res) => {
   }
 });
 
+app.delete('/api/admin/loans/:loanId', authenticate, isAdmin, async (req,res)=>{
+    const client=await pool.connect();
+    try {
+        await ensureApexLoansSchema();
+        const loanId=Number(req.params.loanId);
+        if(!Number.isInteger(loanId)) return res.status(400).json({error:'Préstamo inválido'});
+        await client.query('BEGIN');
+        const lq=await client.query('SELECT * FROM apex_loans WHERE id=$1 FOR UPDATE',[loanId]);
+        if(!lq.rows.length) throw Error('Préstamo no encontrado');
+        const loan=lq.rows[0];
+        if(Number(loan.outstanding)>0.000001) throw Error('Solo se puede eliminar un préstamo totalmente pagado');
+        const uq=await client.query('SELECT historial_detallado FROM users WHERE id=$1 FOR UPDATE',[loan.user_id]);
+        const history=Array.isArray(uq.rows[0]?.historial_detallado)?uq.rows[0].historial_detallado:[];
+        const clean=history.filter(x=>String(x?.loanId??x?.loan_id??'')!==String(loanId));
+        await client.query('DELETE FROM apex_loans WHERE id=$1',[loanId]);
+        await client.query('UPDATE users SET historial_detallado=$1::jsonb WHERE id=$2',[JSON.stringify(clean),loan.user_id]);
+        await client.query('COMMIT');
+        res.json({success:true,deletedLoanId:loanId});
+    } catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('Apex delete loan:',e);res.status(400).json({error:e.message||'No se pudo eliminar el préstamo'});} finally{client.release();}
+});
 app.get('/api/user/loans', authenticate, async (req,res)=>{try{await ensureApexLoansSchema();res.json(await apexUserLoans(req.userId));}catch(e){console.error('Apex user loans:',e);res.status(500).json({error:'No se pudo cargar tus préstamos'});}});
 
 app.get('/api/user/:id', authenticate, async (req, res) => {
