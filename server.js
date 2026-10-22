@@ -2033,8 +2033,18 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
             console.log('❌ Acceso denegado para usuario:', adminCheck.rows[0]?.telefono);
             return res.status(403).json({ error: 'Acceso denegado' });
         }
-        
-        const result = await pool.query('SELECT * FROM users ORDER BY id ASC');
+        await ensureApexLoansSchema();
+        const result = await pool.query(`
+            SELECT u.*, COALESCE(debt.debe, 0) AS deuda_pendiente
+            FROM users u
+            LEFT JOIN (
+                SELECT user_id, SUM(outstanding) AS debe
+                FROM apex_loans
+                GROUP BY user_id
+            ) debt ON debt.user_id = u.id
+            ORDER BY u.id ASC
+        `);
+        res.set('Cache-Control', 'no-store');
         res.json(result.rows);
         
     } catch (error) {
