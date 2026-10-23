@@ -349,6 +349,14 @@ async function apexUserLoans(userId) {
 }
 ensureApexLoansSchema().catch(error=>console.error('Apex loans schema:',error.message));
 
+async function ensureApexUserReferralGoalsSchema() {
+    await pool.query(`CREATE TABLE IF NOT EXISTS apex_user_referral_goals (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        target INTEGER NOT NULL DEFAULT 2 CHECK (target >= 1 AND target <= 1000),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+}
+ensureApexUserReferralGoalsSchema().catch(error=>console.error('Apex referral goals schema:',error.message));
 
 async function ensureNotificationTable() {
     try {
@@ -2050,6 +2058,109 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
     } catch (error) {
         console.error('Error al obtener usuarios:', error);
         res.status(500).json({ error: 'Error en el servidor' });
+    }
+});
+
+function apexReferralParseJson(value, fallback) {
+    if (value && typeof value === 'object') return value;
+    if (typeof value === 'string') {
+        try { return JSON.parse(value); } catch (_) { return fallback; }
+    }
+    return fallback;
+}
+function apexReferralValidDate(value) {
+    if (!value) return null;
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) ? time : null;
+}
+app.get('/api/admin/users/progress', authenticate, isAdmin, async (req, res) => {
+    try {
+        await ensureApexUserReferralGoalsSchema();
+        const result = await pool.query(`
+            SELECT u.id, u.telefono, u.nombre, u.apellido, u.referido_por,
+                   u.fecha_registro, u.fechas_invito, u.historial_detallado,
+                   COALESCE(g.target, 2) AS target
+            FROM users u
+            LEFT JOIN apex_user_referral_goals g ON g.user_id = u.id
+            WHERE LOWER(TRIM(COALESCE(u.telefono, ''))) <> 'admin'
+            ORDER BY u.id ASC
+        `);
+        const rows = result.rows || [];
+        const normalizePhone = value => String(value || '').trim();
+        const byPhone = new Map(rows.map(row => [normalizePhone(row.telefono), row]));
+        const directChildren = new Map();
+        rows.forEach(row => {
+            const parentPhone = normalizePhone(row.referido_por);
+            if (!parentPhone) return;
+            if (!directChildren.has(parentPhone)) directChildren.set(parentPhone, []);
+            directChildren.get(parentPhone).push(row);
+        });
+        const output = rows.map(row => {
+            const phone = normalizePhone(row.telefono);
+            const parentPhone = normalizePhone(row.referido_por);
+            const parent = byPhone.get(parentPhone);
+            const history = apexReferralParseJson(row.historial_detallado, []);
+            const inviteDates = apexReferralParseJson(row.fechas_invito, {});
+            const purchaseTimes = [];
+            const legacyPlanTime = apexReferralValidDate(inviteDates?.fechaPrimerPlan);
+            if (legacyPlanTime !== null) purchaseTimes.push(legacyPlanTime);
+            if (Array.isArray(history)) history.forEach(item => {
+                if (String(item?.tipo || '').toLowerCase() !== 'compra_plan') return;
+                const time = apexReferralValidDate(item?.fecha || item?.date);
+                if (time !== null) purchaseTimes.push(time);
+            });
+            const planAcquiredAt = purchaseTimes.length ? new Date(Math.min(...purchaseTimes)).toISOString() : null;
+            const children = directChildren.get(phone) || [];
+            const referralTimes = children
+                .map(child => apexReferralValidDate(child.fecha_registro || child.created_at))
+                .filter(time => time !== null);
+            const latestReferralAt = referralTimes.length ? Math.max(...referralTimes) : null;
+            const startTime = planAcquiredAt ? apexReferralValidDate(planAcquiredAt) : null;
+            const cycleStart = startTime === null ? null : Math.max(startTime, latestReferralAt === null ? startTime : latestReferralAt);
+            const deadlineAt = cycleStart === null ? null : new Date(cycleStart + 21 * 24 * 60 * 60 * 1000).toISOString();
+            return {
+                id: Number(row.id),
+                phone,
+                name: [row.nombre, row.apellido].filter(Boolean).join(' ').trim(),
+                referredBy: parent ? { id: Number(parent.id), name: [parent.nombre, parent.apellido].filter(Boolean).join(' ').trim(), phone: parentPhone } : (parentPhone ? { id: null, name: parentPhone, phone: parentPhone } : null),
+                referrerId: parent ? Number(parent.id) : null,
+                target: Number(row.target) || 2,
+                planAcquiredAt,
+                deadlineAt,
+                invitees: children.map(child => ({
+                    id: Number(child.id),
+                    name: [child.nombre, child.apellido].filter(Boolean).join(' ').trim(),
+                    phone: normalizePhone(child.telefono),
+                    registeredAt: child.fecha_registro || child.created_at || null
+                }))
+            };
+        });
+        res.set('Cache-Control', 'no-store');
+        res.json({ users: output });
+    } catch (error) {
+        console.error('Error cargando seguimiento de referidos:', error);
+        res.status(500).json({ error: 'No se pudo cargar el seguimiento de referidos' });
+    }
+});
+app.put('/api/admin/users/:id/goal', authenticate, isAdmin, async (req, res) => {
+    try {
+        const userId = Number(req.params.id);
+        const target = Number(req.body?.target);
+        if (!Number.isSafeInteger(userId) || userId < 1) return res.status(400).json({ error: 'ID de usuario inválido' });
+        if (!Number.isInteger(target) || target < 1 || target > 1000) return res.status(400).json({ error: 'El objetivo debe ser un número entero entre 1 y 1000' });
+        await ensureApexUserReferralGoalsSchema();
+        const user = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+        if (!user.rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        const result = await pool.query(`
+            INSERT INTO apex_user_referral_goals (user_id, target, updated_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET target = EXCLUDED.target, updated_at = NOW()
+            RETURNING user_id, target
+        `, [userId, target]);
+        res.json({ userId: Number(result.rows[0].user_id), target: Number(result.rows[0].target) });
+    } catch (error) {
+        console.error('Error guardando objetivo de referidos:', error);
+        res.status(500).json({ error: 'No se pudo guardar el objetivo' });
     }
 });
 
