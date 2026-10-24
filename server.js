@@ -2092,18 +2092,18 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
             ORDER BY u.id ASC
         `);
         const users = result.rows || [];
+        const resolveReferrer = apexReferralBuildUserLookup(users);
         const invitedCounts = new Map();
         users.forEach(invitee => {
-            if (invitee.referral_manual_status === 'abandoned') return;
-            const manualPlanTime = apexReferralValidDate(invitee.referral_manual_plan_acquired_at);
-            const automaticPlanTime = apexReferralValidDate(apexReferralFirstPlanDate(invitee.historial_detallado, invitee.fechas_invito));
-            if (manualPlanTime === null && automaticPlanTime === null) return;
-            const referrerPhone = String(invitee.referido_por || '').trim();
-            if (!referrerPhone) return;
-            invitedCounts.set(referrerPhone, (invitedCounts.get(referrerPhone) || 0) + 1);
+            if (invitee.referral_manual_status === 'abandoned' || !apexReferralHasAcquiredPlan(invitee)) return;
+            const referrer = resolveReferrer(invitee.referido_por);
+            if (!referrer) return;
+            const referrerKey = apexReferralPhoneKey(referrer.telefono);
+            if (!referrerKey) return;
+            invitedCounts.set(referrerKey, (invitedCounts.get(referrerKey) || 0) + 1);
         });
         users.forEach(user => {
-            user.referral_invited_count = invitedCounts.get(String(user.telefono || '').trim()) || 0;
+            user.referral_invited_count = invitedCounts.get(apexReferralPhoneKey(user.telefono)) || 0;
             delete user.referral_manual_plan_acquired_at;
             delete user.referral_manual_status;
         });
@@ -2141,12 +2141,48 @@ function apexReferralFirstPlanDate(historyValue, inviteDatesValue) {
     });
     return dates.length ? new Date(Math.min(...dates)).toISOString() : null;
 }
+function apexReferralPhoneKey(value) {
+    const raw = String(value || '').trim();
+    return raw.replace(/\D/g, '') || raw.toLowerCase();
+}
+function apexReferralBuildUserLookup(rows) {
+    const byPhoneExact = new Map();
+    const byPhoneKey = new Map();
+    const byCode = new Map();
+    const byId = new Map();
+    (rows || []).forEach(row => {
+        const phone = String(row.telefono || '').trim();
+        if (phone) {
+            byPhoneExact.set(phone, row);
+            byPhoneKey.set(apexReferralPhoneKey(phone), row);
+        }
+        const code = String(row.codigo_referido || '').trim().toUpperCase();
+        if (code) byCode.set(code, row);
+        const id = String(row.id || '').trim();
+        if (id) byId.set(id, row);
+    });
+    return value => {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        return byPhoneExact.get(raw) || byCode.get(raw.toUpperCase()) || byPhoneKey.get(apexReferralPhoneKey(raw)) || byId.get(raw) || null;
+    };
+}
+function apexReferralHasAcquiredPlan(row) {
+    if (!row) return false;
+    const manualPlanDate = apexReferralValidDate(row.manual_plan_acquired_at ?? row.referral_manual_plan_acquired_at);
+    if (manualPlanDate !== null) return true;
+    const automaticPlanDate = apexReferralValidDate(apexReferralFirstPlanDate(row.historial_detallado, row.fechas_invito));
+    if (automaticPlanDate !== null) return true;
+    const plan = String(row.plan || '').trim().toLowerCase();
+    const noPlanMarkers = new Set(['', 'sin plan', 'sin_plan', 'sin-plan', 'sinplan', 'no plan', 'no_plan', 'no tiene plan', 'ninguno', 'ninguna', 'null', 'undefined', 'none', 'n/a', 'na', 'false', '0']);
+    return !noPlanMarkers.has(plan) || Number(row.plan_amount || 0) > 0;
+}
 app.get('/api/admin/users/progress', authenticate, isAdmin, async (req, res) => {
     try {
         await ensureApexUserReferralGoalsSchema();
         const result = await pool.query(`
-            SELECT u.id, u.telefono, u.nombre, u.apellido, u.referido_por,
-                   u.fecha_registro, u.fechas_invito, u.historial_detallado,
+            SELECT u.id, u.telefono, u.codigo_referido, u.nombre, u.apellido, u.referido_por,
+                   u.plan, u.plan_amount, u.fecha_registro, u.fechas_invito, u.historial_detallado,
                    COALESCE(g.target, 2) AS target,
                    g.manual_plan_acquired_at, COALESCE(g.deadline_adjust_days, 0) AS deadline_adjust_days,
                    g.deadline_adjusted_at, g.manual_status, g.manual_status_note,
@@ -2158,30 +2194,28 @@ app.get('/api/admin/users/progress', authenticate, isAdmin, async (req, res) => 
         `);
         const rows = result.rows || [];
         const normalizePhone = value => String(value || '').trim();
-        const byPhone = new Map(rows.map(row => [normalizePhone(row.telefono), row]));
+        const phoneKey = apexReferralPhoneKey;
+        const resolveReferrer = apexReferralBuildUserLookup(rows);
         const directChildren = new Map();
         rows.forEach(row => {
-            const parentPhone = normalizePhone(row.referido_por);
-            if (!parentPhone) return;
-            if (!directChildren.has(parentPhone)) directChildren.set(parentPhone, []);
-            directChildren.get(parentPhone).push(row);
+            const parent = resolveReferrer(row.referido_por);
+            if (!parent) return;
+            const parentKey = phoneKey(parent.telefono);
+            if (!parentKey) return;
+            if (!directChildren.has(parentKey)) directChildren.set(parentKey, []);
+            directChildren.get(parentKey).push(row);
         });
         const output = rows.map(row => {
             const phone = normalizePhone(row.telefono);
             const parentPhone = normalizePhone(row.referido_por);
-            const parent = byPhone.get(parentPhone);
+            const parent = resolveReferrer(parentPhone);
             const automaticPlanAcquiredAt = apexReferralFirstPlanDate(row.historial_detallado, row.fechas_invito);
             const automaticPlanTime = apexReferralValidDate(automaticPlanAcquiredAt);
             const manualPlanTime = apexReferralValidDate(row.manual_plan_acquired_at);
             const planTime = manualPlanTime === null ? automaticPlanTime : manualPlanTime;
             const planAcquiredAt = planTime === null ? null : new Date(planTime).toISOString();
-            const allChildren = directChildren.get(phone) || [];
-            const children = allChildren.filter(child => {
-                if (child.manual_status === 'abandoned') return false;
-                const manualChildPlanTime = apexReferralValidDate(child.manual_plan_acquired_at);
-                const automaticChildPlanTime = apexReferralValidDate(apexReferralFirstPlanDate(child.historial_detallado, child.fechas_invito));
-                return manualChildPlanTime !== null || automaticChildPlanTime !== null;
-            });
+            const allChildren = directChildren.get(phoneKey(phone)) || [];
+            const children = allChildren.filter(child => child.manual_status !== 'abandoned' && apexReferralHasAcquiredPlan(child));
             const referralTimes = children
                 .map(child => {
                     const manualChildPlanTime = apexReferralValidDate(child.manual_plan_acquired_at);
@@ -2201,7 +2235,7 @@ app.get('/api/admin/users/progress', authenticate, isAdmin, async (req, res) => 
                 id: Number(row.id),
                 phone,
                 name: [row.nombre, row.apellido].filter(Boolean).join(' ').trim(),
-                referredBy: parent ? { id: Number(parent.id), name: [parent.nombre, parent.apellido].filter(Boolean).join(' ').trim(), phone: parentPhone } : (parentPhone ? { id: null, name: parentPhone, phone: parentPhone } : null),
+                referredBy: parent ? { id: Number(parent.id), name: [parent.nombre, parent.apellido].filter(Boolean).join(' ').trim(), phone: String(parent.telefono || '').trim() } : (parentPhone ? { id: null, name: parentPhone, phone: parentPhone } : null),
                 referrerId: parent ? Number(parent.id) : null,
                 target: Number(row.target) || 2,
                 planAcquiredAt,

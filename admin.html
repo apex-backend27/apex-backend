@@ -591,7 +591,31 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     else if (typeof window.alert === 'function') window.alert(text);
   }
 
-  async function saveTarget(user, row, nextTarget, targetValue, invitedCell) {
+  function phoneKey(value) {
+    var raw = String(value || '').trim();
+    return raw.replace(/\D/g, '') || raw.toLowerCase();
+  }
+
+  function indexes(list) {
+    var byPhone = new Map();
+    var byCode = new Map();
+    list.forEach(function (user) {
+      var phone = String(user.telefono || '').trim();
+      if (phone) byPhone.set(phoneKey(phone), user);
+      var code = String(user.codigo_referido || '').trim().toUpperCase();
+      if (code) byCode.set(code, user);
+    });
+    return {
+      byPhone: byPhone,
+      resolve: function (value) {
+        var raw = String(value || '').trim();
+        if (!raw) return null;
+        return byPhone.get(phoneKey(raw)) || byCode.get(raw.toUpperCase()) || null;
+      }
+    };
+  }
+
+  async function saveTarget(user, row, nextTarget, targetCell, invitedCell) {
     if (!user || !user.id) return;
     if (!Number.isInteger(nextTarget) || nextTarget < 1 || nextTarget > 1000) {
       message('El objetivo debe ser un número entero entre 1 y 1000.', 'danger');
@@ -618,7 +642,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       user.referral_target = Number(data.target) || nextTarget;
       var invited = Number.parseInt(user.referral_invited_count, 10);
       invited = Number.isInteger(invited) && invited >= 0 ? invited : 0;
-      if (targetValue) targetValue.textContent = String(user.referral_target);
+      if (targetCell) targetCell.textContent = String(user.referral_target);
       if (invitedCell) invitedCell.textContent = invited + '/' + user.referral_target;
       var minus = row.querySelector('[data-apex-goal-step="-1"]');
       var plus = row.querySelector('[data-apex-goal-step="1"]');
@@ -642,9 +666,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     var body = document.getElementById('usersTableBody');
     if (!body) return;
     var list = typeof getUsers === 'function' ? getUsers() : [];
-    var byPhone = new Map(list.map(function (user) {
-      return [String(user.telefono || '').trim(), user];
-    }));
+    var lookup = indexes(list);
+    var byPhone = lookup.byPhone;
 
     Array.from(body.querySelectorAll('tr')).forEach(function (row) {
       if (row.cells.length === 1) {
@@ -655,7 +678,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       if (row.dataset.apexColumnsApplied !== '1' && row.cells.length >= 11) {
         var cells = Array.from(row.cells);
         var phone = String(cells[2].textContent || '').trim();
-        var user = byPhone.get(phone) || {};
+        var user = byPhone.get(phoneKey(phone)) || {};
         var target = Number.parseInt(user.referral_target, 10);
         target = Number.isInteger(target) && target > 0 ? target : 2;
         var invited = Number.parseInt(user.referral_invited_count, 10);
@@ -679,7 +702,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         }
 
         var referral = String(user.referido_por || '').trim();
-        var referrer = referral ? byPhone.get(referral) : null;
+        var referrer = lookup.resolve(referral);
         var refCell = document.createElement('td');
         if (referrer) {
           var referrerName = document.createElement('span');
@@ -687,11 +710,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
           var referrerPhone = document.createElement('small');
           referrerPhone.className = 'usuario-telefono';
           referrerPhone.style.display = 'block';
-          referrerPhone.textContent = referral;
+          referrerPhone.textContent = String(referrer.telefono || '').trim();
           refCell.appendChild(referrerName);
           refCell.appendChild(document.createElement('br'));
           refCell.appendChild(referrerPhone);
-          refCell.title = referral;
+          refCell.title = String(referrer.telefono || referral);
         } else {
           refCell.textContent = referral || '—';
         }
@@ -699,50 +722,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         var objectiveCell = document.createElement('td');
         objectiveCell.style.textAlign = 'center';
         objectiveCell.style.fontWeight = '700';
-        objectiveCell.style.whiteSpace = 'nowrap';
-        var goalControls = document.createElement('span');
-        goalControls.style.display = 'inline-flex';
-        goalControls.style.alignItems = 'center';
-        goalControls.style.gap = '4px';
-        var minus = document.createElement('button');
-        minus.type = 'button';
-        minus.className = 'btn btn-danger btn-sm';
-        minus.dataset.apexGoalControl = '1';
-        minus.dataset.apexGoalStep = '-1';
-        minus.title = 'Quitar una persona del objetivo';
-        minus.setAttribute('aria-label', 'Disminuir objetivo');
-        minus.textContent = '−';
-        minus.disabled = target <= 1;
-        var targetValue = document.createElement('span');
-        targetValue.className = 'apex-goal-value';
-        targetValue.style.display = 'inline-block';
-        targetValue.style.minWidth = '18px';
-        targetValue.textContent = String(target);
-        var plus = document.createElement('button');
-        plus.type = 'button';
-        plus.className = 'btn btn-success btn-sm';
-        plus.dataset.apexGoalControl = '1';
-        plus.dataset.apexGoalStep = '1';
-        plus.title = 'Agregar una persona al objetivo';
-        plus.setAttribute('aria-label', 'Aumentar objetivo');
-        plus.textContent = '+';
-        plus.disabled = target >= 1000;
-        if (user.id) {
-          minus.addEventListener('click', function () {
-            saveTarget(user, row, Number(targetValue.textContent) - 1, targetValue, invitedCell);
-          });
-          plus.addEventListener('click', function () {
-            saveTarget(user, row, Number(targetValue.textContent) + 1, targetValue, invitedCell);
-          });
-        } else {
-          minus.disabled = true;
-          plus.disabled = true;
-        }
-        goalControls.appendChild(minus);
-        goalControls.appendChild(targetValue);
-        goalControls.appendChild(plus);
-        objectiveCell.appendChild(goalControls);
-
+        objectiveCell.textContent = String(target);
         var invitedCell = document.createElement('td');
         invitedCell.textContent = invited + '/' + target;
         invitedCell.style.textAlign = 'center';
@@ -764,19 +744,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
       var cellsNow = row.cells;
       var phoneNow = String((cellsNow[3] && cellsNow[3].textContent) || '').trim();
-      var userNow = byPhone.get(phoneNow) || {};
+      var userNow = byPhone.get(phoneKey(phoneNow)) || {};
       var targetNow = Number.parseInt(userNow.referral_target, 10);
       targetNow = Number.isInteger(targetNow) && targetNow > 0 ? targetNow : 2;
       var invitedNow = Number.parseInt(userNow.referral_invited_count, 10);
       invitedNow = Number.isInteger(invitedNow) && invitedNow >= 0 ? invitedNow : 0;
       if (row.dataset.apexColumnsApplied === '1') {
-        var targetSpan = cellsNow[6] && cellsNow[6].querySelector('.apex-goal-value');
-        if (targetSpan) targetSpan.textContent = String(targetNow);
+        if (cellsNow[6]) cellsNow[6].textContent = String(targetNow);
         if (cellsNow[7]) cellsNow[7].textContent = invitedNow + '/' + targetNow;
-        var minusNow = cellsNow[6] && cellsNow[6].querySelector('[data-apex-goal-step="-1"]');
-        var plusNow = cellsNow[6] && cellsNow[6].querySelector('[data-apex-goal-step="1"]');
-        if (minusNow) minusNow.disabled = targetNow <= 1;
-        if (plusNow) plusNow.disabled = targetNow >= 1000;
       }
 
       var actions = row.querySelector('.action-buttons');
@@ -805,6 +780,38 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         });
         actions.appendChild(history);
       }
+
+      var targetCell = cellsNow[6];
+      if (userNow.id && !actions.querySelector('[data-apex-goal-step="-1"]')) {
+        var minus = document.createElement('button');
+        minus.type = 'button';
+        minus.className = 'btn btn-danger btn-sm';
+        minus.dataset.apexGoalControl = '1';
+        minus.dataset.apexGoalStep = '-1';
+        minus.title = 'Quitar una persona del objetivo';
+        minus.setAttribute('aria-label', 'Disminuir objetivo');
+        minus.textContent = '−';
+        minus.disabled = targetNow <= 1;
+        minus.addEventListener('click', function () {
+          saveTarget(userNow, row, Number(targetCell.textContent) - 1, targetCell, cellsNow[7]);
+        });
+        actions.appendChild(minus);
+      }
+      if (userNow.id && !actions.querySelector('[data-apex-goal-step="1"]')) {
+        var plus = document.createElement('button');
+        plus.type = 'button';
+        plus.className = 'btn btn-success btn-sm';
+        plus.dataset.apexGoalControl = '1';
+        plus.dataset.apexGoalStep = '1';
+        plus.title = 'Agregar una persona al objetivo';
+        plus.setAttribute('aria-label', 'Aumentar objetivo');
+        plus.textContent = '+';
+        plus.disabled = targetNow >= 1000;
+        plus.addEventListener('click', function () {
+          saveTarget(userNow, row, Number(targetCell.textContent) + 1, targetCell, cellsNow[7]);
+        });
+        actions.appendChild(plus);
+      }
       if (!actions.querySelector('[data-apex-goal]') && userNow.id) {
         var editGoal = document.createElement('button');
         editGoal.type = 'button';
@@ -814,7 +821,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         editGoal.title = 'Editar objetivo de invitados';
         editGoal.textContent = '🎯 Objetivo';
         editGoal.addEventListener('click', function () {
-          var current = Number.parseInt(userNow.referral_target, 10);
+          var current = Number.parseInt(targetCell.textContent, 10);
           current = Number.isInteger(current) && current > 0 ? current : 2;
           var raw = window.prompt('Nuevo objetivo de invitados (entero de 1 a 1000):', String(current));
           if (raw === null) return;
@@ -823,7 +830,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
             message('El objetivo debe ser un número entero entre 1 y 1000.', 'danger');
             return;
           }
-          saveTarget(userNow, row, nextTarget, cellsNow[6] && cellsNow[6].querySelector('.apex-goal-value'), cellsNow[7]);
+          saveTarget(userNow, row, nextTarget, targetCell, cellsNow[7]);
         });
         actions.appendChild(editGoal);
       }
