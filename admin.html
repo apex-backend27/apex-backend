@@ -591,6 +591,53 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
     else if (typeof window.alert === 'function') window.alert(text);
   }
 
+  async function saveTarget(user, row, nextTarget, targetValue, invitedCell) {
+    if (!user || !user.id) return;
+    if (!Number.isInteger(nextTarget) || nextTarget < 1 || nextTarget > 1000) {
+      message('El objetivo debe ser un número entero entre 1 y 1000.', 'danger');
+      return;
+    }
+    var token = localStorage.getItem('apex_token') || sessionStorage.getItem('apex_token') || '';
+    if (!token) {
+      message('La sesión administrativa expiró. Vuelve a iniciar sesión.', 'danger');
+      return;
+    }
+    var apiRoot = typeof window.API_URL === 'string' ? window.API_URL : (typeof API_URL === 'string' ? API_URL : '');
+    var controls = row.querySelectorAll('[data-apex-goal-control]');
+    controls.forEach(function (control) { control.disabled = true; });
+    try {
+      var response = await fetch(apiRoot + '/api/admin/users/' + encodeURIComponent(user.id) + '/goal', {
+        method: 'PUT',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, Accept: 'application/json' },
+        body: JSON.stringify({ target: nextTarget })
+      });
+      var data = {};
+      try { data = await response.json(); } catch (_) {}
+      if (!response.ok || data.error) throw new Error(data.error || 'No se pudo guardar el objetivo');
+      user.referral_target = Number(data.target) || nextTarget;
+      var invited = Number.parseInt(user.referral_invited_count, 10);
+      invited = Number.isInteger(invited) && invited >= 0 ? invited : 0;
+      if (targetValue) targetValue.textContent = String(user.referral_target);
+      if (invitedCell) invitedCell.textContent = invited + '/' + user.referral_target;
+      var minus = row.querySelector('[data-apex-goal-step="-1"]');
+      var plus = row.querySelector('[data-apex-goal-step="1"]');
+      if (minus) minus.disabled = user.referral_target <= 1;
+      if (plus) plus.disabled = user.referral_target >= 1000;
+      if (typeof window.cargarDatosAdmin === 'function') await window.cargarDatosAdmin();
+      message('Objetivo actualizado.', 'success');
+    } catch (error) {
+      message('No se pudo actualizar el objetivo: ' + error.message, 'danger');
+    } finally {
+      controls.forEach(function (control) { control.disabled = false; });
+      var finalTarget = Number.parseInt(user.referral_target, 10) || 2;
+      var finalMinus = row.querySelector('[data-apex-goal-step="-1"]');
+      var finalPlus = row.querySelector('[data-apex-goal-step="1"]');
+      if (finalMinus) finalMinus.disabled = finalTarget <= 1;
+      if (finalPlus) finalPlus.disabled = finalTarget >= 1000;
+    }
+  }
+
   function apply() {
     var body = document.getElementById('usersTableBody');
     if (!body) return;
@@ -650,9 +697,52 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         }
 
         var objectiveCell = document.createElement('td');
-        objectiveCell.textContent = String(target);
         objectiveCell.style.textAlign = 'center';
         objectiveCell.style.fontWeight = '700';
+        objectiveCell.style.whiteSpace = 'nowrap';
+        var goalControls = document.createElement('span');
+        goalControls.style.display = 'inline-flex';
+        goalControls.style.alignItems = 'center';
+        goalControls.style.gap = '4px';
+        var minus = document.createElement('button');
+        minus.type = 'button';
+        minus.className = 'btn btn-danger btn-sm';
+        minus.dataset.apexGoalControl = '1';
+        minus.dataset.apexGoalStep = '-1';
+        minus.title = 'Quitar una persona del objetivo';
+        minus.setAttribute('aria-label', 'Disminuir objetivo');
+        minus.textContent = '−';
+        minus.disabled = target <= 1;
+        var targetValue = document.createElement('span');
+        targetValue.className = 'apex-goal-value';
+        targetValue.style.display = 'inline-block';
+        targetValue.style.minWidth = '18px';
+        targetValue.textContent = String(target);
+        var plus = document.createElement('button');
+        plus.type = 'button';
+        plus.className = 'btn btn-success btn-sm';
+        plus.dataset.apexGoalControl = '1';
+        plus.dataset.apexGoalStep = '1';
+        plus.title = 'Agregar una persona al objetivo';
+        plus.setAttribute('aria-label', 'Aumentar objetivo');
+        plus.textContent = '+';
+        plus.disabled = target >= 1000;
+        if (user.id) {
+          minus.addEventListener('click', function () {
+            saveTarget(user, row, Number(targetValue.textContent) - 1, targetValue, invitedCell);
+          });
+          plus.addEventListener('click', function () {
+            saveTarget(user, row, Number(targetValue.textContent) + 1, targetValue, invitedCell);
+          });
+        } else {
+          minus.disabled = true;
+          plus.disabled = true;
+        }
+        goalControls.appendChild(minus);
+        goalControls.appendChild(targetValue);
+        goalControls.appendChild(plus);
+        objectiveCell.appendChild(goalControls);
+
         var invitedCell = document.createElement('td');
         invitedCell.textContent = invited + '/' + target;
         invitedCell.style.textAlign = 'center';
@@ -680,8 +770,13 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
       var invitedNow = Number.parseInt(userNow.referral_invited_count, 10);
       invitedNow = Number.isInteger(invitedNow) && invitedNow >= 0 ? invitedNow : 0;
       if (row.dataset.apexColumnsApplied === '1') {
-        if (cellsNow[6]) cellsNow[6].textContent = String(targetNow);
+        var targetSpan = cellsNow[6] && cellsNow[6].querySelector('.apex-goal-value');
+        if (targetSpan) targetSpan.textContent = String(targetNow);
         if (cellsNow[7]) cellsNow[7].textContent = invitedNow + '/' + targetNow;
+        var minusNow = cellsNow[6] && cellsNow[6].querySelector('[data-apex-goal-step="-1"]');
+        var plusNow = cellsNow[6] && cellsNow[6].querySelector('[data-apex-goal-step="1"]');
+        if (minusNow) minusNow.disabled = targetNow <= 1;
+        if (plusNow) plusNow.disabled = targetNow >= 1000;
       }
 
       var actions = row.querySelector('.action-buttons');
@@ -715,6 +810,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
         editGoal.type = 'button';
         editGoal.className = 'btn btn-warning btn-sm';
         editGoal.dataset.apexGoal = '1';
+        editGoal.dataset.apexGoalControl = '1';
         editGoal.title = 'Editar objetivo de invitados';
         editGoal.textContent = '🎯 Objetivo';
         editGoal.addEventListener('click', function () {
@@ -722,37 +818,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
           current = Number.isInteger(current) && current > 0 ? current : 2;
           var raw = window.prompt('Nuevo objetivo de invitados (entero de 1 a 1000):', String(current));
           if (raw === null) return;
-          var target = Number(String(raw).trim());
-          if (!Number.isInteger(target) || target < 1 || target > 1000) {
+          var nextTarget = Number(String(raw).trim());
+          if (!Number.isInteger(nextTarget) || nextTarget < 1 || nextTarget > 1000) {
             message('El objetivo debe ser un número entero entre 1 y 1000.', 'danger');
             return;
           }
-          var token = localStorage.getItem('apex_token') || sessionStorage.getItem('apex_token') || '';
-          if (!token) {
-            message('La sesión administrativa expiró. Vuelve a iniciar sesión.', 'danger');
-            return;
-          }
-          var apiRoot = typeof window.API_URL === 'string' ? window.API_URL : (typeof API_URL === 'string' ? API_URL : '');
-          fetch(apiRoot + '/api/admin/users/' + encodeURIComponent(userNow.id) + '/goal', {
-            method: 'PUT',
-            cache: 'no-store',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, Accept: 'application/json' },
-            body: JSON.stringify({ target: target })
-          }).then(async function (response) {
-            var data = {};
-            try { data = await response.json(); } catch (_) {}
-            if (!response.ok || data.error) throw new Error(data.error || 'No se pudo guardar el objetivo');
-            userNow.referral_target = Number(data.target) || target;
-            if (typeof window.cargarDatosAdmin === 'function') {
-              await window.cargarDatosAdmin();
-            } else {
-              if (cellsNow[6]) cellsNow[6].textContent = String(userNow.referral_target);
-              if (cellsNow[7]) cellsNow[7].textContent = invitedNow + '/' + userNow.referral_target;
-            }
-            message('Objetivo actualizado.', 'success');
-          }).catch(function (error) {
-            message('No se pudo actualizar el objetivo: ' + error.message, 'danger');
-          });
+          saveTarget(userNow, row, nextTarget, cellsNow[6] && cellsNow[6].querySelector('.apex-goal-value'), cellsNow[7]);
         });
         actions.appendChild(editGoal);
       }

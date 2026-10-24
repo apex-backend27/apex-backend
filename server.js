@@ -2080,7 +2080,8 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
             SELECT u.*,
                    COALESCE(debt.debe, 0) AS deuda_pendiente,
                    COALESCE(referral_goal.target, 2) AS referral_target,
-                   COALESCE(referral_counts.invited_count, 0)::INTEGER AS referral_invited_count
+                   referral_goal.manual_plan_acquired_at AS referral_manual_plan_acquired_at,
+                   referral_goal.manual_status AS referral_manual_status
             FROM users u
             LEFT JOIN (
                 SELECT user_id, SUM(outstanding) AS debe
@@ -2088,19 +2089,26 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
                 GROUP BY user_id
             ) debt ON debt.user_id = u.id
             LEFT JOIN apex_user_referral_goals referral_goal ON referral_goal.user_id = u.id
-            LEFT JOIN (
-                SELECT TRIM(COALESCE(invited.referido_por, '')) AS referrer_phone,
-                       COUNT(*)::INTEGER AS invited_count
-                FROM users invited
-                LEFT JOIN apex_user_referral_goals invitee_goal ON invitee_goal.user_id = invited.id
-                WHERE TRIM(COALESCE(invited.referido_por, '')) <> ''
-                  AND COALESCE(invitee_goal.manual_status, '') <> 'abandoned'
-                GROUP BY TRIM(COALESCE(invited.referido_por, ''))
-            ) referral_counts ON referral_counts.referrer_phone = TRIM(COALESCE(u.telefono, ''))
             ORDER BY u.id ASC
         `);
+        const users = result.rows || [];
+        const invitedCounts = new Map();
+        users.forEach(invitee => {
+            if (invitee.referral_manual_status === 'abandoned') return;
+            const manualPlanTime = apexReferralValidDate(invitee.referral_manual_plan_acquired_at);
+            const automaticPlanTime = apexReferralValidDate(apexReferralFirstPlanDate(invitee.historial_detallado, invitee.fechas_invito));
+            if (manualPlanTime === null && automaticPlanTime === null) return;
+            const referrerPhone = String(invitee.referido_por || '').trim();
+            if (!referrerPhone) return;
+            invitedCounts.set(referrerPhone, (invitedCounts.get(referrerPhone) || 0) + 1);
+        });
+        users.forEach(user => {
+            user.referral_invited_count = invitedCounts.get(String(user.telefono || '').trim()) || 0;
+            delete user.referral_manual_plan_acquired_at;
+            delete user.referral_manual_status;
+        });
         res.set('Cache-Control', 'no-store');
-        res.json(result.rows);
+        res.json(users);
         
     } catch (error) {
         console.error('Error al obtener usuarios:', error);
@@ -2127,7 +2135,7 @@ function apexReferralFirstPlanDate(historyValue, inviteDatesValue) {
     const legacyDate = apexReferralValidDate(inviteDates?.fechaPrimerPlan);
     if (legacyDate !== null) dates.push(legacyDate);
     if (Array.isArray(history)) history.forEach(item => {
-        if (String(item?.tipo || '').toLowerCase() !== 'compra_plan') return;
+        if (String(item?.tipo || item?.type || '').toLowerCase() !== 'compra_plan') return;
         const time = apexReferralValidDate(item?.fecha || item?.date);
         if (time !== null) dates.push(time);
     });
@@ -2168,9 +2176,19 @@ app.get('/api/admin/users/progress', authenticate, isAdmin, async (req, res) => 
             const planTime = manualPlanTime === null ? automaticPlanTime : manualPlanTime;
             const planAcquiredAt = planTime === null ? null : new Date(planTime).toISOString();
             const allChildren = directChildren.get(phone) || [];
-            const children = allChildren.filter(child => child.manual_status !== 'abandoned');
+            const children = allChildren.filter(child => {
+                if (child.manual_status === 'abandoned') return false;
+                const manualChildPlanTime = apexReferralValidDate(child.manual_plan_acquired_at);
+                const automaticChildPlanTime = apexReferralValidDate(apexReferralFirstPlanDate(child.historial_detallado, child.fechas_invito));
+                return manualChildPlanTime !== null || automaticChildPlanTime !== null;
+            });
             const referralTimes = children
-                .map(child => apexReferralValidDate(child.fecha_registro || child.created_at))
+                .map(child => {
+                    const manualChildPlanTime = apexReferralValidDate(child.manual_plan_acquired_at);
+                    return manualChildPlanTime === null
+                        ? apexReferralValidDate(apexReferralFirstPlanDate(child.historial_detallado, child.fechas_invito))
+                        : manualChildPlanTime;
+                })
                 .filter(time => time !== null);
             const latestReferralAt = referralTimes.length ? Math.max(...referralTimes) : null;
             const adjustedAt = apexReferralValidDate(row.deadline_adjusted_at);
