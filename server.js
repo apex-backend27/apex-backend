@@ -2079,12 +2079,13 @@ app.get('/api/admin/users', authenticate, isAdmin, async (req, res) => {
         const result = await pool.query(`
             SELECT u.*,
                    COALESCE(debt.debe, 0) AS deuda_pendiente,
+                   COALESCE(debt.total_prestado, 0) AS total_prestado,
                    COALESCE(referral_goal.target, 2) AS referral_target,
                    referral_goal.manual_plan_acquired_at AS referral_manual_plan_acquired_at,
                    referral_goal.manual_status AS referral_manual_status
             FROM users u
             LEFT JOIN (
-                SELECT user_id, SUM(outstanding) AS debe
+                SELECT user_id, SUM(outstanding) AS debe, SUM(amount) AS total_prestado
                 FROM apex_loans
                 GROUP BY user_id
             ) debt ON debt.user_id = u.id
@@ -2612,6 +2613,21 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
         await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS comision_retiro_porcentaje NUMERIC(8,4) DEFAULT NULL');
         const userId = req.params.id;
         const updates = { ...req.body };
+        if (Object.prototype.hasOwnProperty.call(updates, 'referido_por')) {
+            const referral = updates.referido_por == null ? '' : String(updates.referido_por).trim();
+            if (!referral) {
+                updates.referido_por = null;
+            } else {
+                const referrer = await pool.query(
+                    'SELECT id, telefono FROM users WHERE id <> $1 AND (telefono = $2 OR codigo_referido = $2) LIMIT 1',
+                    [userId, referral]
+                );
+                if (!referrer.rows[0]) {
+                    return res.status(400).json({ error: 'El invitador seleccionado no existe o no es válido' });
+                }
+                updates.referido_por = referrer.rows[0].telefono;
+            }
+        }
         if (Object.prototype.hasOwnProperty.call(updates, 'comision_retiro_porcentaje')) {
             if (updates.comision_retiro_porcentaje === '' || updates.comision_retiro_porcentaje === null) updates.comision_retiro_porcentaje = null;
             else {
@@ -2635,7 +2651,7 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
                 'tareas_asignadas', 'tareas_completadas_hoy', 'ultima_fecha_tareas',
                 'racha_dias', 'cobro_tareas_fecha', 'cobro_tareas_monto', 'historial',
                 'canjes_realizados', 'cupones_asignados', 'logros_asignados', 'logros_reclamados',
-                'referidos', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
+                'referidos', 'referido_por', 'fechas_invito', 'historial_detallado', 'direccion_retiro',
                 'nombre', 'apellido', 'password_hash', 'password_retiro_hash', 'plan_amount', 'daily_earnings',
                 'comision_retiro_porcentaje', 'es_admin', 'es_super_admin', 'total_ganado', 'ganado_semanal', 'ganado_semanal_inicio'];
             if (camposPermitidos.includes(key)) {
