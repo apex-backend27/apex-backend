@@ -2636,6 +2636,11 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
                 updates.comision_retiro_porcentaje = pct;
             }
         }
+        if (Object.prototype.hasOwnProperty.call(updates, 'plan') && ['sin plan', 'sin_plan', '', 'null', 'undefined'].includes(String(updates.plan ?? '').trim().toLowerCase())) {
+            updates.plan = 'Sin plan';
+            updates.plan_amount = 0;
+            updates.daily_earnings = 0;
+        }
         if (updates.password) { updates.password_hash = await bcrypt.hash(String(updates.password), 10); delete updates.password; }
         if (updates.password_retiro) { updates.password_retiro_hash = await bcrypt.hash(String(updates.password_retiro), 10); delete updates.password_retiro; }
         
@@ -2932,6 +2937,7 @@ app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
         await client.query('BEGIN');
         const current = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
         const u = current.rows[0];
+        if (u.produccion_pausada || u.cuenta_habilitada === false) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Tu cuenta está pausada o deshabilitada; no puedes adquirir otro plan' }); }
         const balance = Number(u.balance || 0);
         if (balance < plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Saldo insuficiente' }); }
         if (u.plan && u.plan !== 'Sin plan' && Number(u.plan_amount || 0) >= plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Ya tienes este plan o uno superior' }); }
@@ -3171,7 +3177,13 @@ async function readPlanesCatalog(db=pool){
     const q=await db.query('SELECT planes_catalogo,special_plan_config FROM configuracion WHERE id=1');
     const current=normalizarCatalogoPlanes(q.rows[0]?.planes_catalogo);
     const legacySpecial=specialPlanConfig(q.rows[0]?.special_plan_config);
-    if(!Array.isArray(q.rows[0]?.planes_catalogo)||!q.rows[0].planes_catalogo.length){
+    if(Array.isArray(q.rows[0]?.planes_catalogo)&&q.rows[0].planes_catalogo.length){
+        const i=current.findIndex(p=>p.id==='plan_especial');
+        if(i>=0 && legacySpecial.visible && !current[i].visible){
+            current[i]=normalizarPlanCatalogo({...current[i],...legacySpecial,costo:legacySpecial.amount,genera:legacySpecial.daily,dias:legacySpecial.days,cobro:legacySpecial.payout});
+            await db.query('UPDATE configuracion SET planes_catalogo=$1::jsonb,updated_at=NOW() WHERE id=1',[JSON.stringify(current)]);
+        }
+    } else {
         const i=current.findIndex(p=>p.id==='plan_especial');
         if(i>=0) current[i]=normalizarPlanCatalogo({...current[i],...legacySpecial,costo:legacySpecial.amount,genera:legacySpecial.daily,dias:legacySpecial.days,cobro:legacySpecial.payout});
         await db.query('UPDATE configuracion SET planes_catalogo=$1::jsonb,updated_at=NOW() WHERE id=1',[JSON.stringify(current)]);
