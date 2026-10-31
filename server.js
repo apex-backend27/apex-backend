@@ -1024,7 +1024,7 @@ function publicUserData(row, referidosOverride) {
         ...safe,
         balance: Number(safe.balance || 0),
         puntos: Number(safe.puntos || 0),
-        plan: planRealDesdeDatos(safe),
+        plan: safe.plan || 'Sin plan',
         plan_amount: Number(safe.plan_amount || 0),
         daily_earnings: gananciaDiariaOficial(safe),
         plan_activo: safe.plan_activo !== false,
@@ -1148,7 +1148,7 @@ app.get('/api/verify', authenticate, async (req, res) => {
             plan_actual: planRealDesdeDatos(r),
             plan_amount: Number(r.plan_amount || 0),
             daily_earnings: Number(r.daily_earnings || 0),
-            tienePlan: Boolean(planRealDesdeDatos(r) !== 'Sin plan' || Number(r.plan_amount || 0) > 0 || Number(r.daily_earnings || 0) > 0),
+            tienePlan: Boolean((r.plan && !['sin plan','sin_plan','null','undefined','ninguno'].includes(String(r.plan).trim().toLowerCase())) || Number(r.plan_amount || 0) > 0 || Number(r.daily_earnings || 0) > 0),
             date: r.fecha_registro,
             referido_por: r.referido_por
         }));
@@ -1231,10 +1231,12 @@ app.delete('/api/admin/loans/:loanId', authenticate, isAdmin, async (req,res)=>{
 });
 app.get('/api/user/loans', authenticate, async (req,res)=>{try{await ensureApexLoansSchema();res.json(await apexUserLoans(req.userId));}catch(e){console.error('Apex user loans:',e);res.status(500).json({error:'No se pudo cargar tus préstamos'});}});
 
-app.get('/api/user/:id', authenticate, async (req, res, next) => {
+app.get('/api/user/:id', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
-    if (!/^\d+$/.test(String(id))) return next();
+    if (!/^\d+$/.test(String(id))) {
+      return res.status(404).json({ error: 'Ruta de usuario no válida' });
+    }
     if (String(req.userId) !== String(id)) {
       return res.status(403).json({ error: 'No tienes permiso para consultar esta cuenta' });
     }
@@ -1483,7 +1485,7 @@ app.get('/api/user/referrals', authenticate, async (req, res) => {
                 nombre: [db.nombre || value.nombre, db.apellido || value.apellido].filter(Boolean).join(' ') || value.name || 'Sin nombre',
                 plan: planRealDesdeDatos(db.id ? db : null, db.id ? {} : value), plan_amount: Number(db.id ? db.plan_amount : (value.plan_amount || 0)),
                 daily_earnings: Number(db.id ? db.daily_earnings : (value.daily_earnings || 0)), plan_nombre: planRealDesdeDatos(db.id ? db : null, db.id ? {} : value),
-                plan_actual: planRealDesdeDatos(db.id ? db : null, db.id ? {} : value), tienePlan: Boolean(planRealDesdeDatos(db.id ? db : null, db.id ? {} : value) !== 'Sin plan' || Number(db.plan_amount || value.plan_amount || 0) > 0),
+                plan_actual: planRealDesdeDatos(db.id ? db : null, db.id ? {} : value), tienePlan: Boolean(db.plan || value.plan || Number(db.plan_amount || value.plan_amount || 0) > 0),
                 date: db.fecha_registro || value.date || null, referido_por: db.referido_por || value.referido_por || null,
                 codigo_referido: db.codigo_referido || value.codigo_referido || null, nivel: level,
                 activo: db.cuenta_habilitada !== false };
@@ -2634,11 +2636,6 @@ app.put('/api/admin/user/:id', authenticate, isAdmin, async (req, res) => {
                 updates.comision_retiro_porcentaje = pct;
             }
         }
-        if (Object.prototype.hasOwnProperty.call(updates, 'plan') && ['sin plan', 'sin_plan', '', 'null', 'undefined'].includes(String(updates.plan ?? '').trim().toLowerCase())) {
-            updates.plan = 'Sin plan';
-            updates.plan_amount = 0;
-            updates.daily_earnings = 0;
-        }
         if (updates.password) { updates.password_hash = await bcrypt.hash(String(updates.password), 10); delete updates.password; }
         if (updates.password_retiro) { updates.password_retiro_hash = await bcrypt.hash(String(updates.password_retiro), 10); delete updates.password_retiro; }
         
@@ -2926,16 +2923,13 @@ app.post('/api/user/withdraw', authenticate, async (req, res) => {
 });
 
 app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
-    const catalog = await readPlanesCatalog();
-    const selected = catalog.find(p => String(p.id) === String(req.body.plan) || String(p.nombre).toLowerCase() === String(req.body.plan || '').toLowerCase());
-    if (!selected || selected.tipo === 'special' || selected.visible === false) return res.status(400).json({ error: 'Plan no disponible' });
-    const plan = planCatalogoToLegacy(selected);
+    const plan = PLANES_APEX[req.body.plan];
+    if (!plan || plan.comingSoon) return res.status(400).json({ error: 'Este plan estará disponible próximamente' });
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
         const current = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
         const u = current.rows[0];
-        if (u.produccion_pausada || u.cuenta_habilitada === false) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Tu cuenta está pausada o deshabilitada; no puedes adquirir otro plan' }); }
         const balance = Number(u.balance || 0);
         if (balance < plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Saldo insuficiente' }); }
         if (u.plan && u.plan !== 'Sin plan' && Number(u.plan_amount || 0) >= plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Ya tienes este plan o uno superior' }); }
@@ -3151,72 +3145,6 @@ app.post('/api/admin/loans/:loanId/adjust', authenticate, isAdmin, async (req,re
     const client=await pool.connect(); try { await ensureApexLoansSchema();const loanId=Number(req.params.loanId),delta=Number(String(req.body.delta??'').replace(',','.')),date=req.body.date?new Date(req.body.date):new Date(),note=String(req.body.note||'Ajuste de préstamo').trim();if(!Number.isInteger(loanId)||!Number.isFinite(delta)||delta===0||Number.isNaN(date.getTime()))return res.status(400).json({error:'Ajuste y fecha válidos son obligatorios'});await client.query('BEGIN');const lq=await client.query('SELECT * FROM apex_loans WHERE id=$1 FOR UPDATE',[loanId]);if(!lq.rows.length)throw Error('Préstamo no encontrado');const loan=lq.rows[0],next=Number(loan.outstanding)+delta;if(next<0)throw Error('El ajuste no puede dejar la deuda negativa');const uq=await client.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[loan.user_id]),u=uq.rows[0],nextBalance=Number(u.balance||0)+delta;if(nextBalance<0)throw Error('El ajuste no puede dejar el saldo negativo');const hist=Array.isArray(u.historial_detallado)?u.historial_detallado:[];hist.push(loanHistoryItem('ajuste_prestamo',delta,note,date,loanId));await client.query('UPDATE apex_loans SET outstanding=$1,status=$2,updated_at=NOW() WHERE id=$3',[next,next<=0.000001?'pagado':'pendiente',loanId]);const updated=await client.query('UPDATE users SET balance=$1,historial_detallado=$2::jsonb WHERE id=$3 RETURNING *',[nextBalance,JSON.stringify(hist),loan.user_id]);await client.query('COMMIT');res.json({success:true,debe:next,balance:nextBalance,user:updated.rows[0]||null});}catch(e){try{await client.query('ROLLBACK')}catch(_){}console.error('Apex adjustment:',e);res.status(400).json({error:e.message||'No se pudo aplicar el ajuste'});}finally{client.release();}
 });
 
-
-
-// APEX_PLAN_CATALOG_V1
-const PLANES_CATALOGO_DEFAULT = Object.entries(PLANES_APEX).map(([id, value]) => ({
-    id, nombre: id, tipo: 'standard', costo: Number(value.amount), genera: Number(value.daily), visible: value.comingSoon !== true, comingSoon: value.comingSoon === true
-})).concat([{ id: 'plan_especial', nombre: 'Plan Especial', tipo: 'special', costo: 150, genera: 10, dias: 30, cobro: 300, visible: false, weekdays: [1,2,3,4,5] }]);
-function normalizarPlanCatalogo(raw) {
-    const src = raw && typeof raw === 'object' ? raw : {};
-    const id = String(src.id || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 50);
-    const nombre = String(src.nombre || id || 'Plan').trim().slice(0, 60);
-    const num=(v,d,min=0)=>{const n=Number(v);return Number.isFinite(n)&&n>=min?n:d;};
-    const tipo=src.tipo==='special'||id==='plan_especial'?'special':'standard';
-    return {id:id||('plan_'+Date.now()),nombre,tipo,costo:Number(num(src.costo??src.amount,0).toFixed(2)),genera:Number(num(src.genera??src.daily,0).toFixed(2)),dias:Math.min(366,Math.floor(num(src.dias??src.days,30,1))),cobro:Number(num(src.cobro??src.payout,300).toFixed(2)),visible:src.visible!==false,comingSoon:src.comingSoon===true,weekdays:Array.isArray(src.weekdays)?[...new Set(src.weekdays.map(Number).filter(n=>Number.isInteger(n)&&n>=0&&n<=6))].sort((a,b)=>a-b):[1,2,3,4,5]};
-}
-function normalizarCatalogoPlanes(raw) {
-    const list=Array.isArray(raw)?raw:[]; const seen=new Set(); const out=[];
-    for(const item of list){const p=normalizarPlanCatalogo(item);if(!seen.has(p.id)){seen.add(p.id);out.push(p);}}
-    return out.length?out:PLANES_CATALOGO_DEFAULT.map(normalizarPlanCatalogo);
-}
-async function readPlanesCatalog(db=pool){
-    await db.query("ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS planes_catalogo JSONB NOT NULL DEFAULT '[]'::jsonb");
-    const q=await db.query('SELECT planes_catalogo,special_plan_config FROM configuracion WHERE id=1');
-    const current=normalizarCatalogoPlanes(q.rows[0]?.planes_catalogo);
-    const legacySpecial=specialPlanConfig(q.rows[0]?.special_plan_config);
-    if(Array.isArray(q.rows[0]?.planes_catalogo)&&q.rows[0].planes_catalogo.length){
-        const i=current.findIndex(p=>p.id==='plan_especial');
-        if(i>=0 && legacySpecial.visible && !current[i].visible){
-            current[i]=normalizarPlanCatalogo({...current[i],...legacySpecial,costo:legacySpecial.amount,genera:legacySpecial.daily,dias:legacySpecial.days,cobro:legacySpecial.payout});
-            await db.query('UPDATE configuracion SET planes_catalogo=$1::jsonb,updated_at=NOW() WHERE id=1',[JSON.stringify(current)]);
-        }
-    } else {
-        const i=current.findIndex(p=>p.id==='plan_especial');
-        if(i>=0) current[i]=normalizarPlanCatalogo({...current[i],...legacySpecial,costo:legacySpecial.amount,genera:legacySpecial.daily,dias:legacySpecial.days,cobro:legacySpecial.payout});
-        await db.query('UPDATE configuracion SET planes_catalogo=$1::jsonb,updated_at=NOW() WHERE id=1',[JSON.stringify(current)]);
-    }
-    return current;
-}
-function planCatalogoToLegacy(p){return {amount:Number(p.costo||0),daily:Number(p.genera||0),comingSoon:p.comingSoon===true};}
-app.get('/api/plans/catalog', authenticate, async (req,res)=>{try{const all=await readPlanesCatalog();res.json({planes:all.filter(p=>p.visible||flagTrue(req.user?.es_admin))});}catch(e){res.status(500).json({error:'No se pudieron cargar los planes'});}});
-app.get('/api/admin/plans/catalog', authenticate, isAdmin, async (req,res)=>{try{res.json({planes:await readPlanesCatalog()});}catch(e){res.status(500).json({error:'No se pudo cargar el catálogo de planes'});}});
-app.put('/api/admin/plans/catalog', authenticate, isAdmin, async (req,res)=>{try{const incoming=Array.isArray(req.body?.planes)?req.body.planes:[], current=await readPlanesCatalog();const baseIds=['temporal','trader','analista','gestor','master','elite'];const base=baseIds.map(id=>{const legacyName=Object.keys(PLANES_APEX).find(k=>k.toLowerCase()===id)||id;const old=current.find(p=>p.id===id)||normalizarPlanCatalogo({id,nombre:legacyName,costo:PLANES_APEX[legacyName]?.amount,genera:PLANES_APEX[legacyName]?.daily,visible:true});const fresh=incoming.find(p=>String(p.id).toLowerCase()===id&&p.tipo!=='special')||{};return normalizarPlanCatalogo({...old,...fresh,id,tipo:'standard',dias:30,cobro:0});});const specials=incoming.filter(p=>p.tipo==='special').map(normalizarPlanCatalogo);const planes=base.concat(specials);if(planes.some(p=>p.costo<=0||p.genera<0))throw Error('Costo y generación deben ser válidos');const q=await pool.query("INSERT INTO configuracion(id,planes_catalogo,updated_at) VALUES(1,$1::jsonb,NOW()) ON CONFLICT(id) DO UPDATE SET planes_catalogo=$1::jsonb,updated_at=NOW() RETURNING planes_catalogo",[JSON.stringify(planes)]);const special=planes.find(p=>p.id==='plan_especial');if(special){const cfg=specialPlanConfig({nombre:special.nombre,visible:special.visible,amount:special.costo,days:special.dias,daily:special.genera,payout:special.cobro,weekdays:special.weekdays});await pool.query("INSERT INTO configuracion(id,special_plan_config,updated_at) VALUES(1,$1::jsonb,NOW()) ON CONFLICT(id) DO UPDATE SET special_plan_config=$1::jsonb,updated_at=NOW()",[JSON.stringify(cfg)]);}res.json({message:'Planes guardados',planes:normalizarCatalogoPlanes(q.rows[0].planes_catalogo)});}catch(e){res.status(400).json({error:e.message||'No se pudieron guardar los planes'});}});
-
-// APEX_SPECIAL_PLAN_V1 — Plan Especial de celebración
-const SPECIAL_PLAN_DEFAULT = { nombre: 'Plan Especial', visible: false, amount: 150, days: 30, daily: 10, payout: 300, weekdays: [1, 2, 3, 4, 5] };
-function specialPlanConfig(raw) {
-    const src = raw && typeof raw === 'object' ? raw : {};
-    const num = (v, fallback, min = 0) => { const n = Number(v); return Number.isFinite(n) && n >= min ? n : fallback; };
-    const weekdays = Array.isArray(src.weekdays) ? [...new Set(src.weekdays.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 6))].sort((a,b) => a-b) : SPECIAL_PLAN_DEFAULT.weekdays;
-    return { nombre: String(src.nombre || SPECIAL_PLAN_DEFAULT.nombre).slice(0, 60), visible: src.visible === true, amount: Number(num(src.amount, 150).toFixed(2)), days: Math.min(366, Math.floor(num(src.days, 30, 1))), daily: Number(num(src.daily, 10).toFixed(2)), payout: Number(num(src.payout, 300).toFixed(2)), weekdays: weekdays.length ? weekdays : [1,2,3,4,5] };
-}
-function specialPlanState(raw) { const s = raw && typeof raw === 'object' ? raw : {}; return { status: String(s.status || 'none'), activated_at: s.activated_at || null, checkins_completed: Math.max(0, Number(s.checkins_completed || 0)), earned: Number(Number(s.earned || 0).toFixed(2)), last_checkin_date: s.last_checkin_date || null, payout_claimed: s.payout_claimed === true, consumed_deposit_id: s.consumed_deposit_id || null, payout_gross: Number(Number(s.payout_gross || 0).toFixed(2)), payout_commission: Number(Number(s.payout_commission || 0).toFixed(2)), payout_net: Number(Number(s.payout_net || 0).toFixed(2)), completed_at: s.completed_at || null }; }
-async function ensureSpecialPlanColumns() { try { await pool.query("ALTER TABLE configuracion ADD COLUMN IF NOT EXISTS special_plan_config JSONB NOT NULL DEFAULT '{}'::jsonb"); await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS special_plan_state JSONB NOT NULL DEFAULT '{}'::jsonb"); await pool.query('ALTER TABLE polygon_deposits ADD COLUMN IF NOT EXISTS special_plan_consumed_at TIMESTAMPTZ'); } catch (e) { console.error('Error preparando Plan Especial:', e.message); } }
-ensureSpecialPlanColumns();
-async function readSpecialPlanConfig(db = pool) { const q = await db.query('SELECT special_plan_config FROM configuracion WHERE id=1'); return specialPlanConfig(q.rows[0] && q.rows[0].special_plan_config); }
-app.get('/api/special-plan/config', authenticate, async (req,res) => { try { const config = await readSpecialPlanConfig(); res.json({ visible: config.visible, config: config.visible || flagTrue(req.user.es_admin) ? config : { nombre: config.nombre, visible: false } }); } catch(e) { res.status(500).json({error:'No se pudo cargar el Plan Especial'}); } });
-app.get('/api/user/special-plan', authenticate, async (req,res) => { try { const config=await readSpecialPlanConfig(), q=await pool.query('SELECT * FROM users WHERE id=$1',[req.userId]), u=q.rows[0], state=specialPlanState(u.special_plan_state), activeState=['active','ready','completed'].includes(state.status); res.json({visible:config.visible||activeState,config,state,paused:Boolean(u.produccion_pausada)||u.cuenta_habilitada===false,user:publicUserData(u)}); } catch(e) { res.status(500).json({error:'No se pudo cargar el estado del Plan Especial'}); } });
-app.get('/api/admin/special-plan/config', authenticate, isAdmin, async (req,res) => { try { res.json({config:await readSpecialPlanConfig()}); } catch(e) { res.status(500).json({error:'No se pudo cargar la configuración'}); } });
-app.put('/api/admin/special-plan/config', authenticate, isAdmin, async (req,res) => { try { const config=specialPlanConfig(req.body||{}); const q=await pool.query("INSERT INTO configuracion(id,special_plan_config,updated_at) VALUES(1,$1::jsonb,NOW()) ON CONFLICT(id) DO UPDATE SET special_plan_config=$1::jsonb,updated_at=NOW() RETURNING special_plan_config",[JSON.stringify(config)]); res.json({message:'Plan Especial configurado',config:specialPlanConfig(q.rows[0].special_plan_config)}); } catch(e) { res.status(400).json({error:'No se pudo guardar el Plan Especial'}); } });
-app.get('/api/admin/special-plan/authorizations', authenticate, isAdmin, async (req,res)=>{try{const q=await pool.query("SELECT id,nombre,apellido,telefono,balance,plan,special_plan_state FROM users WHERE COALESCE(special_plan_state->>'status','none') IN ('none','rejected') ORDER BY id");res.json({users:q.rows.map(x=>({id:x.id,nombre:x.nombre,apellido:x.apellido,telefono:x.telefono,balance:Number(x.balance||0),plan:x.plan,state:specialPlanState(x.special_plan_state)}))})}catch(e){res.status(500).json({error:'No se pudieron cargar usuarios para autorización'})}});
-app.post('/api/admin/user/:id/special-plan/authorize', authenticate, isAdmin, async (req,res)=>{try{const cfg=await readSpecialPlanConfig(),q=await pool.query('SELECT * FROM users WHERE id=$1',[req.params.id]);if(!q.rows.length)return res.status(404).json({error:'Usuario no encontrado'});const u=q.rows[0],state=specialPlanState(u.special_plan_state);if(['active','ready','completed','authorized'].includes(state.status))return res.status(400).json({error:'El usuario ya tiene una autorización o plan activo'});state.status='authorized';state.authorized_at=new Date().toISOString();state.authorized_by=req.userId;state.authorization_amount=cfg.amount;const r=await pool.query('UPDATE users SET special_plan_state=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(state),req.params.id]);res.json({message:'Compra del Plan Especial autorizada',config:cfg,state,user:publicUserData(r.rows[0])})}catch(e){res.status(400).json({error:e.message||'No se pudo autorizar'})}});
-app.post('/api/user/special-plan/purchase', authenticate, async (req,res)=>{const c=await pool.connect();try{await c.query('BEGIN');const cfg=await readSpecialPlanConfig(c),q=await c.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]);if(!q.rows.length)throw Error('Usuario no encontrado');const u=q.rows[0],state=specialPlanState(u.special_plan_state);if(!cfg.visible)throw Error('El Plan Especial no está disponible');if(state.status!=='authorized')throw Error('Primero debes comunicarte con el gerente para autorizar tu compra');const amount=Number(cfg.amount);if(Number(u.balance||0)<amount)throw Error('Saldo insuficiente. Necesitas $'+amount.toFixed(2));const next={status:'active',authorized_at:state.authorized_at||null,purchased_at:new Date().toISOString(),checkins_completed:0,earned:0,last_checkin_date:null,payout_claimed:false,payout_gross:0,payout_commission:0,payout_net:0,completed_at:null};const d=Array.isArray(u.historial_detallado)?u.historial_detallado:[];d.push({tipo:'plan_especial_compra',concepto:'Compra de Plan Especial autorizada',monto:amount,fecha:new Date().toISOString(),estado:'completado'});const r=await c.query('UPDATE users SET balance=COALESCE(balance,0)-$1,special_plan_state=$2::jsonb,historial_detallado=$3::jsonb WHERE id=$4 RETURNING *',[amount,JSON.stringify(next),JSON.stringify(d),req.userId]);await c.query('COMMIT');res.json({message:'Plan Especial comprado correctamente',config:cfg,state:next,user:publicUserData(r.rows[0])});}catch(e){try{await c.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{c.release()}});
-app.get('/api/admin/special-plan/candidates', authenticate, isAdmin, async (req,res)=>{try{const cfg=await readSpecialPlanConfig(),q=await pool.query("SELECT d.id,d.user_id,d.amount,d.tx_hash,d.credited_at,u.nombre,u.apellido,u.telefono,u.plan,u.special_plan_state FROM polygon_deposits d JOIN users u ON u.id=d.user_id WHERE d.status='credited' AND d.special_plan_consumed_at IS NULL AND d.amount >= $1 ORDER BY d.credited_at DESC NULLS LAST,d.id DESC",[cfg.amount]);res.json({config:cfg,candidates:q.rows.map(x=>({deposit_id:x.id,user_id:x.user_id,amount:Number(x.amount||0),tx_hash:x.tx_hash,credited_at:x.credited_at,nombre:x.nombre,apellido:x.apellido,telefono:x.telefono,plan:x.plan,state:specialPlanState(x.special_plan_state)}))});}catch(e){res.status(500).json({error:'No se pudieron cargar los depósitos elegibles'})}});
-app.post('/api/admin/user/:id/special-plan/activate', authenticate, isAdmin, async (req,res)=>{const c=await pool.connect();try{await c.query('BEGIN');const cfg=await readSpecialPlanConfig(c),uq=await c.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.params.id]);if(!uq.rows.length)throw Error('Usuario no encontrado');const u=uq.rows[0],state=specialPlanState(u.special_plan_state);if(['active','ready','completed'].includes(state.status))throw Error('El usuario ya tiene un Plan Especial activo o utilizado');const params=[req.params.id,cfg.amount];let sql="SELECT id FROM polygon_deposits WHERE user_id=$1 AND status='credited' AND special_plan_consumed_at IS NULL AND amount >= $2";if(req.body&&req.body.deposit_id){sql+=' AND id=$3';params.push(Number(req.body.deposit_id))}sql+=' ORDER BY credited_at DESC NULLS LAST,id DESC LIMIT 1 FOR UPDATE';const dq=await c.query(sql,params);if(!dq.rows.length)throw Error('No existe un depósito acreditado elegible para este usuario');const next={status:'active',activated_at:new Date().toISOString(),checkins_completed:0,earned:0,last_checkin_date:null,payout_claimed:false,consumed_deposit_id:dq.rows[0].id,payout_gross:0,payout_commission:0,payout_net:0,completed_at:null};await c.query('UPDATE polygon_deposits SET special_plan_consumed_at=NOW(),updated_at=NOW() WHERE id=$1',[dq.rows[0].id]);const r=await c.query('UPDATE users SET special_plan_state=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(next),req.params.id]);await c.query('COMMIT');res.json({message:'Plan Especial activado manualmente',config:cfg,state:next,user:publicUserData(r.rows[0])});}catch(e){try{await c.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message})}finally{c.release()}});
-app.post('/api/user/special-plan/activate', authenticate, async (req,res) => { const c=await pool.connect(); try { throw Error('El Plan Especial debe ser activado manualmente por el administrador'); await c.query('BEGIN'); const cfg=await readSpecialPlanConfig(c); if(!cfg.visible) throw Error('El Plan Especial no está disponible'); const q=await c.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]); const u=q.rows[0], state=specialPlanState(u.special_plan_state); if(state.status==='active'||state.status==='ready'||state.status==='completed') throw Error('Ya tienes un Plan Especial activo o utilizado'); const d=await c.query("SELECT id FROM polygon_deposits WHERE user_id=$1 AND status='credited' AND special_plan_consumed_at IS NULL AND amount >= $2 ORDER BY credited_at DESC NULLS LAST,id DESC LIMIT 1 FOR UPDATE",[req.userId,cfg.amount]); if(!d.rows.length) throw Error('Necesitas un depósito externo acreditado de al menos $'+cfg.amount.toFixed(2)+' USDT0'); const next={status:'active',activated_at:new Date().toISOString(),checkins_completed:0,earned:0,last_checkin_date:null,payout_claimed:false,consumed_deposit_id:d.rows[0].id,payout_gross:0,payout_commission:0,payout_net:0,completed_at:null}; await c.query('UPDATE polygon_deposits SET special_plan_consumed_at=NOW(),updated_at=NOW() WHERE id=$1',[d.rows[0].id]); const u2=await c.query('UPDATE users SET special_plan_state=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(next),req.userId]); await c.query('COMMIT'); res.json({message:'Plan Especial activado',config:cfg,state:next,user:publicUserData(u2.rows[0])}); } catch(e) { try{await c.query('ROLLBACK')}catch(_){} res.status(400).json({error:e.message}); } finally{c.release();} });
-app.post('/api/user/special-plan/checkin', authenticate, async (req,res) => { const c=await pool.connect(); try { await c.query('BEGIN'); const cfg=await readSpecialPlanConfig(c), today=normalizarFechaLima(new Date()), day=obtenerDiaSemanaLima(), q=await c.query('SELECT * FROM users WHERE id=$1 FOR UPDATE',[req.userId]), u=q.rows[0], state=specialPlanState(u.special_plan_state); if(!cfg.visible) throw Error('El Plan Especial no está disponible'); if(!cfg.weekdays.includes(day)) throw Error('El check-in solo está disponible en días hábiles'); if(u.produccion_pausada||u.cuenta_habilitada===false) throw Error('Tu cuenta está pausada; no puedes hacer check-in'); if(state.status!=='active') throw Error(state.status==='ready'?'El plan ya está listo para cobrar':'Primero activa el Plan Especial'); if(state.last_checkin_date===today) throw Error('El check-in de hoy ya fue realizado'); state.checkins_completed=Math.min(cfg.days,state.checkins_completed+1); state.earned=Number((state.earned+cfg.daily).toFixed(2)); state.last_checkin_date=today; if(state.checkins_completed>=cfg.days){state.status='ready';state.completed_at=new Date().toISOString();} const u2=await c.query('UPDATE users SET special_plan_state=$1::jsonb WHERE id=$2 RETURNING *',[JSON.stringify(state),req.userId]); await c.query('COMMIT'); res.json({message:'Check-in registrado',config:cfg,state,user:publicUserData(u2.rows[0])}); } catch(e){try{await c.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message});}finally{c.release();} });
-app.post('/api/user/special-plan/claim', authenticate, async (req,res) => { const c=await pool.connect(); try { await c.query('BEGIN'); const cfg=await readSpecialPlanConfig(c), q=await c.query('SELECT * FROM users WHERE id=$1 FOR UPDATE'), u=q.rows[0], state=specialPlanState(u.special_plan_state); if(state.status!=='ready'||state.payout_claimed) throw Error('El Plan Especial aún no está listo para cobrar'); const g=await c.query('SELECT comision_retiro_porcentaje FROM configuracion WHERE id=1'), globalFee=Number(g.rows[0]?.comision_retiro_porcentaje??23), own=Number(u.comision_retiro_porcentaje), fee=Number.isFinite(own)&&own>=0&&own<=100?own:globalFee, gross=cfg.payout, commission=Number((gross*fee/100).toFixed(2)), net=Number((gross-commission).toFixed(2)), now=new Date().toISOString(), detail=Array.isArray(u.historial_detallado)?u.historial_detallado:[]; detail.push({tipo:'plan_especial',concepto:'Cobro Plan Especial completado',monto:net,monto_bruto:gross,comision:commission,comision_porcentaje:fee,fecha:now,estado:'aprobado'}); state.status='completed';state.payout_claimed=true;state.payout_gross=gross;state.payout_commission=commission;state.payout_net=net; const week=inicioSemanaLima(new Date()), u2=await c.query('UPDATE users SET balance=COALESCE(balance,0)+$1,total_ganado=COALESCE(total_ganado,0)+$1,ganado_semanal=CASE WHEN ganado_semanal_inicio=$2::date THEN COALESCE(ganado_semanal,0)+$1 ELSE $1 END,ganado_semanal_inicio=$2::date,special_plan_state=$3::jsonb,historial_detallado=$4::jsonb WHERE id=$5 RETURNING *',[net,week,JSON.stringify(state),JSON.stringify(detail),req.userId]); await c.query('COMMIT'); res.json({message:'Cobro del Plan Especial acreditado',config:cfg,state,bruto:gross,comision:commission,neto:net,user:publicUserData(u2.rows[0])}); } catch(e){try{await c.query('ROLLBACK')}catch(_){}res.status(400).json({error:e.message});}finally{c.release();} });
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor corriendo en puerto ${port}`);
