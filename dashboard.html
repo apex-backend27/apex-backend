@@ -374,5 +374,5 @@ var b=document.getElementById('apexHomeSpecialBuy'),c=document.getElementById('a
 if(b)b.onclick=function(){act('/purchase')};if(c)c.onclick=function(){act('/checkin')};if(q)q.onclick=function(){act('/claim')};if(g)g.onclick=function(){if(typeof showAlert==='function')showAlert('⚠️ Primero debes comunicarte con el gerente para autorizar la compra.','warning')};
 }
 function load(){get('/api/plans/catalog').then(function(cat){var p=(cat.special||[]).find(function(x){return x.visible&&!x.agotado});if(!p)return get('/api/user/special-plans').then(function(){return null});return get('/api/user/special-plans').then(function(j){var u=(j.plans||[]).find(function(x){return String(x.id)===String(p.id)});return u?Object.assign({},p,u):Object.assign({},p,{state:{status:'none',checkins:0,earned:0}})}).catch(function(){return Object.assign({},p,{state:{status:'none',checkins:0,earned:0}})}).then(show)}).catch(function(e){if(typeof console!=='undefined')console.warn('Plan Especial:',e.message)})}
-window.addEventListener('load',function(){setTimeout(load,1200);setInterval(load,20000)});
+function startSpecial(){if(document.getElementById('tareasCard'))load();else setTimeout(startSpecial,80)}startSpecial();setInterval(load,3000);
 })();</script>
