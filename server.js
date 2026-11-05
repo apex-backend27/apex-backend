@@ -1231,7 +1231,7 @@ app.delete('/api/admin/loans/:loanId', authenticate, isAdmin, async (req,res)=>{
 });
 app.get('/api/user/loans', authenticate, async (req,res)=>{try{await ensureApexLoansSchema();res.json(await apexUserLoans(req.userId));}catch(e){console.error('Apex user loans:',e);res.status(500).json({error:'No se pudo cargar tus préstamos'});}});
 
-app.get('/api/user/:id', authenticate, async (req, res) => {
+app.get('/api/user/:id(\\d+)', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
     if (!/^\d+$/.test(String(id))) {
