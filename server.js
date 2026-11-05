@@ -2930,6 +2930,15 @@ app.post('/api/user/plan/purchase', authenticate, async (req, res) => {
         await client.query('BEGIN');
         const current = await client.query('SELECT * FROM users WHERE id = $1 FOR UPDATE', [req.userId]);
         const u = current.rows[0];
+        const currentPlanName = normalizarPlan(u.plan);
+        const targetPlanName = normalizarPlan(req.body.plan);
+        const planRanks = {'Sin plan':0, 'Temporal':1, 'Trader':2, 'Analista':3, 'Gestor':4, 'Master':5, 'Elite':6};
+        const currentRank = Number(planRanks[currentPlanName] || 0);
+        const targetRank = Number(planRanks[targetPlanName] || 0);
+        if (currentRank > 0 && targetRank === currentRank + 1 && Number(u.nivel_autorizado || 0) < targetRank) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ error: 'Necesitas autorización del administrador para subir a ' + targetPlanName });
+        }
         const balance = Number(u.balance || 0);
         if (balance < plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Saldo insuficiente' }); }
         if (u.plan && u.plan !== 'Sin plan' && Number(u.plan_amount || 0) >= plan.amount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Ya tienes este plan o uno superior' }); }
